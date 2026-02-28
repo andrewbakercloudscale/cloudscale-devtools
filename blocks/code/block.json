@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "cloudscale/code-block",
+    "version": "1.7.0",
+    "title": "CloudScale Code Block",
+    "category": "formatting",
+    "icon": "editor-code",
+    "description": "Syntax highlighted code block with auto language detection, clipboard copy, and dark/light mode toggle.",
+    "keywords": [ "code", "syntax", "highlight", "cloudscale", "developer", "programming" ],
+    "supports": {
+        "html": false,
+        "multiple": true,
+        "className": true,
+        "align": [ "wide", "full" ]
+    },
+    "attributes": {
+        "content": {
+            "type": "string",
+            "default": ""
+        },
+        "language": {
+            "type": "string",
+            "default": ""
+        },
+        "title": {
+            "type": "string",
+            "default": ""
+        },
+        "theme": {
+            "type": "string",
+            "default": ""
+        }
+    },
+    "textdomain": "cs-code-block",
+    "editorStyle": "cs-code-block-editor",
+    "style": "cs-code-block-frontend",
+    "viewScript": "cs-code-block-frontend"
+}
