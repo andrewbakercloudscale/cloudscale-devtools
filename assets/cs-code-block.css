@@ -1,5 +1,5 @@
 /**
- * CloudScale Code Block — Frontend Styles v1.7.0
+ * CloudScale Code Block — Frontend Styles v1.7.5
  *
  * Uses CSS custom properties (--cs-bg, --cs-toolbar-bg, etc.) set by the
  * frontend JS from csCodeConfig, so any highlight.js theme pair works.
@@ -10,7 +10,7 @@
     --cs-bg: #282c34;
     --cs-toolbar-bg: #21252b;
     --cs-toolbar-border: rgba(255,255,255,0.08);
-    --cs-text-muted: #7c8493;
+    --cs-text-muted: rgba(255,255,255,0.80);
     --cs-text-title: #9da5b4;
     --cs-hover-bg: rgba(255,255,255,0.08);
     --cs-hover-color: #abb2bf;
@@ -38,7 +38,7 @@
 /* Light mode overrides applied by JS via data-active-theme="light" */
 .cs-code-wrapper[data-active-theme="light"] {
     --cs-toolbar-border: rgba(0,0,0,0.1);
-    --cs-text-muted: #7c8493;
+    --cs-text-muted: rgba(0,0,0,0.70);
     --cs-text-title: #5c6370;
     --cs-hover-bg: rgba(0,0,0,0.08);
     --cs-hover-color: #383a42;
@@ -59,6 +59,28 @@
     user-select: none;
     background: var(--cs-toolbar-bg);
     border-bottom: 1px solid var(--cs-toolbar-border);
+}
+
+/* 3. BRAND LINK */
+.cs-code-brand {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-decoration: none;
+    flex-shrink: 0;
+    color: #61afef;
+    opacity: 0.85;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.cs-code-brand:hover {
+    opacity: 1;
+    color: #0fb8e0;
+}
+
+.cs-brand-bolt {
+    font-style: normal;
 }
 
 /* 3. TITLE */

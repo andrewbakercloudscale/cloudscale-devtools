@@ -1,5 +1,5 @@
 /**
- * CloudScale Code Block — Frontend Script v1.7.0
+ * CloudScale Code Block — Frontend Script v1.7.5
  *
  * Reads theme colours from csCodeConfig (set by PHP) and applies them
  * via CSS custom properties so any highlight.js theme pair works.
@@ -184,7 +184,8 @@
         if ( match ) detectedLang = match[1];
 
         var badge = wrapper.querySelector( '.cs-code-lang-badge' );
-        if ( badge && detectedLang ) {
+        var skipBadge = [ 'undefined', 'plaintext', 'text' ];
+        if ( badge && detectedLang && skipBadge.indexOf( detectedLang.toLowerCase() ) === -1 ) {
             badge.textContent = langNames[ detectedLang.toLowerCase() ] || detectedLang;
         }
 

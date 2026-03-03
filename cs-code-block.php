@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://andrewbaker.ninja
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.4
+ * Version: 1.7.6
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL v2 or later
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CloudScale_Code_Block {
 
-    const VERSION      = '1.7.4';
+    const VERSION      = '1.7.6';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
@@ -214,14 +214,14 @@ class CloudScale_Code_Block {
             'cs-code-block-frontend',
             plugins_url( 'assets/cs-code-block.css', __FILE__ ),
             [ 'hljs-theme-dark', 'hljs-theme-light' ],
-            self::VERSION
+            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block.css' )
         );
 
         wp_register_script(
             'cs-code-block-frontend',
             plugins_url( 'assets/cs-code-block.js', __FILE__ ),
             [ 'hljs-core' ],
-            self::VERSION,
+            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block.js' ),
             true
         );
 
@@ -284,6 +284,8 @@ class CloudScale_Code_Block {
         $lang_class = $lang ? 'language-' . esc_attr( $lang ) : '';
         $theme_attr = $theme ? ' data-theme="' . esc_attr( $theme ) . '"' : '';
 
+        $cloudscale_link = '<a class="cs-code-brand" href="https://andrewbaker.ninja/2026/02/27/building-a-better-code-block-for-wordpress-cloudscale-code-block-plugin/" target="_blank" rel="noopener noreferrer"><span class="cs-brand-bolt">&#9889;</span> Powered by CloudScale</a>';
+
         $title_html = '';
         if ( $title ) {
             $title_html = '<div class="cs-code-title">' . esc_html( $title ) . '</div>';
@@ -293,6 +295,7 @@ class CloudScale_Code_Block {
         ?>
         <div class="cs-code-wrapper" id="<?php echo esc_attr( $id ); ?>"<?php echo $theme_attr; ?>>
             <div class="cs-code-toolbar">
+                <?php echo $cloudscale_link; ?>
                 <?php echo $title_html; ?>
                 <div class="cs-code-actions">
                     <span class="cs-code-lang-badge"></span>
