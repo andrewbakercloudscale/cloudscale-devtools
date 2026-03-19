@@ -6,7 +6,10 @@
  * Version: 1.7.18
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
- * License: GPL v2 or later
+ * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Requires at least: 6.0
+ * Requires PHP: 7.4
  * Text Domain: cs-code-block
  *
  * @package CloudScale_Code_Block
@@ -32,6 +35,7 @@ class CloudScale_Code_Block {
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
+    const MIGRATE_NONCE = 'cs_code_migrate_action';
 
     /**
      * Returns the theme registry mapping slugs to CDN filenames and colour values.
@@ -1010,12 +1014,10 @@ class CloudScale_Code_Block {
 
         wp_send_json_success( [ 'theme' => $theme, 'theme_pair' => $pair ] );
     }
-
     /* ==================================================================
        7. MIGRATION TOOL
-       ================================================================== */
 
-    const MIGRATE_NONCE = 'cs_code_migrate_action';
+       ================================================================== */
 
     /* ==================================================================
        7a. Migration: Block conversion logic
@@ -1233,10 +1235,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_scan() {
-        check_ajax_referer( self::MIGRATE_NONCE, 'nonce' );
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
+        }
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Insufficient permissions.' );
+            wp_send_json_error( 'Forbidden', 403 );
         }
 
         global $wpdb;
@@ -1287,10 +1291,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_preview() {
-        check_ajax_referer( self::MIGRATE_NONCE, 'nonce' );
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
+        }
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Insufficient permissions.' );
+            wp_send_json_error( 'Forbidden', 403 );
         }
 
         $post_id = (int) ( $_POST['post_id'] ?? 0 );
@@ -1317,10 +1323,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_migrate_single() {
-        check_ajax_referer( self::MIGRATE_NONCE, 'nonce' );
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
+        }
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Insufficient permissions.' );
+            wp_send_json_error( 'Forbidden', 403 );
         }
 
         $post_id = (int) ( $_POST['post_id'] ?? 0 );
@@ -1361,10 +1369,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_migrate_all() {
-        check_ajax_referer( self::MIGRATE_NONCE, 'nonce' );
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
+        }
 
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Insufficient permissions.' );
+            wp_send_json_error( 'Forbidden', 403 );
         }
 
         global $wpdb;

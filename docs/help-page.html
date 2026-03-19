@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>CloudScale Code Block — Help</title></head><body>
+<!-- wp:html -->
+<style>
+.cs-help-docs{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1a202c;line-height:1.7;max-width:900px;}
+.cs-help-docs a{color:#2563eb;}
+.cs-help-docs code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px;font-size:.88em;}
+.cs-hero{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0e6b8f 100%);color:#fff;border-radius:12px;padding:48px 40px;margin-bottom:40px;}
+.cs-hero h1{font-size:2.2em;font-weight:800;margin:0 0 12px;letter-spacing:-.02em;color:#fff;}
+.cs-hero p{font-size:1.1em;margin:0;opacity:.85;max-width:680px;}
+.cs-hero .cs-badge{display:inline-block;background:rgba(255,255,255,.15);border-radius:20px;padding:4px 14px;font-size:.8em;font-weight:600;margin-bottom:16px;letter-spacing:.05em;text-transform:uppercase;}
+.cs-toc{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:28px 36px;margin:32px 0;}
+.cs-toc-title{font-size:1em;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:0 0 16px;}
+.cs-toc ol{display:grid;grid-template-columns:1fr 1fr;gap:6px 32px;margin:0;padding-left:24px;}
+.cs-toc li a{color:#2563eb;text-decoration:none;font-weight:500;font-size:.97em;}
+.cs-tab-section{margin:56px 0 0;}
+.cs-tab-heading{font-size:2em;font-weight:800;color:#0f172a;padding:0 0 16px;border-bottom:3px solid #0e6b8f;margin:0 0 8px;}
+.cs-tab-intro{color:#475569;font-size:1.05em;margin:10px 0 32px;}
+.cs-panel-section{margin:36px 0 0;}
+.cs-panel-heading{font-size:1.45em;font-weight:700;color:#1e293b;margin:0 0 16px;padding:0 0 10px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px;}
+.cs-panel-heading::before{content:"";display:inline-block;width:4px;height:1.2em;background:#0e6b8f;border-radius:2px;flex-shrink:0;}
+.cs-screenshot{margin:20px 0 24px;}
+.cs-screenshot img{max-width:100%;border-radius:8px;border:1px solid #d1d5db;box-shadow:0 4px 20px rgba(0,0,0,.10);display:block;}
+.cs-panel-body{color:#334155;}
+.cs-panel-body p{margin:0 0 12px;}
+.cs-panel-body ul,.cs-panel-body ol{padding-left:22px;margin:8px 0 16px;}
+.cs-panel-body li{margin:6px 0;}
+.cs-panel-body strong{color:#1e293b;}
+.cs-divider{border:none;border-top:1px solid #e2e8f0;margin:40px 0;}
+</style>
+<div class="cs-help-docs" style="max-width:900px;margin:0 auto;">
+<div class="cs-hero">
+<div class="cs-badge">Free &amp; Open Source</div>
+<h1>CloudScale Code Block</h1>
+<p>Syntax highlighted code blocks with auto language detection, clipboard copy, dark/light mode toggle, a code block migrator from other plugins, and a read-only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.</p>
+</div>
+
+<div class="cs-toc">
+<div class="cs-toc-title">Contents</div>
+<ol><li><a href="#code-block">Code Block Overview</a></li>
+<li><a href="#sql-tool">SQL Query Tool</a></li>
+<li><a href="#migrator">Code Block Migrator</a></li></ol>
+</div>
+
+<hr class="cs-divider"/>
+
+
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="code-block">Code Block Overview</h3>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/03/panel-code-block-1.jpg" alt="Code Block Overview" /></figure>
+<div class="cs-panel-body">
+<p>The <strong>CloudScale Code Block</strong> is a Gutenberg block and shortcode for displaying syntax-highlighted code in your posts and pages.</p>
+<ul>
+<li><strong>Auto language detection</strong> — the plugin detects the programming language from the code content and applies appropriate syntax highlighting automatically.</li>
+<li><strong>Manual language selection</strong> — override the auto-detected language from the block toolbar dropdown.</li>
+<li><strong>Copy to clipboard</strong> — a copy button appears on hover, letting readers copy the full code snippet with one click.</li>
+<li><strong>Dark / Light mode toggle</strong> — readers can switch the code block theme between dark and light to match their preference. The setting is remembered via localStorage.</li>
+<li><strong>Line numbers</strong> — optionally display line numbers alongside the code.</li>
+<li><strong>Shortcode usage:</strong> <code>[cs_code lang="php"]your code here[/cs_code]</code></li>
+</ul></div>
+</div>
+<hr class="cs-divider"/>
+
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="sql-tool">SQL Query Tool</h3>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/03/panel-sql-tool-1.jpg" alt="SQL Query Tool" /></figure>
+<div class="cs-panel-body">
+<p>The <strong>SQL Query Tool</strong> lets you run read-only SQL SELECT queries against your WordPress database directly from the admin — without needing phpMyAdmin or SSH access.</p>
+<ul>
+<li>Only <code>SELECT</code> statements are allowed — the tool blocks any query that could modify data (<code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>DROP</code>, etc.).</li>
+<li>Results are displayed in a formatted table with column headers.</li>
+<li>Row count and query execution time are shown below the results.</li>
+<li>Useful for quick data lookups, verifying plugin data, and debugging without leaving WordPress admin.</li>
+</ul>
+<p><strong>Note:</strong> this tool is only accessible to WordPress administrators.</p></div>
+</div>
+<hr class="cs-divider"/>
+
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="migrator">Code Block Migrator</h3>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/03/panel-migrator-1.jpg" alt="Code Block Migrator" /></figure>
+<div class="cs-panel-body">
+<p>The <strong>Code Block Migrator</strong> converts code blocks from other WordPress plugins (such as Crayon Syntax Highlighter, SyntaxHighlighter Evolved, and others) to CloudScale Code Blocks in one operation.</p>
+<ul>
+<li><strong>Scan</strong> — finds all posts and pages containing shortcodes or HTML from supported legacy plugins.</li>
+<li><strong>Preview</strong> — shows what will be converted before making any changes.</li>
+<li><strong>Convert</strong> — replaces the old shortcodes/HTML with <code>[cs_code]</code> shortcodes, preserving the code content and language attribute where possible.</li>
+</ul>
+<p>Always take a backup before running the migrator.</p></div>
+</div>
+<hr class="cs-divider"/>
+</div>
+<!-- /wp:html -->
+</body></html>
