@@ -960,6 +960,13 @@
             togglePanel();
         });
         toggleBtn.addEventListener('click', function (e) { e.stopPropagation(); togglePanel(); });
+        // iOS Safari fallback: touchend fires reliably even when parent has
+        // overflow/fixed positioning quirks that can swallow click events.
+        toggleBtn.addEventListener('touchend', function (e) {
+            e.preventDefault(); // prevent the follow-up click from double-toggling
+            e.stopPropagation();
+            togglePanel();
+        });
         if (exportBtn) exportBtn.addEventListener('click', function (e) { e.stopPropagation(); exportJSON(); });
 
         var helpBtn   = document.getElementById('cs-perf-help-btn');

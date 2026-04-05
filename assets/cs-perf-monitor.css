@@ -18,13 +18,22 @@
     box-shadow: 0 -4px 24px rgba(0,0,0,.6);
     display: flex;
     flex-direction: column;
-    transition: height .2s ease;
-    /* Default (collapsed): only header visible */
-    height: 48px;
-    overflow: hidden;
+    /* No overflow:hidden here — iOS Safari suppresses child touch events on
+       position:fixed elements that have overflow:hidden. Collapse is handled
+       by hiding #cs-perf-body instead. */
 }
+/* Collapsed: only the 48px header is visible */
+#cs-perf.cs-perf-collapsed {
+    height: 48px;
+}
+#cs-perf.cs-perf-collapsed #cs-perf-body {
+    display: none;
+}
+/* Open: body visible, height set by JS */
 #cs-perf.cs-perf-open {
     height: 320px; /* overridden by JS from localStorage */
+    overflow: hidden; /* clip body content when open */
+    transition: height .2s ease;
 }
 
 /* ── Resize handle ───────────────────────────────────────────────────────── */
@@ -83,6 +92,9 @@
     min-height: 34px;
     position: relative;
     z-index: 2;
+    /* Force GPU layer — fixes iOS Safari touch suppression on fixed containers */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 .cs-perf-monitor-btn:hover { background: #3c3c3c; border-color: #007acc; }
 .cs-perf-logo {
