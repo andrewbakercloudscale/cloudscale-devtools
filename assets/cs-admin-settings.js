@@ -39,7 +39,10 @@
                         savedMsg.classList.remove( 'visible' );
                     }, 2000 );
                     var perfPanel = document.getElementById( 'cs-perf' );
-                    if ( perfPanel ) {
+                    if ( resp.data.perf_enabled === '1' && ! perfPanel ) {
+                        // Panel wasn't rendered (was disabled) — reload to inject it
+                        window.location.reload();
+                    } else if ( perfPanel ) {
                         perfPanel.style.display = resp.data.perf_enabled === '1' ? '' : 'none';
                     }
                 }
