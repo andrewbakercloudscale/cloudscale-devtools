@@ -88,6 +88,11 @@
 
         if (!panel) return;
 
+        // Move the help panel to document.body so it's outside the fixed panel
+        // hierarchy — avoids iOS Safari touch-blocking and overflow:hidden clipping.
+        var helpPanel = document.getElementById('cs-perf-help');
+        if (helpPanel) document.body.appendChild(helpPanel);
+
         computeN1Patterns();
         populatePluginFilter();
         populateAssetPluginFilter();

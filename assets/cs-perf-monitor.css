@@ -46,7 +46,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: nowrap;
     height: 48px;
+    min-height: 48px;
     padding: 0 10px;
     background: #252526;
     flex-shrink: 0;
@@ -54,6 +56,7 @@
     user-select: none;
     -webkit-user-select: none;
     gap: 8px;
+    overflow: hidden;
 }
 .cs-perf-hl,
 .cs-perf-hr {
@@ -139,15 +142,15 @@
     left: 10px;
     width: auto;
     max-width: 520px;
-    max-height: calc(100dvh - 80px);
+    max-height: calc(100svh - 80px);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background: #252526;
     border: 1px solid #007acc;
     border-radius: 8px;
     padding: 16px;
-    z-index: 100000;
+    z-index: 999999;
     box-shadow: 0 -6px 32px rgba(0,0,0,.7);
-    /* Align to right on wide screens, full-width on narrow */
     margin-left: auto;
 }
 .cs-perf-help-close {
@@ -1142,8 +1145,12 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
 
 /* ── Mobile / narrow viewport ────────────────────────────────────────────── */
 @media (max-width: 600px) {
-    /* Header: hide total time text to save space */
+    /* Header: hide total time text and button label to save space */
     .cs-perf-total { display: none; }
+    .cs-perf-name  { display: none; }
+
+    /* Tighten up the toggle button on mobile */
+    .cs-perf-monitor-btn { padding: 6px 8px; gap: 4px; }
 
     /* DB table: hide Plugin & Rows columns, keep Query + Time */
     .cs-ptable th.c-p,
