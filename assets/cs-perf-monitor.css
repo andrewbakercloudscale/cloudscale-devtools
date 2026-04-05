@@ -6,6 +6,9 @@
 #cs-perf {
     position: fixed;
     bottom: 0;
+    /* On mobile browsers the toolbar overlaps bottom:0 fixed elements.
+       calc(100vh - 100svh) = toolbar height; svh = small viewport (toolbar always shown). */
+    bottom: calc(100vh - 100svh);
     left: 0;
     right: 0;
     z-index: 99999;
