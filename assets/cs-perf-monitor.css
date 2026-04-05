@@ -56,7 +56,6 @@
     user-select: none;
     -webkit-user-select: none;
     gap: 8px;
-    overflow: hidden;
 }
 .cs-perf-hl,
 .cs-perf-hr {
@@ -77,9 +76,13 @@
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
     transition: background .15s, border-color .15s;
     flex-shrink: 0;
     min-height: 34px;
+    position: relative;
+    z-index: 2;
 }
 .cs-perf-monitor-btn:hover { background: #3c3c3c; border-color: #007acc; }
 .cs-perf-logo {
