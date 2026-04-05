@@ -7,10 +7,11 @@
 ( function() {
     'use strict';
 
-    var saveBtn  = document.getElementById( 'cs-settings-save' );
-    var selPair  = document.getElementById( 'cs-settings-pair' );
-    var selTheme = document.getElementById( 'cs-settings-theme' );
-    var savedMsg = document.getElementById( 'cs-settings-saved' );
+    var saveBtn   = document.getElementById( 'cs-settings-save' );
+    var selPair   = document.getElementById( 'cs-settings-pair' );
+    var selTheme  = document.getElementById( 'cs-settings-theme' );
+    var savedMsg  = document.getElementById( 'cs-settings-saved' );
+    var chkPerf   = document.getElementById( 'cs-settings-perf-enabled' );
 
     if ( ! saveBtn ) {
         return;
@@ -25,6 +26,7 @@
         fd.append( 'nonce',      csAdminSettings.nonce );
         fd.append( 'theme',      selTheme.value );
         fd.append( 'theme_pair', selPair.value );
+        fd.append( 'cs_perf_monitor_enabled', chkPerf && chkPerf.checked ? '1' : '0' );
 
         fetch( ajaxurl, { method: 'POST', body: fd } )
             .then( function( r ) { return r.json(); } )

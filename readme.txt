@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.7.47
+Stable tag: 1.7.49
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.7.49 =
+* Added: Code Block Settings now includes a checkbox to show/hide the CS Monitor performance panel
 
 = 1.7.47 =
 * Added: CS Monitor — Assets tab showing all enqueued JS and CSS files with plugin attribution, type filter, and search

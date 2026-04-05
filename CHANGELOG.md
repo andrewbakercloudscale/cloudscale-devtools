@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.7.48] - 2026-04-05
+
+### Added
+- Code Block Settings: checkbox to show/hide the CS Monitor performance panel (saved via AJAX alongside theme settings; hides the panel for all users when unchecked)
+
 ## [1.7.36] - 2026-04-05
 
 ### Added

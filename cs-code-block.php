@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://andrewbaker.ninja
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.47
+ * Version: 1.7.49
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -621,6 +621,14 @@ class CloudScale_Code_Block {
             },
             'default' => 'atom-one',
         ] );
+
+        register_setting( 'cs_code_settings', 'cs_perf_monitor_enabled', [
+            'type'              => 'string',
+            'sanitize_callback' => function ( $val ) {
+                return '0' === $val ? '0' : '1';
+            },
+            'default' => '1',
+        ] );
     }
 
     /* ==================================================================
@@ -771,9 +779,10 @@ class CloudScale_Code_Block {
      * @return void
      */
     private static function render_settings_panel() {
-        $theme     = get_option( 'cs_code_default_theme', 'dark' );
-        $pair_slug = get_option( 'cs_code_theme_pair', 'atom-one' );
-        $registry  = self::get_theme_registry();
+        $theme       = get_option( 'cs_code_default_theme', 'dark' );
+        $pair_slug   = get_option( 'cs_code_theme_pair', 'atom-one' );
+        $perf_on     = get_option( 'cs_perf_monitor_enabled', '1' ) !== '0';
+        $registry    = self::get_theme_registry();
         ?>
         <div class="cs-panel">
             <div class="cs-section-header cs-section-header-teal">
@@ -800,6 +809,14 @@ class CloudScale_Code_Block {
                         </select>
                         <span class="cs-hint"><?php esc_html_e( 'Visitors can still toggle per block.', 'cloudscale-code-block' ); ?></span>
                     </div>
+                </div>
+                <div class="cs-field" style="margin-top:14px">
+                    <label class="cs-label"><?php esc_html_e( 'CS Monitor panel:', 'cloudscale-code-block' ); ?></label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="cs-settings-perf-enabled" name="cs_perf_monitor_enabled" value="1" <?php checked( $perf_on ); ?>>
+                        <span style="font-size:13px;color:#555"><?php esc_html_e( 'Show the ⚡ CS Monitor performance panel', 'cloudscale-code-block' ); ?></span>
+                    </label>
+                    <span class="cs-hint"><?php esc_html_e( 'Visible to admins only. Uncheck to hide the panel on all pages.', 'cloudscale-code-block' ); ?></span>
                 </div>
                 <div style="margin-top:14px;display:flex;align-items:center;gap:10px">
                     <button type="button" class="cs-btn-primary" id="cs-settings-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-code-block' ); ?></button>
@@ -1091,7 +1108,10 @@ class CloudScale_Code_Block {
         }
         update_option( 'cs_code_theme_pair', $pair );
 
-        wp_send_json_success( [ 'theme' => $theme, 'theme_pair' => $pair ] );
+        $perf_enabled = isset( $_POST['cs_perf_monitor_enabled'] ) && '1' === $_POST['cs_perf_monitor_enabled'] ? '1' : '0'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        update_option( 'cs_perf_monitor_enabled', $perf_enabled );
+
+        wp_send_json_success( [ 'theme' => $theme, 'theme_pair' => $pair, 'perf_enabled' => $perf_enabled ] );
     }
     /* ==================================================================
        7. MIGRATION TOOL
@@ -1896,6 +1916,9 @@ class CloudScale_Code_Block {
      */
     public static function perf_output_panel() {
         if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( get_option( 'cs_perf_monitor_enabled', '1' ) === '0' ) {
             return;
         }
 
