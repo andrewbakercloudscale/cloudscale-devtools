@@ -323,7 +323,6 @@
                     + '<span class="cs-time-val cs-tv-' + cls + '">' + fmtMs(h.total_ms) + '</span>'
                     + '</div></td>'
                 + '<td class="c-hm cs-tv-' + speedClass(h.max_ms) + '">' + fmtMs(h.max_ms) + '</td>'
-                + '<td class="c-ha" style="color:#888">' + fmtMs(h.avg_ms) + '</td>'
                 + '</tr>';
         });
         hooksTbody.innerHTML = html;

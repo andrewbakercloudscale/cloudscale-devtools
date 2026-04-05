@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://andrewbaker.ninja
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.45
+ * Version: 1.7.46
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) ) {
  */
 class CloudScale_Code_Block {
 
-    const VERSION      = '1.7.45';
+    const VERSION      = '1.7.46';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
@@ -2510,11 +2510,10 @@ class CloudScale_Code_Block {
                     . '</div>'
                     . '<div class="cs-tbl-wrap">'
                         . '<table class="cs-ptable"><thead><tr>'
-                            . '<th class="c-hk cs-sortable cs-sort-hk-active" data-sort="total_ms">Hook&nbsp;&#8595;</th>'
+                            . '<th class="c-hk">Hook</th>'
                             . '<th class="c-hc cs-sortable" data-sort="count">Count&nbsp;&#8597;</th>'
                             . '<th class="c-ht cs-sortable cs-sort-hk-time" data-sort="total_ms">Total&nbsp;&#8597;</th>'
                             . '<th class="c-hm cs-sortable" data-sort="max_ms">Max&nbsp;&#8597;</th>'
-                            . '<th class="c-ha">Avg</th>'
                         . '</tr></thead><tbody id="cs-hooks-rows"></tbody></table>'
                     . '</div>'
                 . '</div>'
