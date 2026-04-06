@@ -171,8 +171,11 @@
 
     // Push the WP content area up so nothing is hidden under the fixed panel.
     function setPadding(px) {
-        var target = document.getElementById('wpcontent') || document.body;
-        target.style.paddingBottom = px + 'px';
+        // Target body — WP admin scrolls at the window/body level.
+        // Also patch #wpbody-content which may clip on some themes.
+        document.body.style.paddingBottom = px + 'px';
+        var wpbody = document.getElementById('wpbody-content');
+        if (wpbody) wpbody.style.paddingBottom = px + 'px';
     }
 
     function openPanel(h, animate) {
