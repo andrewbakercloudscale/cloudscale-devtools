@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.44
+ * Version: 1.8.56
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.44';
+    const VERSION      = '1.8.56';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -225,7 +225,8 @@ class CloudScale_DevTools {
         add_action( 'enqueue_block_editor_assets', [ __CLASS__, 'enqueue_convert_script' ] );
         add_action( 'admin_menu', [ __CLASS__, 'add_tools_page' ] );
         add_action( 'admin_init', [ __CLASS__, 'register_settings' ] );
-        add_action( 'admin_init', [ __CLASS__, 'redirect_legacy_slug' ] );
+        add_action( 'admin_init',       [ __CLASS__, 'redirect_legacy_slug' ] );
+        add_action( 'init', [ __CLASS__, 'redirect_legacy_help_url' ], 1 );
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin_assets' ] );
 
         // Migration AJAX
@@ -712,9 +713,24 @@ class CloudScale_DevTools {
     /**
      * Redirects legacy ?page=cloudscale-code-sql URLs to the new slug.
      *
-     * @since  1.8.44
+     * @since  1.8.56
      * @return void
      */
+    /**
+     * Redirects the old help page URL to the current one.
+     *
+     * @since  1.8.56
+     * @return void
+     */
+    public static function redirect_legacy_help_url() {
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+        if ( strpos( $uri, 'code-block-help' ) !== false ) {
+            wp_redirect( home_url( '/wordpress-plugin-help/cloudscale-devtools-help/' ), 301 );
+            exit;
+        }
+    }
+
     public static function redirect_legacy_slug() {
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if ( isset( $_GET['page'] ) && $_GET['page'] === 'cloudscale-code-sql' ) {
@@ -852,7 +868,7 @@ class CloudScale_DevTools {
                 <div id="cs-banner-right">
                     <span class="cs-badge cs-badge-green">✅ <?php esc_html_e( 'Totally Free', 'cloudscale-devtools' ); ?></span>
                     <a href="https://andrewbaker.ninja" target="_blank" rel="noopener noreferrer" class="cs-badge cs-badge-orange" style="text-decoration:none">andrewbaker.ninja</a>
-                    <a href="https://andrewbaker.ninja/wordpress-plugin-help/code-block-help/" target="_blank" rel="noopener noreferrer" class="cs-badge cs-badge-help" style="text-decoration:none">❓ <?php esc_html_e( 'Help', 'cloudscale-devtools' ); ?></a>
+                    <a href="https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-devtools-help/" target="_blank" rel="noopener noreferrer" class="cs-badge cs-badge-help" style="text-decoration:none">❓ <?php esc_html_e( 'Help', 'cloudscale-devtools' ); ?></a>
                 </div>
             </div>
 
