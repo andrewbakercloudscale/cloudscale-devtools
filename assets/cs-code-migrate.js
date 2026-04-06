@@ -25,19 +25,23 @@
     function ajax(action, data, callback) {
         var fd = new FormData();
         fd.append('action', action);
-        fd.append('nonce', csMigrate.nonce);
+        fd.append('nonce', csDevtoolsMigrate.nonce);
         if (data) {
             Object.keys(data).forEach(function (k) {
                 fd.append(k, data[k]);
             });
         }
-        fetch(csMigrate.ajaxUrl, { method: 'POST', body: fd })
+        fetch(csDevtoolsMigrate.ajaxUrl, { method: 'POST', body: fd })
             .then(function (r) { return r.json(); })
             .then(function (resp) {
-                if (resp.success) {
+                if (resp && resp.success) {
                     callback(null, resp.data);
+                } else if (resp && resp.data) {
+                    callback(resp.data);
+                } else if (resp === -1 || resp === 0) {
+                    callback('Session expired — please reload the page and try again.');
                 } else {
-                    callback(resp.data || 'Unknown error');
+                    callback('Server error. Please check you are logged in and try again.');
                 }
             })
             .catch(function (err) {
@@ -65,7 +69,7 @@
         setStatus('Scanning...', '');
         resultsArea.innerHTML = '<p class="cs-loading"><span class="cs-spinner"></span> Scanning all posts for legacy code blocks...</p>';
 
-        ajax('cs_migrate_scan', {}, function (err, data) {
+        ajax('cs_devtools_migrate_scan', {}, function (err, data) {
             scanBtn.disabled = false;
 
             if (err) {
@@ -151,7 +155,7 @@
         modalBody.innerHTML = '<p class="cs-loading"><span class="cs-spinner"></span> Loading block preview...</p>';
         modalMigrateBtn.setAttribute('data-post-id', postId);
 
-        ajax('cs_migrate_preview', { post_id: postId }, function (err, data) {
+        ajax('cs_devtools_migrate_preview', { post_id: postId }, function (err, data) {
             if (err) {
                 modalBody.innerHTML = '<p style="color:#d63638;">Error: ' + escHtml(err) + '</p>';
                 return;
@@ -203,7 +207,7 @@
         this.disabled = true;
         this.textContent = 'Migrating...';
 
-        ajax('cs_migrate_single', { post_id: postId }, function (err, data) {
+        ajax('cs_devtools_migrate_single', { post_id: postId }, function (err, data) {
             modalMigrateBtn.disabled = false;
             modalMigrateBtn.innerHTML = '<span class="dashicons dashicons-yes-alt"></span> Migrate This Post';
 
@@ -228,7 +232,7 @@
         btn.disabled = true;
         btn.textContent = 'Migrating...';
 
-        ajax('cs_migrate_single', { post_id: postId }, function (err, data) {
+        ajax('cs_devtools_migrate_single', { post_id: postId }, function (err, data) {
             if (err) {
                 btn.disabled = false;
                 btn.textContent = 'Migrate';
@@ -293,7 +297,7 @@
         migrateAllBtn.textContent = 'Migrating all...';
         setStatus('Migrating all remaining posts...', '');
 
-        ajax('cs_migrate_all', {}, function (err, data) {
+        ajax('cs_devtools_migrate_all', {}, function (err, data) {
             migrateAllBtn.innerHTML = '<span class="dashicons dashicons-update"></span> Migrate All Remaining';
 
             if (err) {

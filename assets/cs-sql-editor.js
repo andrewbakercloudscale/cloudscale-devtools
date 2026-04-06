@@ -2,7 +2,7 @@
  * CloudScale Code Block - SQL Editor
  *
  * Handles the SQL query editor, quick-query buttons, and results table.
- * Depends on csSqlEditor (nonce) localised by PHP.
+ * Depends on csDevtoolsSqlEditor (nonce) localised by PHP.
  */
 ( function() {
     'use strict';
@@ -18,7 +18,7 @@
         return;
     }
 
-    var nonce = csSqlEditor.nonce;
+    var nonce = csDevtoolsSqlEditor.nonce;
 
     function escHtml( s ) {
         var d = document.createElement( 'div' );
@@ -41,7 +41,7 @@
         fetch( ajaxurl, {
             method:  'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body:    'action=cs_sql_run&nonce=' + encodeURIComponent( nonce ) + '&sql=' + encodeURIComponent( sql )
+            body:    'action=cs_devtools_sql_run&nonce=' + encodeURIComponent( nonce ) + '&sql=' + encodeURIComponent( sql )
         } )
         .then( function( r ) { return r.json(); } )
         .then( function( resp ) {

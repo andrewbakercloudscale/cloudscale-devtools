@@ -2,7 +2,7 @@
  * CloudScale Code Block - Admin Settings Save
  *
  * Handles the AJAX save for the Code Block Settings panel.
- * Depends on csAdminSettings (nonce) localised by PHP.
+ * Depends on csDevtoolsAdminSettings (nonce) localised by PHP.
  */
 ( function() {
     'use strict';
@@ -22,11 +22,11 @@
         saveBtn.textContent = 'Saving...';
 
         var fd = new FormData();
-        fd.append( 'action',     'cs_save_theme_setting' );
-        fd.append( 'nonce',      csAdminSettings.nonce );
+        fd.append( 'action',     'cs_devtools_save_theme_setting' );
+        fd.append( 'nonce',      csDevtoolsAdminSettings.nonce );
         fd.append( 'theme',      selTheme.value );
         fd.append( 'theme_pair', selPair.value );
-        fd.append( 'cs_perf_monitor_enabled', chkPerf && chkPerf.checked ? '1' : '0' );
+        fd.append( 'cs_devtools_perf_monitor_enabled', chkPerf && chkPerf.checked ? '1' : '0' );
 
         fetch( ajaxurl, { method: 'POST', body: fd } )
             .then( function( r ) { return r.json(); } )

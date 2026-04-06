@@ -18,9 +18,12 @@ helpLib.run({
     pluginFile: `${__dirname}/../cs-code-block.php`,
 
     sections: [
-        { id: 'code-block',  label: 'Code Block Overview',  file: 'panel-code-block.png'  },
-        { id: 'sql-tool',    label: 'SQL Query Tool',        file: 'panel-sql-tool.png'    },
-        { id: 'migrator',    label: 'Code Block Migrator',   file: 'panel-migrator.png'    },
+        { id: 'code-block', label: 'Code Block Overview',  file: 'panel-code-block.png',  elementSelector: '#cs-panel-code-settings' },
+        { id: 'migrator',   label: 'Code Block Migrator',  file: 'panel-migrator.png',    elementSelector: '#cs-panel-migrator' },
+        { id: 'sql-tool',   label: 'SQL Query Tool',       file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=sql"]', elementSelector: '#cs-panel-sql' },
+        { id: 'hide-login', label: 'Hide Login URL',       file: 'panel-hide-login.png',  tabSelector: 'a[href*="tab=login"]', elementSelector: '#cs-panel-hide-login' },
+        { id: '2fa',        label: 'Two-Factor Auth',      file: 'panel-2fa.png',         tabSelector: 'a[href*="tab=login"]', elementSelector: '#cs-panel-2fa' },
+        { id: 'passkeys',   label: 'Passkeys (WebAuthn)',  file: 'panel-passkeys.png',    tabSelector: 'a[href*="tab=login"]', elementSelector: '#cs-panel-passkeys' },
     ],
 
     docs: {
@@ -50,7 +53,7 @@ helpLib.run({
 <p>The <strong>SQL Query Tool</strong> lets WordPress administrators run read-only SELECT queries against the live database from within wp-admin — without needing phpMyAdmin, Adminer, or SSH access. Results are displayed in a paginated table with column headers and query execution time.</p>
 <p><strong>Security model:</strong></p>
 <ul>
-<li>Access is restricted to users with the <code>manage_options</code> capability (Administrators only). All AJAX handlers verify a nonce generated with the action <code>cs_code_migrate_action</code>.</li>
+<li>Access is restricted to users with the <code>manage_options</code> capability (Administrators only). All AJAX handlers verify a nonce generated with the action <code>cs_devtools_sql_nonce</code>.</li>
 <li>Every query is validated by <code>is_safe_query()</code> before execution. This function: strips all block comments (including MySQL optimizer hint syntax <code>/*!...*/</code>) and line comments (<code>--</code> and <code>#</code>), rejects any query containing a semicolon (prevents statement stacking), blocks <code>INTO OUTFILE</code>, <code>INTO DUMPFILE</code>, and <code>LOAD_FILE</code> clauses, and only allows queries starting with <code>SELECT</code>, <code>SHOW</code>, <code>DESCRIBE</code>, <code>DESC</code>, or <code>EXPLAIN</code>.</li>
 <li>Queries are executed via <code>$wpdb->get_results()</code> with <code>suppress_errors(true)</code>. Any MySQL error is caught and displayed without exposing the full stack trace.</li>
 </ul>
@@ -62,6 +65,57 @@ helpLib.run({
 <li><em>URL &amp; Migration Helpers</em>: HTTP references, posts with HTTP GUIDs, old IP references, posts missing meta descriptions.</li>
 </ul>
 <p><strong>Keyboard shortcuts:</strong> <kbd>Enter</kbd> or <kbd>Ctrl+Enter</kbd> runs the query. <kbd>Shift+Enter</kbd> inserts a newline.</p>`,
+
+        'hide-login': `
+<p>The <strong>Hide Login URL</strong> feature moves your WordPress login page away from the default <code>/wp-login.php</code> address to a secret URL of your choosing. Bots and automated scanners that probe <code>/wp-login.php</code> receive a 404 response — they never see the login form, which eliminates the vast majority of brute-force and credential-stuffing traffic.</p>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>When enabled, a custom WordPress <code>init</code> hook (priority 1) intercepts requests to your chosen slug and serves <code>wp-login.php</code> transparently, so the login form loads correctly at the new URL without any redirect.</li>
+<li>Direct requests to <code>/wp-login.php</code> are blocked by a <code>login_init</code> hook and return a 404.</li>
+<li>The <code>wp_login_url()</code>, <code>logout_url()</code>, and <code>lostpassword_url()</code> filters are overridden to always produce your custom URL, so all internal WordPress links (password reset emails, "Back to login" links) continue to work correctly.</li>
+</ul>
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Toggle <em>Enable Hide Login</em> on.</li>
+<li>Enter a slug in <em>Custom Login Path</em> — letters, numbers, and hyphens only (e.g. <code>my-secret-login</code>). Avoid obvious words like <code>login</code>, <code>admin</code>, or <code>dashboard</code>.</li>
+<li>Click <em>Save Hide Login Settings</em>.</li>
+<li><strong>Immediately note the new URL</strong> shown after saving. If you lose it, you can recover access via WP-CLI: <code>wp option get cs_devtools_login_slug</code>.</li>
+</ol>
+<p><strong>Compatibility:</strong> WP-CLI, XMLRPC, REST API, and WP Cron are unaffected — they bypass the login URL check entirely. Other security plugins that check <code>$pagenow === 'wp-login.php'</code> will continue to work because the plugin sets <code>$pagenow</code> correctly when serving the custom slug.</p>`,
+
+        '2fa': `
+<p><strong>Two-Factor Authentication (2FA)</strong> requires users to prove their identity with a second factor — a one-time code — in addition to their password. Even if a password is compromised, an attacker cannot log in without also having access to the second factor.</p>
+<p><strong>Available methods:</strong></p>
+<ul>
+<li><strong>Email code</strong> — after a successful password login, a 6-digit code is emailed to the user's account address. The code expires after 10 minutes. No app required, but relies on reliable email delivery.</li>
+<li><strong>Authenticator app (TOTP)</strong> — uses the industry-standard Time-based One-Time Password algorithm (RFC 6238). Users scan a QR code with Google Authenticator, Authy, 1Password, or any compatible app. The app generates a fresh 6-digit code every 30 seconds. Works completely offline.</li>
+<li><strong>Passkey</strong> — replaces the code prompt with a biometric check (Face ID, Touch ID, Windows Hello) or hardware security key. The fastest and most phishing-resistant method. Requires at least one registered passkey (see the Passkeys section).</li>
+</ul>
+<p><strong>Site-wide settings:</strong></p>
+<ul>
+<li><em>2FA Method</em> — sets which method is available to users. "Off" disables 2FA entirely.</li>
+<li><em>Force 2FA for all administrators</em> — when checked, any user with the Administrator role who has not yet configured their chosen 2FA method will be blocked from the dashboard after login until they complete setup. This enforces 2FA without requiring each admin to opt in manually.</li>
+</ul>
+<p><strong>Per-user setup:</strong> Each user configures their own 2FA credentials in the <em>Your 2FA Setup</em> panel. TOTP setup requires scanning a QR code or manually entering the Base32 secret into an authenticator app, then verifying with a live code. Email 2FA requires confirming a verification link sent to the account email before it is activated.</p>`,
+
+        'passkeys': `
+<p><strong>Passkeys</strong> are FIDO2/WebAuthn credentials that replace password-based 2FA codes with a biometric or hardware-key verification. When you log in, instead of typing a 6-digit code, you authenticate with Face ID, Touch ID, Windows Hello, or a physical security key (YubiKey, etc.).</p>
+<p><strong>How passkeys work:</strong></p>
+<ul>
+<li>Registration generates a public/private key pair on your device. The private key never leaves your device — only the public key is stored on the server (in WordPress user meta).</li>
+<li>At login, the server sends a random challenge. Your device signs it with the private key. The server verifies the signature against the stored public key. No secret is transmitted over the network.</li>
+<li>Passkeys are bound to the site's domain (Relying Party ID), making them inherently phishing-resistant — a fake domain cannot trigger your real passkey.</li>
+</ul>
+<p><strong>Registering a passkey:</strong></p>
+<ol>
+<li>In the <em>Passkeys (WebAuthn)</em> panel, click <em>+ Add Passkey</em>.</li>
+<li>Give the passkey a recognisable label (e.g. "MacBook Pro", "iPhone 16", "YubiKey 5").</li>
+<li>Click <em>Register</em> — your browser will prompt you for biometric verification or to insert a hardware key.</li>
+<li>On success, the passkey appears in the list. Register one passkey per device you want to use for login.</li>
+</ol>
+<p><strong>Using passkeys for login:</strong> In the <em>Two-Factor Authentication</em> settings, set the 2FA method to <em>Passkey</em>. After a successful password login, you will be prompted to verify with your passkey instead of typing a code.</p>
+<p><strong>Browser support:</strong> Chrome 108+, Safari 16+, Edge 108+, Firefox 122+. Older browsers fall back to an email OTP code automatically.</p>
+<p><strong>Testing:</strong> Use the <em>Test</em> button next to each registered passkey to verify it is working correctly without logging out. The test performs a full WebAuthn assertion round-trip and reports success or failure.</p>`,
 
         'migrator': `
 <p>The <strong>Code Block Migrator</strong> converts legacy code block shortcodes and HTML from other WordPress syntax highlighting plugins to CloudScale Code Blocks in a single batch operation — without manual copy-paste or post-by-post editing.</p>

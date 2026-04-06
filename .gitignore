@@ -11,10 +11,13 @@ wp-config.php
 wp-content/uploads/
 # Local deploy tooling
 build.sh
+build-review.sh
 deploy-wordpress.sh
 backup-s3.sh
 purge-cloudflare.sh
 rollback-wordpress.sh
+pi-crontabs.txt
+.env
 .claude/
 .claude-flow/
 

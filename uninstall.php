@@ -5,7 +5,7 @@
  * Removes all plugin data when the plugin is deleted from the WordPress admin.
  * This file is called automatically by WordPress on plugin deletion.
  *
- * @package CloudScale_Code_Block
+ * @package CloudScale_DevTools
  * @since   1.0.0
  */
 
@@ -13,5 +13,5 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
     exit;
 }
 
-delete_option( 'cs_code_default_theme' );
-delete_option( 'cs_code_theme_pair' );
+delete_option( 'cs_devtools_code_default_theme' );
+delete_option( 'cs_devtools_code_theme_pair' );

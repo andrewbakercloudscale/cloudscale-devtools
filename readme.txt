@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.8.11
+Stable tag: 1.8.38
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -40,7 +40,7 @@ CloudScale Code Block is a lightweight, zero dependency Gutenberg block plugin t
 1. Upload the cs-code-block folder to /wp-content/plugins/
 2. Activate the plugin through the Plugins menu in WordPress
 3. Add a CloudScale Code Block from the Gutenberg block inserter, or use the [cs_code] shortcode
-4. Configure your preferred color theme and dark/light default under Tools > CloudScale Code and SQL
+4. Configure your preferred color theme and dark/light default under Tools > CloudScale Code Block
 
 If you were previously using the standalone CloudScale SQL Command plugin, you can deactivate and delete it after activating this version. All SQL functionality is now built in.
 
@@ -48,7 +48,7 @@ If you were previously using the standalone CloudScale SQL Command plugin, you c
 
 = How do I change the syntax color theme? =
 
-Go to Tools > CloudScale Code and SQL. On the Code Migrator tab you will see the Code Block Settings panel at the top. Select your preferred color theme from the dropdown and click Save Settings. The change applies to all code blocks site wide.
+Go to Tools > CloudScale Code Block. On the Code Migrator tab you will see the Code Block Settings panel at the top. Select your preferred color theme from the dropdown and click Save Settings. The change applies to all code blocks site wide.
 
 = Can visitors toggle between dark and light mode? =
 
@@ -143,7 +143,7 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 = 1.6.0 =
 * Merged CloudScale SQL Command plugin into CloudScale Code Block
-* Combined Tools page at Tools > CloudScale Code and SQL with tabbed interface
+* Combined Tools page at Tools > CloudScale Code Block with tabbed interface
 * Code Block Migrator and SQL Command are now tabs on the same page
 * Moved Settings (default theme) as inline options on the Code Block Migrator tab
 * Removed separate Settings > CloudScale Code Block page
