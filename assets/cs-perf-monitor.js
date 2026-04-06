@@ -164,15 +164,24 @@
         var open = localStorage.getItem(LS_OPEN) === '1';
         var h    = parseInt(localStorage.getItem(LS_HEIGHT), 10) || DEFAULT_H;
         if (h < MIN_H) { h = DEFAULT_H; localStorage.removeItem(LS_HEIGHT); }
+        setPadding(open ? clampHeight(h) : 48);
         if (open) openPanel(h, false);
         switchTab(activeTab, false);
+    }
+
+    // Push the WP content area up so nothing is hidden under the fixed panel.
+    function setPadding(px) {
+        var target = document.getElementById('wpcontent') || document.body;
+        target.style.paddingBottom = px + 'px';
     }
 
     function openPanel(h, animate) {
         if (!animate) panel.style.transition = 'none';
         panel.classList.remove('cs-perf-collapsed');
         panel.classList.add('cs-perf-open');
-        panel.style.height = clampHeight(h) + 'px';
+        var clamped = clampHeight(h);
+        panel.style.height = clamped + 'px';
+        setPadding(clamped);
         document.getElementById('cs-perf-toggle-arrow').innerHTML = '&#9660;';
         toggleBtn.setAttribute('aria-expanded', 'true');
         localStorage.setItem(LS_OPEN, '1');
@@ -183,6 +192,7 @@
         panel.classList.remove('cs-perf-open');
         panel.classList.add('cs-perf-collapsed');
         panel.style.height = '';
+        setPadding(48); // collapsed header height
         document.getElementById('cs-perf-toggle-arrow').innerHTML = '&#9650;';
         toggleBtn.setAttribute('aria-expanded', 'false');
         localStorage.setItem(LS_OPEN, '0');
@@ -1509,7 +1519,9 @@
         });
         function onMove(e) {
             panel.style.transition = 'none';
-            panel.style.height = clampHeight(startH + (startY - e.clientY)) + 'px';
+            var h = clampHeight(startH + (startY - e.clientY));
+            panel.style.height = h + 'px';
+            setPadding(h);
             if (!panel.classList.contains('cs-perf-open')) {
                 panel.classList.add('cs-perf-open'); panel.classList.remove('cs-perf-collapsed');
                 document.getElementById('cs-perf-toggle-arrow').innerHTML = '&#9660;'; toggleBtn.setAttribute('aria-expanded', 'true');
