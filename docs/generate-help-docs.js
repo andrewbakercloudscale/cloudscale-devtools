@@ -9,7 +9,7 @@ helpLib.run({
     docsDir:    process.env.WP_DOCS_DIR,
 
     pluginName: 'CloudScale DevTools',
-    pluginDesc: 'CloudScale DevTools is a free WordPress plugin that runs entirely on your server — no external CDN, no API calls, no subscription. Beautiful syntax highlighting, one-click copy, dark/light mode, a built-in SQL query tool, hide login URL, two-factor authentication, and passkey support. Completely free.',
+    pluginDesc: 'A free WordPress developer toolkit: syntax-highlighted code blocks, read-only SQL query tool, bulk code migrator, hide login URL, two-factor authentication (TOTP, email, passkeys), and a site performance monitor. Everything runs on your server — no external APIs, no subscriptions.',
     pageTitle:  'CloudScale DevTools: Online Help',
     pageSlug:   'cloudscale-devtools-help',
     downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
@@ -29,15 +29,15 @@ helpLib.run({
     docs: {
         'code-block': `
 <div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
-<h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;">Why CloudScale Code Block?</h2>
+<h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;">Why CloudScale DevTools?</h2>
 <p style="margin:0 0 10px;">Popular code highlighting plugins like Enlighter and SyntaxHighlighter load external CDN scripts that add 100–300ms to your page load time. Others charge $30–$50/year for features that should come included. Some require you to write custom CSS just to make the output look presentable.</p>
-<p style="margin:0 0 10px;">CloudScale Code Block bundles everything locally — zero external requests, zero impact on your CDN cache hit rate. Auto language detection, clipboard copy button, dark and light theme toggle, and line numbers all work out of the box. It also includes a one-click migrator to import code blocks from other popular plugins.</p>
+<p style="margin:0 0 10px;">CloudScale DevTools bundles everything locally — zero external requests, zero impact on your CDN cache hit rate. Auto language detection, clipboard copy button, dark and light theme toggle, and line numbers all work out of the box. It also includes a one-click migrator to import code blocks from other popular plugins.</p>
 <p style="margin:0;"><strong>Completely free.</strong> No premium version, no nag screens, no feature gating. Use it on as many sites as you want.</p>
 </div>
-<p>The <strong>CloudScale Code Block</strong> is a registered Gutenberg block (<code>cloudscale/code</code>) and a <code>[cs_code]</code> shortcode for displaying syntax-highlighted code in WordPress posts and pages. Syntax highlighting is powered by <strong>highlight.js 11.11.1</strong> loaded from the cdnjs CDN, supporting over 190 languages with auto-detection.</p>
+<p>The <strong>Code Block</strong> feature is a registered Gutenberg block (<code>cloudscale/code</code>) and a <code>[cs_code]</code> shortcode for displaying syntax-highlighted code in WordPress posts and pages. Syntax highlighting is powered by <strong>highlight.js 11.11.1</strong> loaded from the cdnjs CDN, supporting over 190 languages with auto-detection.</p>
 <p><strong>Block and shortcode usage:</strong></p>
 <ul>
-<li><strong>Gutenberg block</strong> — search for "CloudScale Code Block" in the block inserter (<kbd>/code</kbd>). Language, theme override, title, and line numbers are all configurable in the block sidebar panel.</li>
+<li><strong>Gutenberg block</strong> — search for "CloudScale" in the block inserter (<kbd>/code</kbd>). Language, theme override, title, and line numbers are all configurable in the block sidebar panel.</li>
 <li><strong>Shortcode:</strong> <code>[cs_code lang="php" title="functions.php"]your code here[/cs_code]</code>. Supported attributes: <code>lang</code> (any highlight.js language alias), <code>title</code> (displayed as a filename label above the block), <code>theme</code> (overrides the site-wide theme for this block).</li>
 </ul>
 <p><strong>Features:</strong></p>
@@ -118,12 +118,12 @@ helpLib.run({
 <p><strong>Testing:</strong> Use the <em>Test</em> button next to each registered passkey to verify it is working correctly without logging out. The test performs a full WebAuthn assertion round-trip and reports success or failure.</p>`,
 
         'migrator': `
-<p>The <strong>Code Block Migrator</strong> converts legacy code block shortcodes and HTML from other WordPress syntax highlighting plugins to CloudScale Code Blocks in a single batch operation — without manual copy-paste or post-by-post editing.</p>
+<p>The <strong>Code Block Migrator</strong> converts legacy code block shortcodes and HTML from other WordPress syntax highlighting plugins to CloudScale DevTools blocks in a single batch operation — without manual copy-paste or post-by-post editing.</p>
 <p><strong>Supported source formats:</strong></p>
 <ul>
-<li>WordPress core <code><!-- wp:code --></code> blocks — preserves language class attributes where present.</li>
-<li>WordPress core <code><!-- wp:preformatted --></code> blocks.</li>
-<li><code><!-- wp:code-syntax-block/code --></code> blocks from Code Syntax Block plugin.</li>
+<li>WordPress core <code>&lt;!-- wp:code --&gt;</code> blocks — preserves language class attributes where present.</li>
+<li>WordPress core <code>&lt;!-- wp:preformatted --&gt;</code> blocks.</li>
+<li><code>&lt;!-- wp:code-syntax-block/code --&gt;</code> blocks from Code Syntax Block plugin.</li>
 <li>Legacy <code>[code]</code>, <code>[sourcecode]</code>, and similar shortcodes — language attribute is preserved if present.</li>
 </ul>
 <p><strong>Migration workflow:</strong></p>
