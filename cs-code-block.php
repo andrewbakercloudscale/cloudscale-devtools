@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.42
+ * Version: 1.8.44
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.42';
+    const VERSION      = '1.8.44';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -712,7 +712,7 @@ class CloudScale_DevTools {
     /**
      * Redirects legacy ?page=cloudscale-code-sql URLs to the new slug.
      *
-     * @since  1.8.42
+     * @since  1.8.44
      * @return void
      */
     public static function redirect_legacy_slug() {
