@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.59
+ * Version: 1.8.63
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -210,6 +210,8 @@ class CloudScale_DevTools {
     private static $perf_transients = [];
     /** @var array Template hierarchy candidates captured via *_template_hierarchy filters. */
     private static $perf_template_hierarchy = [];
+    /** @var array Request lifecycle milestones: [ ['label'=>string, 'ms'=>float] ] */
+    private static $perf_milestones = [];
 
     /**
      * Registers all plugin hooks.
@@ -254,6 +256,7 @@ class CloudScale_DevTools {
 
         // Login security — URL intercept / 2FA flow (early, priority 1 on init).
         add_action( 'init',        [ __CLASS__, 'login_serve_custom_slug' ], 1 );
+        add_action( 'login_init',  [ __CLASS__, 'login_redirect_authenticated' ], 0 );
         add_action( 'login_init',  [ __CLASS__, 'login_block_direct_access' ], 1 );
         add_action( 'login_init',  [ __CLASS__, 'login_2fa_handle' ] );
         add_filter( 'authenticate',        [ __CLASS__, 'login_2fa_intercept' ], 100, 3 );
@@ -319,6 +322,22 @@ class CloudScale_DevTools {
             // Scripts & styles — collect at footer time (after everything is enqueued).
             add_action( 'admin_footer', [ __CLASS__, 'perf_capture_assets' ], 1 );
             add_action( 'wp_footer',    [ __CLASS__, 'perf_capture_assets' ], 1 );
+
+            // Request lifecycle milestones for the waterfall timeline.
+            // Registered at PHP_INT_MAX so we capture the time after all other
+            // callbacks on that hook have finished running.
+            foreach ( [
+                'plugins_loaded'    => 'Plugins loaded',
+                'init'              => 'WP init',
+                'admin_init'        => 'Admin init',
+                'wp_loaded'         => 'WP loaded',
+                'wp'                => 'Query setup',
+                'template_redirect' => 'Template',
+            ] as $_ms_hook => $_ms_label ) {
+                add_action( $_ms_hook, static function () use ( $_ms_label ) {
+                    self::perf_record_milestone( $_ms_label );
+                }, PHP_INT_MAX );
+            }
         }
     }
 
@@ -2130,14 +2149,20 @@ class CloudScale_DevTools {
         $bt     = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 25 );
         $plugin = self::perf_plugin_from_frames( $bt );
 
+        $parsed_url = wp_parse_url( $url );
+        $home_host  = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+
         self::$perf_http_calls[] = [
-            'url'     => $url,
-            'method'  => strtoupper( $parsed_args['method'] ?? 'GET' ),
-            'status'  => $status,
-            'time_ms' => $elapsed_ms,
-            'cached'  => $cached,
-            'plugin'  => $plugin,
-            'error'   => $error,
+            'url'      => $url,
+            'method'   => strtoupper( $parsed_args['method'] ?? 'GET' ),
+            'status'   => $status,
+            'time_ms'  => $elapsed_ms,
+            'cached'   => $cached,
+            'plugin'   => $plugin,
+            'error'    => $error,
+            // Security flags.
+            'insecure' => isset( $parsed_url['scheme'] ) && 'http' === strtolower( $parsed_url['scheme'] ),
+            'external' => isset( $parsed_url['host'] ) && strtolower( $parsed_url['host'] ) !== strtolower( $home_host ),
         ];
     }
 
@@ -2401,7 +2426,25 @@ class CloudScale_DevTools {
      *
      * @return array
      */
+    /**
+     * Records a named request-lifecycle milestone with ms-since-request-start.
+     *
+     * @param  string $label Human-readable phase label.
+     * @return void
+     */
+    private static function perf_record_milestone( string $label ): void {
+        if ( ! isset( $_SERVER['REQUEST_TIME_FLOAT'] ) ) {
+            return;
+        }
+        self::$perf_milestones[] = [
+            'label' => $label,
+            'ms'    => round( ( microtime( true ) - (float) $_SERVER['REQUEST_TIME_FLOAT'] ) * 1000, 1 ),
+        ];
+    }
+
     private static function perf_build_hooks_data(): array {
+        global $wp_filter;
+
         $hooks = self::$perf_hooks;
         // Sort by total_ms descending.
         uasort( $hooks, static function ( $a, $b ) {
@@ -2410,12 +2453,33 @@ class CloudScale_DevTools {
 
         $result = [];
         foreach ( array_slice( $hooks, 0, 50, true ) as $name => $stat ) {
+            // Collect registered callbacks from $wp_filter for attribution.
+            $callbacks = [];
+            if ( isset( $wp_filter[ $name ] ) && $wp_filter[ $name ] instanceof WP_Hook ) {
+                $cb_count = 0;
+                foreach ( $wp_filter[ $name ]->callbacks as $priority => $cbs ) {
+                    foreach ( $cbs as $cb_info ) {
+                        if ( $cb_count >= 20 ) {
+                            break 2;
+                        }
+                        $info        = self::perf_callback_info( $cb_info['function'] );
+                        $callbacks[] = [
+                            'priority' => (int) $priority,
+                            'label'    => $info['label'],
+                            'plugin'   => $info['plugin'],
+                        ];
+                        $cb_count++;
+                    }
+                }
+            }
+
             $result[] = [
-                'hook'     => $name,
-                'count'    => $stat['count'],
-                'total_ms' => round( $stat['total_ms'], 2 ),
-                'max_ms'   => round( $stat['max_ms'], 2 ),
-                'avg_ms'   => $stat['count'] > 0 ? round( $stat['total_ms'] / $stat['count'], 2 ) : 0,
+                'hook'      => $name,
+                'count'     => $stat['count'],
+                'total_ms'  => round( $stat['total_ms'], 2 ),
+                'max_ms'    => round( $stat['max_ms'], 2 ),
+                'avg_ms'    => $stat['count'] > 0 ? round( $stat['total_ms'] / $stat['count'], 2 ) : 0,
+                'callbacks' => $callbacks,
             ];
         }
         return $result;
@@ -2534,6 +2598,11 @@ class CloudScale_DevTools {
             'request'    => self::perf_build_request_data(),
             'transients' => self::perf_build_transient_data(),
             'template'   => self::perf_build_template_data(),
+            'milestones' => array_merge(
+                [ [ 'label' => 'Request start', 'ms' => 0.0 ] ],
+                self::$perf_milestones,
+                [ [ 'label' => 'Panel output', 'ms' => $page_ms ] ]
+            ),
         ];
 
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
@@ -2939,6 +3008,78 @@ class CloudScale_DevTools {
     }
 
     /**
+     * Maps an absolute (normalised) file path to a plugin slug, theme slug,
+     * or 'WordPress Core'.  Used by perf_callback_info() for hook attribution.
+     *
+     * @param  string $file wp_normalize_path() output.
+     * @return string
+     */
+    private static function perf_plugin_from_file( string $file ): string {
+        if ( '' === $file ) {
+            return 'WordPress Core';
+        }
+        $plugins_dir = wp_normalize_path( WP_PLUGIN_DIR );
+        if ( str_starts_with( $file, $plugins_dir . '/' ) ) {
+            $relative = substr( $file, strlen( $plugins_dir ) + 1 );
+            return explode( '/', $relative )[0] ?? 'WordPress Core';
+        }
+        $themes_dir = wp_normalize_path( get_theme_root() );
+        if ( str_starts_with( $file, $themes_dir . '/' ) ) {
+            $relative = substr( $file, strlen( $themes_dir ) + 1 );
+            return 'theme: ' . ( explode( '/', $relative )[0] ?? '?' );
+        }
+        return 'WordPress Core';
+    }
+
+    /**
+     * Returns a human-readable label and plugin attribution for a hook callback.
+     * Uses Reflection to locate the file that defines the callable.
+     *
+     * @param  mixed $cb Callback (string, array, Closure, invokable object).
+     * @return array{label: string, plugin: string}
+     */
+    private static function perf_callback_info( $cb ): array {
+        $label = '';
+        $file  = '';
+        try {
+            if ( $cb instanceof Closure ) {
+                $rf    = new ReflectionFunction( $cb );
+                $file  = wp_normalize_path( (string) $rf->getFileName() );
+                $label = '{closure}:' . $rf->getStartLine();
+            } elseif ( is_string( $cb ) && function_exists( $cb ) ) {
+                $rf    = new ReflectionFunction( $cb );
+                $file  = wp_normalize_path( (string) $rf->getFileName() );
+                $label = $cb . '()';
+            } elseif ( is_array( $cb ) && 2 === count( $cb ) ) {
+                $class  = is_object( $cb[0] ) ? get_class( $cb[0] ) : (string) $cb[0];
+                $method = (string) ( $cb[1] ?? '' );
+                $label  = $class . '::' . $method . '()';
+                if ( $method && method_exists( $class, $method ) ) {
+                    $rm   = new ReflectionMethod( $class, $method );
+                    $file = wp_normalize_path( (string) $rm->getFileName() );
+                }
+            } elseif ( is_object( $cb ) && method_exists( $cb, '__invoke' ) ) {
+                $rm    = new ReflectionMethod( $cb, '__invoke' );
+                $file  = wp_normalize_path( (string) $rm->getFileName() );
+                $label = get_class( $cb ) . '::__invoke()';
+            } else {
+                $label = is_string( $cb ) ? $cb : '(unknown)';
+            }
+        } catch ( ReflectionException $e ) {
+            if ( is_string( $cb ) ) {
+                $label = $cb;
+            } elseif ( is_array( $cb ) ) {
+                $class = is_object( $cb[0] ) ? get_class( $cb[0] ) : (string) $cb[0];
+                $label = $class . '::' . ( $cb[1] ?? '?' ) . '()';
+            }
+        }
+        return [
+            'label'  => $label ?: '(unknown)',
+            'plugin' => $file ? self::perf_plugin_from_file( $file ) : 'WordPress Core',
+        ];
+    }
+
+    /**
      * Builds a map of function/class prefixes to plugin slugs from active plugins.
      *
      * Used as a fallback when file-path attribution is not available.
@@ -3149,6 +3290,7 @@ class CloudScale_DevTools {
                     . '<span id="cs-pb-db"  class="cs-perf-badge cs-pb-db"  title="Database queries">DB&nbsp;<em>0</em></span>'
                     . '<span id="cs-pb-http" class="cs-perf-badge cs-pb-http" title="HTTP / REST calls">HTTP&nbsp;<em>0</em></span>'
                     . '<span id="cs-pb-log"  class="cs-perf-badge cs-pb-log"  title="Log entries" style="display:none">LOG&nbsp;<em>0</em></span>'
+                    . '<span id="cs-pb-issues" class="cs-perf-badge cs-pb-issues-critical" title="Critical / warning issues detected" style="display:none">&#9888;&nbsp;<em>0</em></span>'
                 . '</div>'
                 . '<div class="cs-perf-hr">'
                     . '<span id="cs-perf-ttl" class="cs-perf-total"></span>'
@@ -3392,6 +3534,12 @@ class CloudScale_DevTools {
             return;
         }
 
+        // Already authenticated — send straight to the dashboard.
+        if ( is_user_logged_in() ) {
+            wp_safe_redirect( admin_url() );
+            exit;
+        }
+
         // Mark that we arrived via the correct custom URL.
         define( 'CS_DEVTOOLS_LOGIN_CUSTOM_SLUG', true );
 
@@ -3409,6 +3557,30 @@ class CloudScale_DevTools {
         // correctly; site_url filter handles the form action rewrite.
 
         require_once ABSPATH . 'wp-login.php'; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude.FileIncludeFound
+        exit;
+    }
+
+    /**
+     * Fired on `login_init` at priority 0 — before any other login hook.
+     * If the visitor already has a valid WordPress session, redirect them
+     * straight to the dashboard instead of showing the login form.
+     *
+     * Skipped for logout, password reset, and other non-login actions so those
+     * flows are never short-circuited.
+     *
+     * @since  1.9.4
+     * @return void
+     */
+    public static function login_redirect_authenticated(): void {
+        $action = isset( $_REQUEST['action'] ) ? sanitize_key( $_REQUEST['action'] ) : 'login'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $skip   = [ 'logout', 'lostpassword', 'rp', 'resetpass', 'postpass', 'register', 'cs_devtools_2fa' ];
+        if ( in_array( $action, $skip, true ) ) {
+            return;
+        }
+        if ( ! is_user_logged_in() ) {
+            return;
+        }
+        wp_safe_redirect( admin_url() );
         exit;
     }
 

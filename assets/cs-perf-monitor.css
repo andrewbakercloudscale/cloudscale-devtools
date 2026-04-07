@@ -135,6 +135,8 @@
 .cs-pb-db   { background: #1a3a5c; color: #5aa8e8; }
 .cs-pb-http { background: #3a1a5c; color: #b07ae8; }
 .cs-pb-log  { background: #1a3a2a; color: #4ec9b0; }
+.cs-pb-issues-critical { background: #4a1a1a; color: #f44747; }
+.cs-pb-issues-warning  { background: #3a2e10; color: #ffaa00; }
 .cs-perf-badge em { font-style: normal; font-weight: 700; }
 
 /* ── Total time chip ─────────────────────────────────────────────────────── */
@@ -510,6 +512,8 @@
 .cs-tag-dupe     { background: #3a3a00; color: #dcdcaa; }
 .cs-tag-cached   { background: #1a3a1a; color: #4ec9b0; }
 .cs-tag-error    { background: #5a1a1a; color: #f44747; }
+.cs-tag-insecure { background: #4a2800; color: #ffaa00; }
+.cs-tag-external { background: #1a2a3a; color: #9cdcfe; }
 .cs-tag-warn     { background: #3a2a00; color: #dcdcaa; }
 
 /* ── Plugin chip ─────────────────────────────────────────────────────────── */
@@ -1385,3 +1389,60 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
 .c-tk { flex: 1; min-width: 180px; font-family: 'Consolas','Monaco',monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c-tg, .c-th, .c-tm, .c-ts, .c-td, .c-tr { width: 52px; text-align: right; }
 .cs-trans-miss { color: #ce9178; font-weight: 700; }
+
+/* ── Request waterfall (Summary tab) ────────────────────────────────────── */
+.cs-waterfall {
+    margin: 6px 0 16px;
+}
+.cs-wf-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 52px 52px;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 11px;
+}
+.cs-wf-label {
+    color: #ccc;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 10px;
+}
+.cs-wf-track {
+    position: relative;
+    height: 10px;
+    background: #2d2d30;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.cs-wf-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 2px;
+    transition: width .4s ease;
+}
+.cs-wf-time {
+    color: #888;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+}
+.cs-wf-dur {
+    color: #4ec9b0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+}
+/* Phase colours */
+.cs-wf-c0 { background: #444;     } /* Request start  */
+.cs-wf-c1 { background: #5aa8e8; } /* Plugins loaded */
+.cs-wf-c2 { background: #4ec9b0; } /* WP init        */
+.cs-wf-c3 { background: #9cdcfe; } /* Admin init / WP loaded */
+.cs-wf-c4 { background: #b5cea8; } /* WP loaded / Query setup */
+.cs-wf-c5 { background: #ce9178; } /* Query / Template */
+.cs-wf-c6 { background: #c586c0; } /* Panel output   */

@@ -43,7 +43,7 @@
     var searchInput, pluginSel, speedSel, dupeChk;
     var dbTbody, httpTbody, logList, summaryWrap;
     var dbCount, httpCount, logCount;
-    var badgeDB, badgeHTTP, badgeLOG;
+    var badgeDB, badgeHTTP, badgeLOG, badgeISSUES;
     var logSearch, logLevel, logSource;
     var assetsTbody, assetsCount, assetSearch, assetType, assetPlugin;
     var hooksTbody, hooksCount, hookSearch;
@@ -78,6 +78,7 @@
         badgeDB      = document.getElementById('cs-pb-db');
         badgeHTTP    = document.getElementById('cs-pb-http');
         badgeLOG     = document.getElementById('cs-pb-log');
+        badgeISSUES  = document.getElementById('cs-pb-issues');
         logSearch    = document.getElementById('cs-lf-search');
         logLevel     = document.getElementById('cs-lf-level');
         logSource    = document.getElementById('cs-lf-source');
@@ -139,7 +140,7 @@
         n1Patterns = {};
         data.queries.forEach(function (q) {
             var fp = normalisePattern(q.sql);
-            if (!n1Patterns[fp]) n1Patterns[fp] = { count: 0, total_ms: 0, plugin: q.plugin, example: q.sql };
+            if (!n1Patterns[fp]) n1Patterns[fp] = { count: 0, total_ms: 0, plugin: q.plugin, caller: q.caller || '', example: q.sql };
             n1Patterns[fp].count++;
             n1Patterns[fp].total_ms += q.time_ms;
         });
@@ -364,11 +365,20 @@
 
         var maxMs = filtered.length > 0 ? filtered[0].total_ms : 1;
         var html  = '';
-        filtered.forEach(function (h) {
+        filtered.forEach(function (h, i) {
             var barW = maxMs > 0 ? Math.max(2, Math.round((h.total_ms / maxMs) * 60)) : 2;
             var cls  = speedClass(h.max_ms);
-            html += '<tr>'
-                + '<td class="c-hk" title="' + esc(h.hook) + '">' + esc(h.hook) + '</td>'
+            var rowCls = rowSpeedClass(h.max_ms);
+            var hasCallbacks = h.callbacks && h.callbacks.length > 0;
+
+            var tags = '';
+            if (h.max_ms >= T_CRITICAL) tags += '<span class="cs-tag cs-tag-critical">critical</span> ';
+            else if (h.max_ms >= T_SLOW) tags += '<span class="cs-tag cs-tag-slow">slow</span> ';
+
+            html += '<tr class="' + rowCls + (hasCallbacks ? ' cs-expandable' : '') + '" data-hk-idx="' + i + '">'
+                + '<td class="c-hk" title="' + esc(h.hook) + '">' + esc(h.hook)
+                    + (tags ? '<br><span style="margin-top:2px;display:inline-block">' + tags + '</span>' : '')
+                    + '</td>'
                 + '<td class="c-hc" style="color:#888">' + h.count + '</td>'
                 + '<td class="c-ht"><div class="cs-time-cell">'
                     + '<span class="cs-lat-bar cs-lat-' + cls + '" style="width:' + barW + 'px"></span>'
@@ -376,8 +386,20 @@
                     + '</div></td>'
                 + '<td class="c-hm cs-tv-' + speedClass(h.max_ms) + '">' + fmtMs(h.max_ms) + '</td>'
                 + '</tr>';
+
+            if (hasCallbacks) {
+                html += '<tr class="cs-row-detail" id="cs-hkd-' + i + '" style="display:none">'
+                    + '<td colspan="4">' + renderCallbacks(h.callbacks) + '</td></tr>';
+            }
         });
         hooksTbody.innerHTML = html;
+
+        Array.prototype.forEach.call(hooksTbody.querySelectorAll('tr.cs-expandable'), function (tr) {
+            tr.addEventListener('click', function () {
+                var d = document.getElementById('cs-hkd-' + tr.dataset.hkIdx);
+                if (d) d.style.display = d.style.display === 'none' ? '' : 'none';
+            });
+        });
     }
 
     // ── Badges ────────────────────────────────────────────────────────────────
@@ -386,6 +408,18 @@
         badgeHTTP.querySelector('em').textContent = meta.http_count  || 0;
         var lc = (data.logs || []).length;
         if (lc > 0 && badgeLOG) { badgeLOG.style.display = ''; badgeLOG.querySelector('em').textContent = lc; }
+        if (badgeISSUES) {
+            var critCnt  = issuesList.filter(function (i) { return i.sev === 'critical'; }).length;
+            var warnCnt  = issuesList.filter(function (i) { return i.sev === 'warning';  }).length;
+            var issueCnt = critCnt + warnCnt;
+            if (issueCnt > 0) {
+                badgeISSUES.style.display = '';
+                badgeISSUES.querySelector('em').textContent = issueCnt;
+                badgeISSUES.className = 'cs-perf-badge ' + (critCnt > 0 ? 'cs-pb-issues-critical' : 'cs-pb-issues-warning');
+            } else {
+                badgeISSUES.style.display = 'none';
+            }
+        }
     }
 
     function updateTotalTime() {
@@ -433,7 +467,9 @@
         if (logCount)    logCount.textContent    = (data.logs || []).length;
         if (assetsCount) {
             var assets = data.assets || {};
-            assetsCount.textContent = ((assets.scripts || []).length + (assets.styles || []).length);
+            var aTotal = (assets.scripts || []).length + (assets.styles || []).length;
+            assetsCount.textContent = aTotal;
+            assetsCount.className   = aTotal > 40 ? 'cs-issues-cnt-critical' : aTotal > 20 ? 'cs-issues-cnt-warning' : '';
         }
         if (hooksCount)  hooksCount.textContent  = (data.hooks       || []).length;
         if (transCount)  transCount.textContent  = (data.transients  || []).length;
@@ -608,6 +644,25 @@
         return html + '</div></div>';
     }
 
+    // ── Hook callbacks renderer ───────────────────────────────────────────────
+    function renderCallbacks(callbacks) {
+        if (!callbacks || callbacks.length === 0) return '';
+        var html = '<div class="cs-stack-trace">'
+            + '<div class="cs-stack-hdr">Registered callbacks — ' + callbacks.length + '</div>'
+            + '<div class="cs-stack-frames">';
+        callbacks.forEach(function (cb) {
+            var isCore = !cb.plugin || cb.plugin === 'WordPress Core';
+            html += '<div class="cs-sf cs-sf-' + (isCore ? 'wp' : 'plugin') + '">'
+                + '<span class="cs-sf-name" title="' + esc(cb.label) + '">' + esc(cb.label) + '</span>'
+                + '<span class="cs-sf-type">p' + cb.priority + '</span>'
+                + (isCore
+                    ? '<span style="color:#666;font-size:10px">core</span>'
+                    : pluginChip(cb.plugin))
+                + '</div>';
+        });
+        return html + '</div></div>';
+    }
+
     // ── EXPLAIN AJAX ──────────────────────────────────────────────────────────
     function runExplain(sql, rowIdx, btn) {
         var resultDiv = document.getElementById('cs-exp-' + rowIdx);
@@ -678,8 +733,10 @@
             var tags = '';
             if (h.time_ms >= T_CRITICAL)  tags += '<span class="cs-tag cs-tag-critical">critical</span> ';
             else if (h.time_ms >= T_SLOW) tags += '<span class="cs-tag cs-tag-slow">slow</span> ';
-            if (h.cached) tags += '<span class="cs-tag cs-tag-cached">cached</span> ';
-            if (h.error)  tags += '<span class="cs-tag cs-tag-error">error</span> ';
+            if (h.cached)   tags += '<span class="cs-tag cs-tag-cached">cached</span> ';
+            if (h.error)    tags += '<span class="cs-tag cs-tag-error">error</span> ';
+            if (h.insecure) tags += '<span class="cs-tag cs-tag-insecure">http</span> ';
+            if (h.external) tags += '<span class="cs-tag cs-tag-external">external</span> ';
 
             html += '<tr class="cs-expandable ' + rowSpeedClass(h.time_ms) + '" data-idx-h="' + i + '">'
                 + '<td class="c-n">' + (i + 1) + '</td>'
@@ -777,9 +834,11 @@
         // N+1 patterns (already computed)
         Object.keys(n1Patterns).forEach(function (k) {
             var p = n1Patterns[k];
+            var detail = truncate(normalisePattern(p.example), 90);
+            if (p.caller) detail += ' — caller: ' + truncate(p.caller, 50);
             issuesList.push({ sev: 'warning', tab: 'db',
                 title: 'N+1 pattern — ' + p.count + ' identical calls — ' + fmtMs(p.total_ms) + ' total',
-                detail: truncate(normalisePattern(p.example), 110), plugin: p.plugin });
+                detail: detail, plugin: p.plugin });
         });
 
         // Duplicate queries — one entry per group
@@ -795,6 +854,15 @@
             issuesList.push({ sev: 'warning', tab: 'db',
                 title: 'Duplicate query — ' + g.count + ' extra calls',
                 detail: truncate(g.sql, 110), plugin: g.plugin });
+        });
+
+        // HTTP security flags
+        data.http.forEach(function (h) {
+            if (h.insecure) {
+                issuesList.push({ sev: 'warning', tab: 'http',
+                    title: 'Insecure HTTP call — plain http:// (not HTTPS)',
+                    detail: truncateUrl(h.url, 110), plugin: h.plugin });
+            }
         });
 
         // HTTP errors + slow HTTP
@@ -851,6 +919,32 @@
             issuesList.push({ sev: 'info', tab: 'logs',
                 title: 'Debug logging is off',
                 detail: 'Enable WP_DEBUG + WP_DEBUG_LOG in wp-config.php to capture PHP errors here', plugin: '' });
+        }
+
+        // Slow / critical hooks
+        (data.hooks || []).forEach(function (h) {
+            if (h.max_ms >= T_CRITICAL) {
+                issuesList.push({ sev: 'critical', tab: 'hooks',
+                    title: 'Critical hook — ' + h.hook + ' — max ' + fmtMs(h.max_ms),
+                    detail: h.count + ' fires · ' + fmtMs(h.total_ms) + ' total', plugin: '' });
+            } else if (h.max_ms >= T_SLOW) {
+                issuesList.push({ sev: 'warning', tab: 'hooks',
+                    title: 'Slow hook — ' + h.hook + ' — max ' + fmtMs(h.max_ms),
+                    detail: h.count + ' fires · ' + fmtMs(h.total_ms) + ' total', plugin: '' });
+            }
+        });
+
+        // Asset bloat
+        var assets = data.assets || {};
+        var totalAssets = (assets.scripts || []).length + (assets.styles || []).length;
+        if (totalAssets > 40) {
+            issuesList.push({ sev: 'warning', tab: 'assets',
+                title: 'Heavy asset load — ' + totalAssets + ' scripts/styles enqueued',
+                detail: (assets.scripts || []).length + ' JS · ' + (assets.styles || []).length + ' CSS — consider consolidating or deferring', plugin: '' });
+        } else if (totalAssets > 20) {
+            issuesList.push({ sev: 'info', tab: 'assets',
+                title: 'Asset count: ' + totalAssets + ' scripts/styles enqueued',
+                detail: (assets.scripts || []).length + ' JS · ' + (assets.styles || []).length + ' CSS', plugin: '' });
         }
 
         // Sort: critical → warning → info
@@ -1073,7 +1167,32 @@
         var dupeList = Object.values(dupeGroups).filter(function (g) { return g.count > 1; })
             .sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
 
-        var html = '<div class="cs-sum-cards">';
+        var html = '';
+
+        // ── Request waterfall ──────────────────────────────────────────────
+        var miles = data.milestones || [];
+        if (miles.length >= 2) {
+            var totalMs = miles[miles.length - 1].ms || meta.page_load_ms || 1;
+            var wfColors = ['cs-wf-c0','cs-wf-c1','cs-wf-c2','cs-wf-c3','cs-wf-c4','cs-wf-c5','cs-wf-c6'];
+            html += '<div class="cs-sum-section-title">Request Timeline</div><div class="cs-waterfall">';
+            miles.forEach(function (m, mi) {
+                var prev    = mi > 0 ? miles[mi - 1].ms : 0;
+                var dur     = m.ms - prev;
+                var fillPct = totalMs > 0 ? Math.min(100, (m.ms / totalMs) * 100) : 0;
+                var cls     = wfColors[Math.min(mi, wfColors.length - 1)];
+                html += '<div class="cs-wf-row">'
+                    + '<div class="cs-wf-label">' + esc(m.label) + '</div>'
+                    + '<div class="cs-wf-track">'
+                        + '<div class="cs-wf-fill ' + cls + '" style="width:' + fillPct.toFixed(1) + '%"></div>'
+                    + '</div>'
+                    + '<div class="cs-wf-time">' + fmtMs(m.ms) + '</div>'
+                    + '<div class="cs-wf-dur">' + (mi > 0 ? '+' + fmtMs(dur) : '') + '</div>'
+                    + '</div>';
+            });
+            html += '</div>';
+        }
+
+        html += '<div class="cs-sum-cards">';
 
         // Environment card
         if (meta.php_version) {
@@ -1138,12 +1257,15 @@
 
         // Assets card
         var assets = data.assets || {};
-        var jsCount  = (assets.scripts || []).length;
-        var cssCount = (assets.styles  || []).length;
+        var jsCount    = (assets.scripts || []).length;
+        var cssCount   = (assets.styles  || []).length;
+        var totalAsset = jsCount + cssCount;
+        var assetWarn  = totalAsset > 40 ? ' cs-s-crit' : totalAsset > 20 ? ' cs-s-warn' : '';
         html += '<div class="cs-sum-card cs-sum-card-assets"><div class="cs-sum-card-title">&#128190; Assets</div>'
-            + '<div class="cs-sum-card-stat">' + (jsCount + cssCount) + '</div>'
+            + '<div class="cs-sum-card-stat' + assetWarn + '">' + totalAsset + '</div>'
             + '<div class="cs-sum-card-sub">'
             + '<span>' + jsCount + ' JS &middot; ' + cssCount + ' CSS</span>'
+            + (totalAsset > 40 ? '<span class="cs-s-crit">&#9888; Heavy load</span>' : totalAsset > 20 ? '<span class="cs-s-warn">&#9651; Consider auditing</span>' : '')
             + '</div></div>';
 
         html += '</div>'; // cards
