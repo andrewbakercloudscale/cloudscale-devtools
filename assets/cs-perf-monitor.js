@@ -1012,6 +1012,77 @@
                 detail: 'Add define(\'DISALLOW_FILE_MODS\', true) to wp-config.php for hardened servers', plugin: '' });
         }
 
+        // "admin" username exists — prime brute-force target
+        if (health.admin_user_exists) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Username "admin" exists — prime brute-force target',
+                detail: 'Rename in Users → Profile. Transfer content first, then delete the old account.', plugin: '' });
+        }
+
+        // Default wp_ table prefix
+        if (health.db_prefix_default) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'Default wp_ database prefix — easier to exploit in SQL injection',
+                detail: 'Change prefix if recently set up; requires a full DB backup on existing sites', plugin: '' });
+        }
+
+        // XML-RPC enabled
+        if (health.xmlrpc_enabled) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'XML-RPC enabled — brute-force amplification vector',
+                detail: "system.multicall allows 100s of password attempts per request — disable via add_filter('xmlrpc_enabled','__return_false')", plugin: '' });
+        }
+
+        // readme.html / license.txt expose WP version
+        if (health.readme_exposed || health.license_exposed) {
+            var expFiles = [health.readme_exposed ? 'readme.html' : '', health.license_exposed ? 'license.txt' : ''].filter(Boolean).join(', ');
+            issuesList.push({ sev: 'info', tab: 'summary',
+                title: 'WP version disclosed via ' + expFiles,
+                detail: 'Delete these files or block via server config to prevent version fingerprinting', plugin: '' });
+        }
+
+        // PHP EOL
+        if (health.php_eol) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'PHP ' + meta.php_version + ' is end-of-life — no security patches',
+                detail: 'Upgrade to PHP 8.3 or 8.4 — all PHP < 8.2 reached end-of-life', plugin: '' });
+        } else if (health.php_old) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'PHP ' + meta.php_version + ' reaches end-of-life December 2026',
+                detail: 'Plan upgrade to PHP 8.3+ — approaching end of security support', plugin: '' });
+        }
+
+        // Failed logins — brute-force signal (analogous to fail2ban for SSH)
+        if (health.failed_logins_1h >= 10) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: health.failed_logins_1h + ' failed logins in the last hour — active brute force',
+                detail: health.failed_logins_24h + ' in 24 h — block source IP in Cloudflare or enforce 2FA', plugin: '' });
+        } else if (health.failed_logins_1h >= 3) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: health.failed_logins_1h + ' failed login attempts in the last hour',
+                detail: health.failed_logins_24h + ' in 24 h', plugin: '' });
+        } else if (health.failed_logins_24h >= 10) {
+            issuesList.push({ sev: 'info', tab: 'summary',
+                title: health.failed_logins_24h + ' failed login attempts in the last 24 hours',
+                detail: 'No acute spike, but sustained probing detected', plugin: '' });
+        }
+
+        // Author enumeration
+        if (health.author_enum_risk) {
+            issuesList.push({ sev: 'info', tab: 'summary',
+                title: 'Author enumeration — /?author=1 reveals WordPress usernames',
+                detail: "Add add_filter('redirect_canonical','__return_false') or disable author archives", plugin: '' });
+        }
+
+        // Plugins with pending updates
+        var pUpdates = health.plugins_with_updates || [];
+        if (pUpdates.length > 0) {
+            var pNames = pUpdates.slice(0, 3).map(function (p) { return p.slug + ' (' + p.current + ' → ' + p.new_version + ')'; }).join(', ');
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: pUpdates.length + ' plugin' + (pUpdates.length > 1 ? 's have' : ' has') + ' pending updates',
+                detail: pNames + (pUpdates.length > 3 ? ' + ' + (pUpdates.length - 3) + ' more' : ''), plugin: '' });
+        }
+
         // Render-blocking scripts — in <head>, no defer/async
         var renderBlocking = (data.assets && data.assets.scripts || []).filter(function (s) {
             return s.src && !s.in_footer && s.strategy !== 'defer' && s.strategy !== 'async';
@@ -1478,6 +1549,52 @@
                 ? health.cron_overdue + ' overdue of ' + health.cron_total + ' scheduled — ' + (health.cron_overdue_list || []).slice(0,2).map(function(e){return e.hook;}).join(', ')
                 : health.cron_total + ' events scheduled, none overdue';
             html += hBadge(cronOk, cronWarn, 'WP-Cron', cronDetail);
+
+            // "admin" username
+            html += hBadge(!health.admin_user_exists, false,
+                '"admin" username',
+                health.admin_user_exists ? 'EXISTS — rename immediately' : 'Not in use');
+
+            // DB prefix
+            html += hBadge(!health.db_prefix_default, true,
+                'DB table prefix',
+                health.db_prefix_default ? 'Default wp_ prefix in use' : 'Custom prefix set');
+
+            // XML-RPC
+            html += hBadge(!health.xmlrpc_enabled, true,
+                'XML-RPC',
+                health.xmlrpc_enabled ? 'Enabled — disable if not needed' : 'Disabled');
+
+            // PHP version
+            var phpOk = !health.php_eol && !health.php_old;
+            var phpWarn = !health.php_eol && health.php_old;
+            html += hBadge(phpOk, phpWarn, 'PHP version', meta.php_version + (health.php_eol ? ' — EOL' : health.php_old ? ' — EOL Dec 2026' : ' — supported'));
+
+            // Failed logins
+            var fl1h = health.failed_logins_1h || 0;
+            var fl24h = health.failed_logins_24h || 0;
+            var flOk = fl1h < 3 && fl24h < 10;
+            var flWarn = fl1h >= 3 && fl1h < 10;
+            html += hBadge(flOk, flWarn,
+                'Failed logins',
+                fl1h + ' in 1 h · ' + fl24h + ' in 24 h' + (fl1h >= 10 ? ' — ACTIVE BRUTE FORCE' : ''));
+
+            // readme / license exposure
+            var exposed = [health.readme_exposed ? 'readme.html' : '', health.license_exposed ? 'license.txt' : ''].filter(Boolean);
+            html += hBadge(exposed.length === 0, true,
+                'Version disclosure',
+                exposed.length > 0 ? exposed.join(', ') + ' present' : 'No version files found');
+
+            // Author enumeration
+            html += hBadge(!health.author_enum_risk, true,
+                'Author enumeration',
+                health.author_enum_risk ? '/?author=1 may reveal usernames' : 'Protected or disabled');
+
+            // Plugin updates
+            var puLen = (health.plugins_with_updates || []).length;
+            html += hBadge(puLen === 0, puLen > 0,
+                'Plugin updates',
+                puLen === 0 ? 'All plugins up to date' : puLen + ' pending update' + (puLen > 1 ? 's' : ''));
 
             html += '</div>';
         }

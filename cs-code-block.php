@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.78
+ * Version: 1.8.79
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.78';
+    const VERSION      = '1.8.79';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -300,6 +300,9 @@ class CloudScale_DevTools {
         add_filter( 'lostpassword_url',    [ __CLASS__, 'login_custom_lostpassword_url' ], 10, 2 );
         add_filter( 'network_site_url',    [ __CLASS__, 'login_custom_network_url' ], 10, 3 );
         add_filter( 'site_url',            [ __CLASS__, 'login_custom_site_url' ], 10, 4 );
+
+        // Security monitor — always track failed logins regardless of monitor toggle.
+        add_action( 'wp_login_failed', [ __CLASS__, 'perf_track_failed_login' ] );
 
         // Custom 404 page + hiscore leaderboard.
         add_action( 'template_redirect',                        [ __CLASS__, 'maybe_custom_404' ], 1 );
@@ -3080,18 +3083,106 @@ class CloudScale_DevTools {
         $wp_debug_display = defined( 'WP_DEBUG' ) && WP_DEBUG
             && ( ! defined( 'WP_DEBUG_DISPLAY' ) || WP_DEBUG_DISPLAY );
 
+        // ── Credential / account hygiene ─────────────────────────────────────
+        $admin_user_exists = (bool) username_exists( 'admin' );
+
+        // ── Database ──────────────────────────────────────────────────────────
+        $db_prefix_default = ( $wpdb->prefix === 'wp_' );
+
+        // ── XML-RPC ───────────────────────────────────────────────────────────
+        $xmlrpc_enabled = file_exists( ABSPATH . 'xmlrpc.php' )
+            && (bool) apply_filters( 'xmlrpc_enabled', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+
+        // ── File exposure ─────────────────────────────────────────────────────
+        $readme_exposed  = file_exists( ABSPATH . 'readme.html' );
+        $license_exposed = file_exists( ABSPATH . 'license.txt' );
+
+        // ── PHP version ───────────────────────────────────────────────────────
+        // April 2026: 8.0 EOL Nov 2023, 8.1 EOL Dec 2025, 8.2 EOL Dec 2026, 8.3+ current.
+        $php_eol = version_compare( PHP_VERSION, '8.2', '<' ); // EOL — no security patches
+        $php_old = ! $php_eol && version_compare( PHP_VERSION, '8.2', '==' ); // 8.2 EOL Dec 2026
+
+        // ── Failed logins (brute-force signal) ────────────────────────────────
+        $failed_logins_1h  = (int) get_transient( 'cs_devtools_failed_logins_1h' );
+        $failed_logins_24h = (int) get_transient( 'cs_devtools_failed_logins_24h' );
+
+        // ── Author enumeration ────────────────────────────────────────────────
+        // With pretty permalinks on, /?author=1 redirects to /author/username/.
+        // Flag if pretty permalinks are active and no known filter blocks it.
+        $author_enum_risk = ! empty( get_option( 'permalink_structure' ) )
+            && ! has_filter( 'redirect_canonical', '__return_false' )
+            && ! has_action( 'template_redirect', '__return_false' );
+
+        // ── Plugins with pending updates ──────────────────────────────────────
+        $plugins_with_updates = self::perf_get_plugin_update_info();
+
         return [
-            'autoload_kb'        => $autoload_kb,
-            'autoload_count'     => $autoload_count,
-            'large_autoloads'    => $large_autoloads,
-            'cron_total'         => $cron_total,
-            'cron_overdue'       => $cron_overdue,
-            'cron_overdue_list'  => $overdue_list,
-            'wp_debug_display'   => $wp_debug_display,
-            'disallow_file_edit' => defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT,
-            'disallow_file_mods' => defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS,
-            'site_https'         => strpos( home_url(), 'https://' ) === 0,
+            'autoload_kb'          => $autoload_kb,
+            'autoload_count'       => $autoload_count,
+            'large_autoloads'      => $large_autoloads,
+            'cron_total'           => $cron_total,
+            'cron_overdue'         => $cron_overdue,
+            'cron_overdue_list'    => $overdue_list,
+            'wp_debug_display'     => $wp_debug_display,
+            'disallow_file_edit'   => defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT,
+            'disallow_file_mods'   => defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS,
+            'site_https'           => strpos( home_url(), 'https://' ) === 0,
+            'admin_user_exists'    => $admin_user_exists,
+            'db_prefix_default'    => $db_prefix_default,
+            'xmlrpc_enabled'       => $xmlrpc_enabled,
+            'readme_exposed'       => $readme_exposed,
+            'license_exposed'      => $license_exposed,
+            'php_eol'              => $php_eol,
+            'php_old'              => $php_old,
+            'failed_logins_1h'     => $failed_logins_1h,
+            'failed_logins_24h'    => $failed_logins_24h,
+            'author_enum_risk'     => $author_enum_risk,
+            'plugins_with_updates' => $plugins_with_updates,
         ];
+    }
+
+    /**
+     * Fired on wp_login_failed. Increments rolling failed-login counters stored
+     * as transients so the CS Monitor can surface brute-force signals.
+     *
+     * @param string $username The username that failed authentication.
+     * @return void
+     */
+    public static function perf_track_failed_login( string $username ): void {
+        // 1-hour rolling window.
+        $c1h = (int) get_transient( 'cs_devtools_failed_logins_1h' );
+        set_transient( 'cs_devtools_failed_logins_1h', $c1h + 1, HOUR_IN_SECONDS );
+        // 24-hour rolling window.
+        $c24h = (int) get_transient( 'cs_devtools_failed_logins_24h' );
+        set_transient( 'cs_devtools_failed_logins_24h', $c24h + 1, DAY_IN_SECONDS );
+    }
+
+    /**
+     * Returns plugins that have a pending update available, using the cached
+     * update_plugins site transient (populated by WP's own update check cron).
+     * Never makes a live HTTP call — reads from DB only.
+     *
+     * @return array  [ { slug, name, current, new_version } ]
+     */
+    private static function perf_get_plugin_update_info(): array {
+        $update_data = get_site_transient( 'update_plugins' );
+        if ( ! $update_data || empty( $update_data->response ) ) {
+            return [];
+        }
+        $results = [];
+        foreach ( $update_data->response as $plugin_file => $plugin_data ) {
+            $current_ver = $update_data->checked[ $plugin_file ] ?? '';
+            $slug        = $plugin_data->slug ?? basename( dirname( $plugin_file ) );
+            $results[]   = [
+                'plugin'      => $plugin_file,
+                'slug'        => $slug,
+                'current'     => $current_ver,
+                'new_version' => $plugin_data->new_version ?? '',
+            ];
+        }
+        // Sort by slug name.
+        usort( $results, fn( $a, $b ) => strcmp( $a['slug'], $b['slug'] ) );
+        return $results;
     }
 
     /**
