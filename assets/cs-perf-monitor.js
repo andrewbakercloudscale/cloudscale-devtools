@@ -1026,11 +1026,18 @@
                 detail: 'Change prefix if recently set up; requires a full DB backup on existing sites', plugin: '' });
         }
 
-        // XML-RPC enabled
+        // XML-RPC enabled — standalone warning; escalates to critical below if brute force is active
         if (health.xmlrpc_enabled) {
             issuesList.push({ sev: 'warning', tab: 'summary',
                 title: 'XML-RPC enabled — brute-force amplification vector',
                 detail: "system.multicall allows 100s of password attempts per request — disable via add_filter('xmlrpc_enabled','__return_false')", plugin: '' });
+        }
+
+        // XML-RPC + active brute force — both signals together mean the attack is already happening
+        if (health.xmlrpc_enabled && health.failed_logins_1h >= 5) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Active XML-RPC brute force — ' + health.failed_logins_1h + ' failed logins/hour with xmlrpc.php enabled',
+                detail: 'Disable immediately: add_filter("xmlrpc_enabled","__return_false") in a mu-plugin, or block /xmlrpc.php at Nginx/Cloudflare WAF.', plugin: '' });
         }
 
         // readme.html / license.txt expose WP version
@@ -1052,6 +1059,43 @@
                 detail: 'Plan upgrade to PHP 8.3+ — approaching end of security support', plugin: '' });
         }
 
+        // WordPress core outdated
+        if (health.wp_update_available) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'WordPress update available — running ' + (meta.wp_version || '?') + ', latest is ' + (health.wp_latest_version || 'a newer version'),
+                detail: 'Outdated WP core leaves known CVEs unpatched. Update via Dashboard → Updates or: wp core update', plugin: '' });
+        }
+
+        // MySQL / MariaDB version EOL
+        if (meta.mysql_version) {
+            var dbParts = meta.mysql_version.split('.').map(Number);
+            var dbMaj = dbParts[0] || 0, dbMin = dbParts[1] || 0;
+            var dbIsMariaDB = !!health.is_mariadb;
+            var dbEolCrit = false, dbEolWarn = false, dbEolLabel = '';
+            if (dbIsMariaDB) {
+                if (dbMaj === 10 && dbMin <= 4)  { dbEolCrit = true;  dbEolLabel = 'EOL Jun 2024'; }
+                else if (dbMaj === 10 && dbMin === 5) { dbEolCrit = true;  dbEolLabel = 'EOL Jun 2025'; }
+                else if (dbMaj === 10 && dbMin === 6) { dbEolWarn = true; dbEolLabel = 'EOL Jul 2026'; }
+                else if (dbMaj === 10 && dbMin < 11) { dbEolWarn = true; dbEolLabel = 'approaching EOL'; }
+                // 10.11 LTS, 11.x — OK
+            } else {
+                if (dbMaj < 8)                    { dbEolCrit = true;  dbEolLabel = 'EOL — no security patches'; }
+                else if (dbMaj === 8 && dbMin === 0) { dbEolWarn = true; dbEolLabel = 'EOL Apr 2026'; }
+                // 8.4 LTS — OK
+            }
+            var dbName = dbIsMariaDB ? 'MariaDB' : 'MySQL';
+            var dbTarget = dbIsMariaDB ? 'MariaDB 10.11 LTS or 11.4 LTS' : 'MySQL 8.4 LTS';
+            if (dbEolCrit) {
+                issuesList.push({ sev: 'critical', tab: 'summary',
+                    title: dbName + ' ' + meta.mysql_version + ' is end-of-life — ' + dbEolLabel,
+                    detail: 'No security patches available. Upgrade to ' + dbTarget + '.', plugin: '' });
+            } else if (dbEolWarn) {
+                issuesList.push({ sev: 'warning', tab: 'summary',
+                    title: dbName + ' ' + meta.mysql_version + ' — ' + dbEolLabel,
+                    detail: 'Plan upgrade to ' + dbTarget + ' before end-of-life.', plugin: '' });
+            }
+        }
+
         // Failed logins — brute-force signal (analogous to fail2ban for SSH)
         if (health.failed_logins_1h >= 10) {
             issuesList.push({ sev: 'critical', tab: 'summary',
@@ -1065,6 +1109,155 @@
             issuesList.push({ sev: 'info', tab: 'summary',
                 title: health.failed_logins_24h + ' failed login attempts in the last 24 hours',
                 detail: 'No acute spike, but sustained probing detected', plugin: '' });
+        }
+
+        // Memory pressure — data lives in meta, not health
+        var memLimitMb = parseInt(meta.memory_limit, 10) || 0;
+        var memUsagePct = (memLimitMb > 0 && meta.memory_peak_mb) ? Math.round((meta.memory_peak_mb / memLimitMb) * 100) : 0;
+        if (memUsagePct >= 90) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Memory critical: ' + meta.memory_peak_mb + 'MB peak (' + memUsagePct + '% of ' + meta.memory_limit + ' limit)',
+                detail: 'PHP process is near memory_limit — OOM fatal errors likely. Increase limit or profile allocations.', plugin: '' });
+        } else if (memUsagePct >= 75) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'Elevated memory usage: ' + meta.memory_peak_mb + 'MB peak (' + memUsagePct + '% of ' + meta.memory_limit + ' limit)',
+                detail: 'Approaching PHP memory_limit — audit heavy plugins or raise the limit in php.ini / wp-config.php.', plugin: '' });
+        }
+
+        // System load average — CPU pressure (Unix only; absent on Windows/shared hosting)
+        var loadAvg  = health.load_avg  || [];
+        var cpuCount = health.cpu_count || 1;
+        if (loadAvg.length >= 1) {
+            var load1m = loadAvg[0];
+            if (load1m >= cpuCount * 2) {
+                issuesList.push({ sev: 'critical', tab: 'summary',
+                    title: 'System overloaded — load average ' + load1m + ' (' + cpuCount + '-CPU server)',
+                    detail: 'Load >2× CPU count. Check for xmlrpc.php flood, WP-Cron pile-up, or stuck PHP-FPM workers.', plugin: '' });
+            } else if (load1m >= cpuCount * 1.5) {
+                issuesList.push({ sev: 'warning', tab: 'summary',
+                    title: 'High CPU load — load average ' + load1m + ' (' + cpuCount + '-CPU server)',
+                    detail: 'Load >1.5× CPU count — request spike, heavy background job, or resource-intensive plugin.', plugin: '' });
+            }
+        }
+
+        // Disk space
+        if (health.disk_pct_used !== null && health.disk_pct_used !== undefined) {
+            if (health.disk_pct_used >= 95) {
+                issuesList.push({ sev: 'critical', tab: 'summary',
+                    title: 'Disk almost full — ' + health.disk_pct_used + '% used (' + health.disk_free_gb + ' GB free)',
+                    detail: 'Site stops working when disk is full — uploads fail, logs stop writing, sessions break. Free space immediately.', plugin: '' });
+            } else if (health.disk_pct_used >= 85) {
+                issuesList.push({ sev: 'warning', tab: 'summary',
+                    title: 'Low disk space — ' + health.disk_pct_used + '% used (' + health.disk_free_gb + ' GB free)',
+                    detail: 'Approaching full. Check for large log files, old backups, and unused media uploads.', plugin: '' });
+            }
+        }
+
+        // PHP OPcache
+        var oc = health.opcache || null;
+        if (oc !== null) {
+            if (oc.enabled === false) {
+                issuesList.push({ sev: 'warning', tab: 'summary',
+                    title: 'PHP OPcache disabled — every request recompiles all PHP files',
+                    detail: 'Enable in php.ini: opcache.enable=1, opcache.memory_consumption=128. Can cut CPU usage and TTFB by 30–50%.', plugin: '' });
+            } else if (oc.enabled) {
+                if (oc.oom_restarts > 0) {
+                    issuesList.push({ sev: 'critical', tab: 'summary',
+                        title: 'OPcache ran out of memory — ' + oc.oom_restarts + ' OOM restart' + (oc.oom_restarts > 1 ? 's' : '') + ' recorded',
+                        detail: 'Cache was cleared under memory pressure — causes CPU spikes. Increase opcache.memory_consumption to 128–256MB.', plugin: '' });
+                }
+                if (oc.mem_pct >= 90) {
+                    issuesList.push({ sev: 'warning', tab: 'summary',
+                        title: 'OPcache memory at ' + oc.mem_pct + '% — ' + oc.used_mb + 'MB used',
+                        detail: 'Cache close to full. Increase opcache.memory_consumption in php.ini before it triggers OOM restarts.', plugin: '' });
+                }
+                if (oc.hit_rate < 85 && oc.cached_scripts > 10) {
+                    issuesList.push({ sev: 'warning', tab: 'summary',
+                        title: 'Low OPcache hit rate: ' + oc.hit_rate + '% — PHP files recompiled frequently',
+                        detail: 'Memory may be too small for all cached scripts, or a plugin is invalidating the cache on every request.', plugin: '' });
+                }
+            }
+        }
+
+        // Uploads directory writable
+        if (health.uploads_writable === false) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Uploads directory not writable — media uploads will fail silently',
+                detail: 'Fix permissions on wp-content/uploads: chmod 755 (or 775 with www-data group ownership).', plugin: '' });
+        }
+
+        // PHP upload and execution limits
+        function parsePhpSizeMb(s) {
+            if (!s) return 0;
+            var n = parseFloat(s);
+            var u = String(s).slice(-1).toUpperCase();
+            if (u === 'G') return n * 1024;
+            if (u === 'K') return n / 1024;
+            return n; // M or bare number treated as MB
+        }
+        var uploadMb  = parsePhpSizeMb(health.php_upload_max);
+        var postMb    = parsePhpSizeMb(health.php_post_max);
+        var maxExec   = health.php_max_exec || 0;
+        if (uploadMb > 0 && uploadMb < 8) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'upload_max_filesize is ' + health.php_upload_max + ' — large media uploads will fail',
+                detail: 'Raise to at least 64M in php.ini or .htaccess: php_value upload_max_filesize 64M', plugin: '' });
+        }
+        if (postMb > 0 && uploadMb > 0 && postMb < uploadMb) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'post_max_size (' + health.php_post_max + ') < upload_max_filesize (' + health.php_upload_max + ')',
+                detail: 'post_max_size must be ≥ upload_max_filesize or file uploads will silently fail. Raise post_max_size.', plugin: '' });
+        }
+        if (maxExec > 0 && maxExec < 30) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'max_execution_time is ' + maxExec + 's — imports and exports may time out',
+                detail: 'Raise to at least 60s in php.ini: max_execution_time = 60', plugin: '' });
+        }
+
+        // Maintenance mode loop — .maintenance file older than 10 minutes
+        if (health.maintenance_stale) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Site stuck in maintenance mode — stale .maintenance file detected',
+                detail: 'An interrupted update left the .maintenance lock file behind. Delete it from the WordPress root directory.', plugin: '' });
+        }
+
+        // siteurl / home URL mismatch vs current request host
+        if (health.url_host_mismatch) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'URL mismatch — current host differs from siteurl/home options',
+                detail: 'Possible login redirect loop, broken cookies, or incorrect site migration. Verify siteurl and home in Settings → General.', plugin: '' });
+        }
+        if (health.url_const_override) {
+            issuesList.push({ sev: 'info', tab: 'summary',
+                title: 'WP_SITEURL or WP_HOME constant overrides database URL',
+                detail: 'These wp-config.php constants shadow Settings → General. If set intentionally, no action needed — but they can mask migration issues.', plugin: '' });
+        }
+
+        // Rewrite rules missing — permalinks need flushing
+        if (health.rewrite_rules_missing) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Rewrite rules missing — pretty permalinks will return 404',
+                detail: 'Go to Settings → Permalinks and click Save Changes to regenerate the rules (no other changes needed).', plugin: '' });
+        }
+
+        // wp-config.php world-readable
+        if (health.wpconfig_world_readable) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'wp-config.php is world-readable — any system user can read DB credentials',
+                detail: 'Run: chmod 600 /path/to/wp-config.php (or 640 if the web server needs group read access).', plugin: '' });
+        }
+
+        // debug.log growing large
+        if (health.debug_log_mb !== null && health.debug_log_mb !== undefined) {
+            if (health.debug_log_mb >= 100) {
+                issuesList.push({ sev: 'critical', tab: 'logs',
+                    title: 'debug.log is ' + health.debug_log_mb + 'MB — disk space risk',
+                    detail: 'Truncate with: truncate -s 0 wp-content/debug.log — then disable WP_DEBUG_LOG or add log rotation.', plugin: '' });
+            } else if (health.debug_log_mb >= 10) {
+                issuesList.push({ sev: 'warning', tab: 'logs',
+                    title: 'debug.log is ' + health.debug_log_mb + 'MB — consider rotating',
+                    detail: 'A large debug log indicates ongoing PHP errors. Check the Logs tab for the most frequent errors, then fix the root cause.', plugin: '' });
+            }
         }
 
         // Author enumeration
@@ -1299,6 +1492,150 @@
                 'Consider Asset CleanUp or Perfmatters for no-code per-page asset management.',
                 'Combine/minify remaining assets if your CDN or caching layer doesn\'t handle it.'
             ]
+        },
+        memory_pressure: {
+            why: 'When PHP peak memory approaches memory_limit, processes become unstable and can crash with a fatal "Allowed memory size exhausted" error, killing the request.',
+            steps: [
+                'Check which plugin is the biggest consumer: install <b>Query Monitor</b> and look at the Memory column.',
+                'Increase the limit as a short-term fix — in <code>wp-config.php</code>: <code>define( \'WP_MEMORY_LIMIT\', \'256M\' );</code>',
+                'Or in <code>php.ini</code> / <code>.htaccess</code>: <code>php_value memory_limit 256M</code>',
+                'Identify and deactivate heavy plugins one by one while watching the memory figure here.',
+                'Check for memory leaks in custom code — large arrays held in global scope or unbounded WP_Query loops are common culprits.',
+                'On WooCommerce stores: enable <code>WC_TEMPLATE_DEBUG_MODE</code> or use an APM (New Relic, Tideways) for per-request allocation traces.'
+            ]
+        },
+        high_load: {
+            why: 'When system load average exceeds CPU count, requests queue up faster than they finish — PHP-FPM workers pile up, response times spike, and the server can become unresponsive.',
+            steps: [
+                'Check for an xmlrpc.php flood first — it\'s the most common cause on WordPress: <code>grep "POST.*xmlrpc.php" /var/log/nginx/access.log | wc -l</code>',
+                'Identify which IPs are attacking: <code>grep "xmlrpc.php" /var/log/nginx/access.log | awk \'{print $1}\' | sort | uniq -c | sort -rn | head -20</code>',
+                'Check for stuck long-running PHP-FPM workers: <code>ps aux | grep php-fpm | grep www | awk \'{print $10, $11}\' | sort -rn | head -10</code>',
+                'Kill workers that have been running for >2 minutes: <code>ps aux | grep php-fpm | grep www | awk \'$10 > "2:00" {print $2}\' | xargs kill -9</code>',
+                'Set a request timeout in your PHP-FPM pool config to prevent pile-up: <code>request_terminate_timeout = 60</code>',
+                'Block xmlrpc.php at Nginx if it\'s the source: <code>location = /xmlrpc.php { deny all; return 403; }</code>',
+                'Check WP-Cron for a backlog — many overdue events running simultaneously also spike load: <code>wp cron event list --due-now</code>'
+            ]
+        },
+        disk_space: {
+            why: 'A full disk silently kills WordPress — new uploads fail, PHP sessions can\'t be written, MySQL can\'t flush to disk, and wp-cron jobs stop completing.',
+            steps: [
+                'Find the largest directories: <code>du -sh /* 2>/dev/null | sort -rh | head -20</code>',
+                'Check for oversized log files: <code>du -sh /var/log/* 2>/dev/null | sort -rh | head -10</code>',
+                'Truncate a log file without deleting it: <code>truncate -s 0 /var/log/nginx/access.log</code> (safer than rm while nginx is running)',
+                'Check WordPress debug.log: <code>du -sh wp-content/debug.log</code> — set a max size or disable WP_DEBUG_LOG when not in use',
+                'Find large files anywhere on the server: <code>find / -xdev -size +100M -not -path "/proc/*" 2>/dev/null | sort</code>',
+                'Clean up old backup archives if stored on the same disk — use an offsite destination (S3, B2) instead.',
+                'Remove unused WordPress uploads: <b>Media → Library</b> — or run <code>wp media regenerate --only-missing</code> to remove orphaned sizes.'
+            ]
+        },
+        opcache: {
+            why: 'PHP OPcache compiles each .php file once and stores the bytecode in shared memory. Without it, every single request re-parses and re-compiles every PHP file — wasting CPU and slowing response times significantly.',
+            steps: [
+                'Check if OPcache is installed: <code>php -m | grep -i opcache</code> — if absent, install the extension.',
+                'Enable in <code>php.ini</code> (or <code>/etc/php/8.x/fpm/conf.d/10-opcache.ini</code>):<br><code>opcache.enable=1</code><br><code>opcache.enable_cli=0</code><br><code>opcache.memory_consumption=128</code><br><code>opcache.interned_strings_buffer=16</code><br><code>opcache.max_accelerated_files=10000</code><br><code>opcache.validate_timestamps=1</code><br><code>opcache.revalidate_freq=60</code>',
+                'Reload PHP-FPM after changes: <code>systemctl reload php8.x-fpm</code>',
+                'Verify OPcache is active: <code>php -r "var_dump(opcache_get_status()[\'opcache_enabled\']);"</code>',
+                'If OOM restarts are occurring, increase memory: <code>opcache.memory_consumption=256</code>',
+                'For high traffic sites, disable timestamp validation in production for a speed boost: <code>opcache.validate_timestamps=0</code> — then reload PHP-FPM after each deploy.'
+            ]
+        },
+        uploads_writable: {
+            why: 'WordPress writes uploaded files directly to wp-content/uploads. If the directory is not writable by the web server user, all media uploads silently fail — the file never lands on disk.',
+            steps: [
+                'Check current ownership and permissions: <code>ls -la wp-content/uploads/</code>',
+                'The directory must be writable by the web server user (typically www-data on Debian/Ubuntu, nginx on RHEL/CentOS).',
+                'Set correct ownership: <code>chown -R www-data:www-data wp-content/uploads/</code>',
+                'Set correct permissions: <code>chmod -R 755 wp-content/uploads/</code>',
+                'If on shared hosting: upload a test file via FTP and confirm it appears in <b>Media → Library</b>.',
+                'Verify the upload path in Settings → Media is not set to an absolute path that doesn\'t exist.',
+                'Check for a custom uploads path set via <code>UPLOADS</code> constant in wp-config.php — the target directory must also be writable.'
+            ]
+        },
+        wp_outdated: {
+            why: 'WordPress core updates patch publicly disclosed security vulnerabilities (CVEs). Running an outdated version gives attackers a known exploit window during the period between disclosure and your update.',
+            steps: [
+                'Go to <b>Dashboard → Updates</b> and click <b>Update Now</b>.',
+                'Or via WP-CLI (faster, no browser timeout): <code>wp core update && wp core update-db</code>',
+                'Always take a backup first: <code>wp db export backup-$(date +%Y%m%d).sql</code>',
+                'If auto-updates are appropriate for your site, enable them in wp-config.php: <code>define( \'WP_AUTO_UPDATE_CORE\', true );</code>',
+                'After updating, run <code>wp plugin verify-checksums --all</code> to confirm plugin integrity.'
+            ]
+        },
+        mysql_eol: {
+            why: 'End-of-life database versions receive no security patches. Known CVEs accumulate without fixes, and WordPress core and plugin minimum requirements continue to rise.',
+            steps: [
+                'Check your current version: <code>mysql --version</code> or <code>SELECT VERSION();</code>',
+                'For <b>MySQL</b>: upgrade to MySQL 8.4 LTS. On Ubuntu: <code>apt-get install mysql-server-8.4</code> or use the official MySQL APT repository.',
+                'For <b>MariaDB</b>: upgrade to 10.11 LTS or 11.4 LTS. See mariadb.org/download for repository setup.',
+                '<b>Before upgrading:</b> <code>wp db export backup-pre-upgrade.sql</code> — always back up first.',
+                'After upgrading the server, run: <code>mysql_upgrade -u root -p</code> (MySQL) or <code>mariadb-upgrade</code> (MariaDB)',
+                'Verify WordPress still works: <code>wp db check</code>',
+                'Check your hosting control panel — managed hosts often have a one-click version selector (cPanel, Plesk, Kinsta, etc.).'
+            ]
+        },
+        maintenance_stuck: {
+            why: 'WordPress creates a .maintenance file at the start of a core/plugin/theme update and deletes it when complete. If the update process is interrupted (browser closed, PHP timeout, server crash), the file remains and the site stays in maintenance mode indefinitely.',
+            steps: [
+                'Connect to your server via SSH or SFTP.',
+                'Navigate to your WordPress root directory (same folder as wp-config.php).',
+                'Delete the lock file: <code>rm .maintenance</code>',
+                'Reload the site — it should return to normal immediately.',
+                'If the interrupted update left plugins or core files in a broken state, re-run the update from <b>Dashboard → Updates</b>.'
+            ]
+        },
+        url_mismatch: {
+            why: 'WordPress stores its own URL (siteurl) and the public site URL (home) in the database. If these don\'t match the domain the site is actually served from, login cookies can\'t be set, causing an infinite redirect loop at /wp-login.php.',
+            steps: [
+                'Check the current configured URLs: go to <b>Settings → General</b> in wp-admin.',
+                'If you can\'t log in, update via WP-CLI: <code>wp option update siteurl "https://yourdomain.com"</code> and <code>wp option update home "https://yourdomain.com"</code>.',
+                'Or update directly in the database: <code>UPDATE wp_options SET option_value="https://yourdomain.com" WHERE option_name IN ("siteurl","home");</code>',
+                'If <code>WP_SITEURL</code> or <code>WP_HOME</code> are defined in wp-config.php, they override the database — update them there instead.',
+                'After fixing URLs, clear all caches (object cache, page cache, browser cookies).',
+                'Verify cookies are working: the WordPress auth cookie domain must match the site domain.'
+            ]
+        },
+        rewrite_rules: {
+            why: 'WordPress uses URL rewriting to map pretty permalink URLs (like /2024/01/my-post/) to the actual query string (?p=123). If the rewrite rules are missing or stale, all non-home URLs return 404.',
+            steps: [
+                'Go to <b>Settings → Permalinks</b> in wp-admin.',
+                'Click <b>Save Changes</b> — no modifications needed, just saving regenerates the rules.',
+                'If that doesn\'t work, verify your <code>.htaccess</code> (Apache) or Nginx config has the WordPress rewrite block.',
+                'For Apache — check that <code>AllowOverride All</code> is set in your virtual host config so .htaccess rules are applied.',
+                'For Nginx — ensure your server block includes: <code>try_files $uri $uri/ /index.php?$args;</code>',
+                'Force regenerate via WP-CLI: <code>wp rewrite flush --hard</code>'
+            ]
+        },
+        wpconfig_perms: {
+            why: 'wp-config.php contains database credentials, auth keys, and salts. World-readable permissions (644) allow any user or process on the same server to read these secrets — a critical risk on shared hosting.',
+            steps: [
+                'Set owner-only read/write: <code>chmod 600 /var/www/html/wp-config.php</code>',
+                'If the web server process needs read access (and runs as a different user): <code>chmod 640 wp-config.php && chown youruser:www-data wp-config.php</code>',
+                'Verify: <code>ls -la wp-config.php</code> should show <code>-rw-------</code> (600) or <code>-rw-r-----</code> (640).',
+                'Optionally, move wp-config.php one level above the web root — WordPress automatically checks the parent directory.',
+                'Rotate your database password and auth keys/salts after exposure: use the <a href="https://api.wordpress.org/secret-key/1.1/salt/">WordPress key generator</a>.'
+            ]
+        },
+        debug_log: {
+            why: 'A large debug.log means PHP is continuously generating errors or notices. Each write appends to the file — on a busy site this can fill disk space and mask the actual errors that need fixing.',
+            steps: [
+                'View the most recent errors in the <b>Logs tab</b> of CS Monitor — identify the most frequent error and fix its root cause.',
+                'Truncate the file without restarting PHP: <code>truncate -s 0 wp-content/debug.log</code>',
+                'Set up log rotation to prevent it growing again: <code>/etc/logrotate.d/wp-debug</code> — rotate daily, keep 7 days, compress.',
+                'Once errors are resolved, disable debug logging in wp-config.php: <code>define( \'WP_DEBUG_LOG\', false );</code>',
+                'Or limit to only genuine errors (not notices/warnings): <code>error_reporting( E_ERROR | E_PARSE );</code>'
+            ]
+        },
+        php_limits: {
+            why: 'WordPress media uploads and import operations fail silently when PHP\'s upload_max_filesize or post_max_size are too small. The browser reports success but no file lands on the server.',
+            steps: [
+                'Locate the active php.ini: <code>php --ini</code> or check <b>Tools → Site Health → Info → Server</b>.',
+                'Increase upload and post size in <code>php.ini</code>:<br><code>upload_max_filesize = 64M</code><br><code>post_max_size = 64M</code><br><code>max_execution_time = 60</code>',
+                'Or via <code>.htaccess</code> on Apache: <code>php_value upload_max_filesize 64M</code><br><code>php_value post_max_size 64M</code>',
+                'Or in <code>wp-config.php</code> (only affects WP memory, not upload size): <code>@ini_set(\'upload_max_filesize\', \'64M\');</code>',
+                '<b>Important:</b> post_max_size must be ≥ upload_max_filesize — if post_max is smaller, PHP silently discards the upload body.',
+                'Reload PHP-FPM after editing php.ini: <code>systemctl reload php8.x-fpm</code>',
+                'Verify the new values at <b>Tools → Site Health → Info → Media Handling</b>.'
+            ]
         }
     };
 
@@ -1306,7 +1643,20 @@
         var t = issue.title.toLowerCase();
         if (t.indexOf('"admin"') !== -1 || (t.indexOf('username') !== -1 && t.indexOf('admin') !== -1)) return ISSUE_FIXES.admin_user;
         if (t.indexOf('wp_') !== -1 && t.indexOf('prefix') !== -1)  return ISSUE_FIXES.db_prefix;
-        if (t.indexOf('xml-rpc') !== -1)                             return ISSUE_FIXES.xmlrpc;
+        if (t.indexOf('xml-rpc') !== -1 || t.indexOf('xmlrpc') !== -1) return ISSUE_FIXES.xmlrpc;
+        if (t.indexOf('memory critical') !== -1 || t.indexOf('elevated memory') !== -1) return ISSUE_FIXES.memory_pressure;
+        if (t.indexOf('system overloaded') !== -1 || t.indexOf('high cpu load') !== -1) return ISSUE_FIXES.high_load;
+        if (t.indexOf('disk almost full') !== -1 || t.indexOf('low disk space') !== -1) return ISSUE_FIXES.disk_space;
+        if (t.indexOf('maintenance mode') !== -1)                                        return ISSUE_FIXES.maintenance_stuck;
+        if (t.indexOf('url mismatch') !== -1 || t.indexOf('wp_siteurl') !== -1 || t.indexOf('wp_home') !== -1) return ISSUE_FIXES.url_mismatch;
+        if (t.indexOf('rewrite rules') !== -1)                                           return ISSUE_FIXES.rewrite_rules;
+        if (t.indexOf('wp-config.php') !== -1)                                           return ISSUE_FIXES.wpconfig_perms;
+        if (t.indexOf('debug.log') !== -1)                                               return ISSUE_FIXES.debug_log;
+        if (t.indexOf('wordpress update available') !== -1)                              return ISSUE_FIXES.wp_outdated;
+        if ((t.indexOf('mysql') !== -1 || t.indexOf('mariadb') !== -1) && (t.indexOf('end-of-life') !== -1 || t.indexOf('eol') !== -1 || t.indexOf('approaching eol') !== -1)) return ISSUE_FIXES.mysql_eol;
+        if (t.indexOf('opcache') !== -1)                                                 return ISSUE_FIXES.opcache;
+        if (t.indexOf('uploads directory') !== -1)                                       return ISSUE_FIXES.uploads_writable;
+        if (t.indexOf('upload_max_filesize') !== -1 || t.indexOf('post_max_size') !== -1 || t.indexOf('max_execution_time') !== -1) return ISSUE_FIXES.php_limits;
         if (t.indexOf('version disclosed') !== -1 || t.indexOf('readme') !== -1 || t.indexOf('license') !== -1) return ISSUE_FIXES.readme_exposed;
         if (t.indexOf('end-of-life') !== -1 && t.indexOf('2026') === -1) return ISSUE_FIXES.php_eol;
         if (t.indexOf('end-of-life december 2026') !== -1 || (t.indexOf('php') !== -1 && t.indexOf('2026') !== -1)) return ISSUE_FIXES.php_old;
@@ -1339,6 +1689,55 @@
         return h;
     }
 
+    // Strip HTML tags for plain-text output; converts <br> to newline first
+    function stripHtmlToText(s) {
+        var t = String(s)
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<li>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+            .replace(/&nbsp;/g, ' ').replace(/&#?\w+;/g, '');
+        return t.trim();
+    }
+
+    function buildIssuesCopyText() {
+        var lines = [];
+        lines.push('CS Monitor — Issues Report');
+        lines.push('URL: ' + (meta.url || window.location.href));
+        lines.push('Date: ' + new Date().toISOString().replace('T', ' ').slice(0, 19));
+        lines.push('');
+
+        var sevOrder  = ['critical', 'warning', 'info'];
+        var sevLabels = { critical: 'CRITICAL', warning: 'WARNING', info: 'INFO' };
+        var lastSev   = null;
+
+        issuesList.forEach(function (issue) {
+            if (issue.sev !== lastSev) {
+                if (lastSev !== null) lines.push('');
+                var cnt = issuesList.filter(function (i) { return i.sev === issue.sev; }).length;
+                lines.push('=== ' + (sevLabels[issue.sev] || issue.sev.toUpperCase()) + ' (' + cnt + ') ===');
+                lines.push('');
+                lastSev = issue.sev;
+            }
+            lines.push('[' + (sevLabels[issue.sev] || issue.sev.toUpperCase()) + '] ' + issue.title);
+            if (issue.detail) lines.push(issue.detail);
+            var fix = getIssueFix(issue);
+            if (fix) {
+                if (fix.why)   lines.push('', '  Why: ' + stripHtmlToText(fix.why));
+                if (fix.steps && fix.steps.length) {
+                    lines.push('  Steps:');
+                    fix.steps.forEach(function (s, i) {
+                        lines.push('    ' + (i + 1) + '. ' + stripHtmlToText(s));
+                    });
+                }
+                if (fix.note) lines.push('  Note: ' + stripHtmlToText(fix.note));
+            }
+            lines.push('');
+        });
+
+        return lines.join('\n');
+    }
+
     function renderIssues() {
         if (!issuesWrap) return;
 
@@ -1349,7 +1748,19 @@
             return;
         }
 
-        var html = '';
+        var critCnt = issuesList.filter(function (i) { return i.sev === 'critical'; }).length;
+        var warnCnt = issuesList.filter(function (i) { return i.sev === 'warning';  }).length;
+        var infoCnt = issuesList.filter(function (i) { return i.sev === 'info';     }).length;
+        var summary = [];
+        if (critCnt) summary.push(critCnt + ' critical');
+        if (warnCnt) summary.push(warnCnt + ' warning' + (warnCnt > 1 ? 's' : ''));
+        if (infoCnt) summary.push(infoCnt + ' info');
+
+        var html = '<div class="cs-issues-toolbar">'
+            + '<span class="cs-issues-summary">' + summary.join(' · ') + '</span>'
+            + '<button class="cs-issues-copy-btn" title="Copy all issues and remediation steps to clipboard">&#128203; Copy All</button>'
+            + '</div>';
+
         var lastSev = null;
         var titles  = { critical: '&#128308;&nbsp;Critical', warning: '&#128993;&nbsp;Warnings', info: '&#128994;&nbsp;Info' };
         issuesList.forEach(function (issue, idx) {
@@ -1375,6 +1786,22 @@
 
         issuesWrap.innerHTML = html;
 
+        // Copy All button
+        var copyBtn = issuesWrap.querySelector('.cs-issues-copy-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+                var text = buildIssuesCopyText();
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        copyBtn.textContent = 'Copied!';
+                        setTimeout(function () { copyBtn.innerHTML = '&#128203; Copy All'; }, 2000);
+                    }).catch(function () { csFallbackCopy(text, copyBtn); });
+                } else {
+                    csFallbackCopy(text, copyBtn);
+                }
+            });
+        }
+
         // Tab-switch on row click (not on Explain button)
         Array.prototype.forEach.call(issuesWrap.querySelectorAll('.cs-issue-row[data-tab]'), function (row) {
             row.addEventListener('click', function () { switchTab(row.getAttribute('data-tab')); });
@@ -1392,6 +1819,23 @@
                 btn.textContent = open ? 'Explain' : 'Close';
             });
         });
+    }
+
+    function csFallbackCopy(text, btn) {
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+            document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            btn.textContent = 'Copied!';
+            setTimeout(function () { btn.innerHTML = '&#128203; Copy All'; }, 2000);
+        } catch (e) {
+            btn.textContent = 'Copy failed';
+            setTimeout(function () { btn.innerHTML = '&#128203; Copy All'; }, 2000);
+        }
     }
 
     // ── Request tab ───────────────────────────────────────────────────────────
@@ -1572,7 +2016,9 @@
         var dupeList = Object.values(dupeGroups).filter(function (g) { return g.count > 1; })
             .sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
 
-        var html = '';
+        var html = '<div class="cs-sum-toolbar">'
+            + '<button id="cs-sum-pdf-btn" class="cs-sum-pdf-btn">&#8595; Download PDF</button>'
+            + '</div>';
 
         // ── Request waterfall ──────────────────────────────────────────────
         var miles = data.milestones || [];
@@ -1758,6 +2204,29 @@
             html += '</div>';
         }
 
+        // ── Recent errors ─────────────────────────────────────────────────────
+        var errorEntries = logs.filter(function (e) {
+            var lvl = (e.level || '').toLowerCase();
+            return lvl.indexOf('error') !== -1 || lvl.indexOf('warn') !== -1 || lvl.indexOf('dep') !== -1;
+        });
+        if (errorEntries.length > 0) {
+            html += '<div><div class="cs-sum-section-title">PHP Errors &amp; Warnings (' + errorEntries.length + ')</div>';
+            errorEntries.slice(0, 8).forEach(function (e) {
+                var lvl  = (e.level || 'notice').toLowerCase();
+                var cls  = lvl.indexOf('error') !== -1 ? 'cs-tv-critical'
+                         : lvl.indexOf('warn')  !== -1 ? 'cs-tv-slow' : 'cs-tv-medium';
+                html += '<div class="cs-sum-top-row">'
+                    + '<span class="cs-sum-top-time ' + cls + '" style="min-width:72px">' + esc(e.level || 'notice') + '</span>'
+                    + '<span class="cs-sum-top-sql">' + esc(truncate(e.message || '', 90)) + '</span>'
+                    + (e.file ? '<span class="cs-sum-top-plugin" title="' + esc(e.file) + '">' + esc(e.file.split('/').pop()) + (e.line ? ':' + e.line : '') + '</span>' : '')
+                    + '</div>';
+            });
+            if (errorEntries.length > 8) {
+                html += '<div style="font-size:10px;color:#666;padding:4px 0 2px">+ ' + (errorEntries.length - 8) + ' more — see Logs tab</div>';
+            }
+            html += '</div>';
+        }
+
         // ── Site Health ────────────────────────────────────────────────────────
         var health = data.health || {};
         if (Object.keys(health).length > 0) {
@@ -1845,16 +2314,125 @@
                 'Author enumeration',
                 health.author_enum_risk ? '/?author=1 may reveal usernames' : 'Protected or disabled');
 
+            // WordPress core
+            html += hBadge(!health.wp_update_available, health.wp_update_available,
+                'WordPress core',
+                health.wp_update_available
+                    ? (meta.wp_version || '?') + ' → ' + (health.wp_latest_version || 'update available')
+                    : (meta.wp_version || '?') + ' — up to date');
+
+            // MySQL / MariaDB version
+            if (meta.mysql_version) {
+                var dbParts2  = meta.mysql_version.split('.').map(Number);
+                var dbMaj2 = dbParts2[0] || 0, dbMin2 = dbParts2[1] || 0;
+                var dbIsMariaDB2 = !!health.is_mariadb;
+                var dbEolOk2 = true, dbEolWarn2 = false;
+                if (dbIsMariaDB2) {
+                    if (dbMaj2 === 10 && dbMin2 <= 5) { dbEolOk2 = false; }
+                    else if (dbMaj2 === 10 && dbMin2 < 11) { dbEolOk2 = false; dbEolWarn2 = true; }
+                } else {
+                    if (dbMaj2 < 8) { dbEolOk2 = false; }
+                    else if (dbMaj2 === 8 && dbMin2 === 0) { dbEolOk2 = false; dbEolWarn2 = true; }
+                }
+                html += hBadge(dbEolOk2, dbEolWarn2,
+                    (dbIsMariaDB2 ? 'MariaDB' : 'MySQL'),
+                    meta.mysql_version + (dbEolOk2 ? ' — supported' : dbEolWarn2 ? ' — approaching EOL' : ' — end-of-life'));
+            }
+
             // Plugin updates
             var puLen = (health.plugins_with_updates || []).length;
             html += hBadge(puLen === 0, puLen > 0,
                 'Plugin updates',
                 puLen === 0 ? 'All plugins up to date' : puLen + ' pending update' + (puLen > 1 ? 's' : ''));
 
+            // Disk space
+            if (health.disk_pct_used !== null && health.disk_pct_used !== undefined) {
+                var diskOk   = health.disk_pct_used < 85;
+                var diskWarn = health.disk_pct_used >= 85 && health.disk_pct_used < 95;
+                html += hBadge(diskOk, diskWarn,
+                    'Disk space',
+                    health.disk_pct_used + '% used' + (health.disk_free_gb !== null ? ' · ' + health.disk_free_gb + ' GB free' : ''));
+            }
+
+            // OPcache
+            if (health.opcache !== null && health.opcache !== undefined) {
+                var ocEnabled = health.opcache.enabled;
+                var ocOk      = ocEnabled && health.opcache.hit_rate >= 85 && health.opcache.mem_pct < 90 && health.opcache.oom_restarts === 0;
+                var ocWarn    = ocEnabled && !ocOk;
+                if (ocEnabled) {
+                    html += hBadge(ocOk, ocWarn, 'OPcache',
+                        'Enabled · ' + health.opcache.hit_rate + '% hit rate · ' + health.opcache.mem_pct + '% mem used'
+                        + (health.opcache.oom_restarts > 0 ? ' · ' + health.opcache.oom_restarts + ' OOM restarts' : ''));
+                } else {
+                    html += hBadge(false, true, 'OPcache', 'Disabled — enable for significant performance gains');
+                }
+            }
+
+            // Uploads writable
+            html += hBadge(health.uploads_writable !== false, false,
+                'Uploads dir',
+                health.uploads_writable === false ? 'Not writable — media uploads will fail' : 'Writable');
+
+            // PHP limits
+            if (health.php_upload_max) {
+                html += hBadge(true, false, 'PHP limits',
+                    'upload: ' + health.php_upload_max + ' · post: ' + health.php_post_max + ' · exec: ' + health.php_max_exec + 's');
+            }
+
+            // Maintenance mode
+            if (health.maintenance_stale !== undefined) {
+                html += hBadge(!health.maintenance_stale, false,
+                    'Maintenance mode',
+                    health.maintenance_stale ? 'STUCK — stale .maintenance file present' : 'Not active');
+            }
+
+            // URL config
+            if (health.url_host_mismatch !== undefined) {
+                html += hBadge(!health.url_host_mismatch, health.url_host_mismatch,
+                    'URL config',
+                    health.url_host_mismatch ? 'Host mismatch — siteurl/home may cause login loops' : 'siteurl and home match current host');
+            }
+
+            // Rewrite rules
+            if (health.rewrite_rules_missing !== undefined) {
+                html += hBadge(!health.rewrite_rules_missing, false,
+                    'Rewrite rules',
+                    health.rewrite_rules_missing ? 'MISSING — flush permalinks at Settings → Permalinks' : 'Present');
+            }
+
+            // wp-config.php permissions
+            if (health.wpconfig_world_readable !== undefined) {
+                html += hBadge(!health.wpconfig_world_readable, health.wpconfig_world_readable,
+                    'wp-config.php',
+                    health.wpconfig_world_readable ? 'World-readable (644) — set chmod 600' : 'Permissions OK');
+            }
+
+            // debug.log
+            if (health.debug_log_mb !== null && health.debug_log_mb !== undefined) {
+                var logOk   = health.debug_log_mb < 10;
+                var logWarn = health.debug_log_mb >= 10 && health.debug_log_mb < 100;
+                html += hBadge(logOk, logWarn,
+                    'debug.log',
+                    health.debug_log_mb + ' MB' + (health.debug_log_mb >= 100 ? ' — DISK RISK' : health.debug_log_mb >= 10 ? ' — consider rotating' : ''));
+            }
+
+            // System load average
+            if (health.load_avg && health.load_avg.length >= 1) {
+                var la1 = health.load_avg[0], la5 = health.load_avg[1] || 0, la15 = health.load_avg[2] || 0;
+                var cpus = health.cpu_count || 1;
+                var laOk   = la1 < cpus;
+                var laWarn = la1 >= cpus && la1 < cpus * 2;
+                html += hBadge(laOk, laWarn, 'Load avg (' + cpus + ' CPU' + (cpus > 1 ? 's' : '') + ')',
+                    la1 + ' / ' + la5 + ' / ' + la15 + ' (1m / 5m / 15m)');
+            }
+
             html += '</div>';
         }
 
         summaryWrap.innerHTML = html;
+
+        var sumPdfBtn = document.getElementById('cs-sum-pdf-btn');
+        if (sumPdfBtn) sumPdfBtn.addEventListener('click', function () { exportPDF(); });
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
@@ -1890,6 +2468,187 @@
             var w = window.open('', '_blank');
             if (w) w.document.write('<pre>' + JSON.stringify(data, null, 2) + '</pre>');
         }
+    }
+
+    // ── Export PDF (print-to-PDF via new window) ──────────────────────────────
+    function exportPDF() {
+        var health  = data.health  || {};
+        var miles   = data.milestones || [];
+        var maxMs   = miles.length ? (miles[miles.length - 1].ms || meta.page_load_ms || 1) : 1;
+        var now     = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+        var domain  = meta.url ? meta.url.replace(/^https?:\/\//, '').split('/')[0] : window.location.hostname;
+
+        function esc2(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+        function stripForPdf(s) {
+            return String(s).replace(/<br\s*\/?>/gi, ' ').replace(/<li>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').replace(/&#?\w+;/g,'');
+        }
+
+        // ── CSS ───────────────────────────────────────────────────────────────
+        var css = [
+            'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;color:#1a202c;margin:0;padding:28px 32px;line-height:1.5}',
+            'h1{font-size:20px;font-weight:700;margin:0 0 2px}',
+            '.report-meta{font-size:11px;color:#718096;margin-bottom:24px}',
+            'h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#4a5568;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin:24px 0 12px}',
+            '.issue{border-left:3px solid #cbd5e0;padding:7px 10px 6px;margin-bottom:7px;page-break-inside:avoid;background:#f7fafc;border-radius:0 3px 3px 0}',
+            '.issue-critical{border-left-color:#e53e3e;background:#fff5f5}',
+            '.issue-warning{border-left-color:#d69e2e;background:#fffbeb}',
+            '.issue-info{border-left-color:#3182ce;background:#ebf8ff}',
+            '.sev{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;padding:1px 5px;border-radius:2px;margin-right:6px;vertical-align:middle}',
+            '.sev-critical{background:#fed7d7;color:#c53030}',
+            '.sev-warning{background:#fefcbf;color:#b7791f}',
+            '.sev-info{background:#bee3f8;color:#2b6cb0}',
+            '.issue-title{font-weight:600;font-size:12px}',
+            '.issue-detail{color:#4a5568;font-size:11px;margin-top:2px}',
+            '.fix{margin:8px 0 0 2px;padding:8px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:3px;page-break-inside:avoid}',
+            '.fix-why{font-size:11px;color:#4a5568;font-style:italic;margin-bottom:5px}',
+            '.fix-steps{margin:0 0 0 16px;padding:0;font-size:11px;color:#2d3748}',
+            '.fix-steps li{margin-bottom:3px}',
+            '.fix-note{font-size:10px;color:#718096;margin-top:5px;font-style:italic}',
+            'code{font-family:"SFMono-Regular",Consolas,monospace;font-size:10px;background:#edf2f7;padding:1px 4px;border-radius:2px}',
+            '.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}',
+            '.card{border:1px solid #e2e8f0;border-radius:4px;padding:10px 12px}',
+            '.card-title{font-size:10px;font-weight:700;text-transform:uppercase;color:#718096;margin-bottom:6px}',
+            '.card-stat{font-size:24px;font-weight:700;color:#1a202c;line-height:1.1;margin-bottom:3px}',
+            '.card-sub{font-size:10px;color:#718096}',
+            '.tl-row{display:flex;align-items:center;margin-bottom:5px;gap:8px}',
+            '.tl-label{width:130px;text-align:right;font-size:11px;color:#4a5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+            '.tl-track{flex:1;height:11px;background:#e2e8f0;border-radius:2px;overflow:hidden}',
+            '.tl-fill{height:100%;border-radius:2px}',
+            '.tl-time{font-size:10px;color:#4a5568;width:56px;text-align:right}',
+            '.tl-delta{font-size:10px;color:#48bb78;width:52px}',
+            '.health-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 24px}',
+            '.health-row{display:flex;gap:6px;align-items:baseline;font-size:11px;padding:2px 0;border-bottom:1px solid #f0f0f0}',
+            '.health-icon{font-weight:700;width:14px;flex-shrink:0}',
+            '.h-ok{color:#276749}.h-warn{color:#b7791f}.h-crit{color:#c53030}',
+            '.health-label{font-weight:600;width:160px;flex-shrink:0}',
+            '.health-detail{color:#718096;font-size:10px}',
+            '.no-issues{color:#276749;font-weight:600;padding:8px 0}',
+            '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}h2{page-break-after:avoid}.issue,.fix{page-break-inside:avoid}}',
+            '.tl-bar-0{background:#60a5fa}.tl-bar-1{background:#4ade80}.tl-bar-2{background:#34d399}.tl-bar-3{background:#a3e635}.tl-bar-4{background:#fbbf24}.tl-bar-5{background:#fb923c}'
+        ].join('\n');
+
+        // ── Header ────────────────────────────────────────────────────────────
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>CS Monitor — ' + esc2(domain) + '</title><style>' + css + '</style></head><body>';
+        html += '<h1>CS Monitor Report</h1>';
+        html += '<div class="report-meta">'
+            + esc2(meta.url || window.location.href) + ' &nbsp;·&nbsp; ' + esc2(now)
+            + (meta.php_version ? ' &nbsp;·&nbsp; PHP ' + esc2(meta.php_version) : '')
+            + (meta.wp_version  ? ' &nbsp;·&nbsp; WP '  + esc2(meta.wp_version)  : '')
+            + (meta.mysql_version ? ' &nbsp;·&nbsp; MySQL ' + esc2(meta.mysql_version) : '')
+            + '</div>';
+
+        // ── Issues ────────────────────────────────────────────────────────────
+        html += '<h2>Issues (' + issuesList.length + ')</h2>';
+        if (issuesList.length === 0) {
+            html += '<div class="no-issues">&#10003; No issues detected on this page load.</div>';
+        } else {
+            var lastSev2 = null;
+            issuesList.forEach(function (issue) {
+                var sev  = issue.sev || 'info';
+                var fix  = getIssueFix(issue);
+                html += '<div class="issue issue-' + sev + '">'
+                    + '<div><span class="sev sev-' + sev + '">' + sev + '</span><span class="issue-title">' + esc2(issue.title) + '</span></div>'
+                    + (issue.detail ? '<div class="issue-detail">' + esc2(issue.detail) + '</div>' : '');
+                if (fix) {
+                    html += '<div class="fix">';
+                    if (fix.why)   html += '<div class="fix-why">' + stripForPdf(fix.why) + '</div>';
+                    if (fix.steps && fix.steps.length) {
+                        html += '<ol class="fix-steps">';
+                        fix.steps.forEach(function (s) { html += '<li>' + stripForPdf(s) + '</li>'; });
+                        html += '</ol>';
+                    }
+                    if (fix.note)  html += '<div class="fix-note">&#9432; ' + stripForPdf(fix.note) + '</div>';
+                    html += '</div>';
+                }
+                html += '</div>';
+            });
+        }
+
+        // ── Summary cards ─────────────────────────────────────────────────────
+        html += '<h2>Performance Summary</h2>';
+        var memPct3 = 0, memLim = parseInt(meta.memory_limit, 10) || 0;
+        if (memLim > 0 && meta.memory_peak_mb) memPct3 = Math.round(meta.memory_peak_mb / memLim * 100);
+        html += '<div class="cards">';
+        html += '<div class="card"><div class="card-title">&#9881; Environment</div>'
+            + '<div class="card-sub">PHP ' + esc2(meta.php_version || '?') + ' &nbsp; WP ' + esc2(meta.wp_version || '?') + '</div>'
+            + (meta.mysql_version ? '<div class="card-sub">MySQL ' + esc2(meta.mysql_version) + '</div>' : '')
+            + (meta.memory_peak_mb ? '<div class="card-sub">Mem peak: ' + meta.memory_peak_mb + 'MB / ' + esc2(meta.memory_limit || '?') + ' (' + memPct3 + '%)</div>' : '')
+            + (meta.active_theme ? '<div class="card-sub">Theme: ' + esc2(meta.active_theme) + '</div>' : '')
+            + '</div>';
+        html += '<div class="card"><div class="card-title">&#128200; DB Queries</div>'
+            + '<div class="card-stat">' + (meta.query_count || 0) + '</div>'
+            + '<div class="card-sub">' + fmtMs(meta.query_total_ms) + ' total</div>'
+            + '</div>';
+        html += '<div class="card"><div class="card-title">&#127760; HTTP / REST</div>'
+            + '<div class="card-stat">' + (meta.http_count || 0) + '</div>'
+            + '<div class="card-sub">' + fmtMs(meta.http_total_ms) + ' total</div>'
+            + '</div>';
+        html += '</div>';
+
+        // ── Request timeline ──────────────────────────────────────────────────
+        if (miles.length > 1) {
+            html += '<h2>Request Timeline</h2>';
+            var colors = ['tl-bar-0','tl-bar-1','tl-bar-2','tl-bar-3','tl-bar-4','tl-bar-5'];
+            miles.forEach(function (m, i) {
+                var pct   = Math.min(100, Math.round(m.ms / maxMs * 100));
+                var delta = i > 0 ? (m.ms - miles[i-1].ms) : 0;
+                var col   = colors[i % colors.length];
+                html += '<div class="tl-row">'
+                    + '<div class="tl-label">' + esc2(m.label) + '</div>'
+                    + '<div class="tl-track"><div class="tl-fill ' + col + '" style="width:' + pct + '%"></div></div>'
+                    + '<div class="tl-time">' + fmtMs(m.ms) + '</div>'
+                    + '<div class="tl-delta">' + (delta > 0 ? '+' + fmtMs(delta) : '') + '</div>'
+                    + '</div>';
+            });
+        }
+
+        // ── Site Health ───────────────────────────────────────────────────────
+        html += '<h2>Site Health</h2><div class="health-grid">';
+        function hRow(ok, warn, label, detail) {
+            var cls = ok ? 'h-ok' : warn ? 'h-warn' : 'h-crit';
+            var ico = ok ? '&#10003;' : '&#9888;';
+            return '<div class="health-row"><span class="health-icon ' + cls + '">' + ico + '</span>'
+                + '<span class="health-label">' + esc2(label) + '</span>'
+                + '<span class="health-detail">' + esc2(detail) + '</span></div>';
+        }
+        html += hRow(health.site_https, false, 'HTTPS', health.site_https ? 'Serving over HTTPS' : 'HTTP — not secure');
+        html += hRow(!health.wp_debug_display, true, 'WP_DEBUG_DISPLAY', health.wp_debug_display ? 'ON — errors visible to visitors' : 'Off (safe)');
+        html += hRow(!health.xmlrpc_enabled, true, 'XML-RPC', health.xmlrpc_enabled ? 'Enabled — disable if not needed' : 'Disabled');
+        html += hRow(!health.admin_user_exists, false, '"admin" username', health.admin_user_exists ? 'EXISTS — rename immediately' : 'Not in use');
+        html += hRow(!health.db_prefix_default, true, 'DB table prefix', health.db_prefix_default ? 'Default wp_ in use' : 'Custom prefix set');
+        html += hRow(health.disallow_file_edit, true, 'DISALLOW_FILE_EDIT', health.disallow_file_edit ? 'Set' : 'Not set');
+        html += hRow(!health.rewrite_rules_missing, false, 'Rewrite rules', health.rewrite_rules_missing ? 'MISSING — flush permalinks' : 'Present');
+        html += hRow(!health.maintenance_stale, false, 'Maintenance mode', health.maintenance_stale ? 'STUCK — delete .maintenance' : 'Not active');
+        html += hRow(!health.url_host_mismatch, true, 'URL config', health.url_host_mismatch ? 'Host mismatch detected' : 'OK');
+        html += hRow(!health.wpconfig_world_readable, true, 'wp-config.php', health.wpconfig_world_readable ? 'World-readable (chmod 600)' : 'Permissions OK');
+        var fl1h = health.failed_logins_1h || 0;
+        html += hRow(fl1h < 3, fl1h >= 3 && fl1h < 10, 'Failed logins', fl1h + ' in 1h · ' + (health.failed_logins_24h || 0) + ' in 24h');
+        html += hRow(!health.php_eol && !health.php_old, !health.php_eol && health.php_old, 'PHP version', (meta.php_version || '?') + (health.php_eol ? ' — EOL' : health.php_old ? ' — EOL Dec 2026' : ' — supported'));
+        if (health.disk_pct_used !== null && health.disk_pct_used !== undefined) {
+            html += hRow(health.disk_pct_used < 85, health.disk_pct_used >= 85 && health.disk_pct_used < 95, 'Disk space', health.disk_pct_used + '% used · ' + (health.disk_free_gb || '?') + ' GB free');
+        }
+        var oc = health.opcache;
+        if (oc) {
+            html += hRow(oc.enabled && oc.hit_rate >= 85 && oc.oom_restarts === 0, oc.enabled && oc.hit_rate < 85, 'OPcache', oc.enabled ? oc.hit_rate + '% hit rate · ' + oc.mem_pct + '% mem' : 'Disabled');
+        }
+        var pUpdates = (health.plugins_with_updates || []).length;
+        html += hRow(pUpdates === 0, pUpdates > 0, 'Plugin updates', pUpdates === 0 ? 'All up to date' : pUpdates + ' pending');
+        if (health.debug_log_mb !== null && health.debug_log_mb !== undefined) {
+            html += hRow(health.debug_log_mb < 10, health.debug_log_mb >= 10 && health.debug_log_mb < 100, 'debug.log', health.debug_log_mb + ' MB');
+        }
+        html += '</div>';
+
+        html += '</body></html>';
+
+        // Open in new window and trigger print dialog
+        var w = window.open('', '_blank', 'width=900,height=700');
+        if (!w) { alert('Pop-up blocked — allow pop-ups for this page and try again.'); return; }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        w.onload = function () { w.focus(); w.print(); };
+        // Fallback if onload already fired
+        setTimeout(function () { try { w.focus(); w.print(); } catch(e) {} }, 600);
     }
 
     // ── Copy current tab to clipboard ─────────────────────────────────────────
@@ -2370,8 +3129,7 @@
 
     function fmtMs(ms) {
         ms = +ms || 0;
-        if (ms < 1)    return ms.toFixed(3) + 'ms';
-        if (ms < 1000) return ms.toFixed(ms < 10 ? 2 : 1) + 'ms';
+        if (ms < 1000) return ms.toFixed(1) + 'ms';
         return (ms / 1000).toFixed(2) + 's';
     }
 

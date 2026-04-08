@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.79
+ * Version: 1.8.86
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.79';
+    const VERSION      = '1.8.86';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -3116,6 +3116,121 @@ class CloudScale_DevTools {
         // ── Plugins with pending updates ──────────────────────────────────────
         $plugins_with_updates = self::perf_get_plugin_update_info();
 
+        // ── Disk space ────────────────────────────────────────────────────────
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        $disk_free  = function_exists( 'disk_free_space' )  ? @disk_free_space( ABSPATH )  : false;
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        $disk_total = function_exists( 'disk_total_space' ) ? @disk_total_space( ABSPATH ) : false;
+        $disk_pct_used = ( false !== $disk_free && false !== $disk_total && $disk_total > 0 )
+            ? (int) round( ( 1 - $disk_free / $disk_total ) * 100 )
+            : null;
+        $disk_free_gb = ( false !== $disk_free ) ? round( (float) $disk_free / 1073741824, 1 ) : null;
+
+        // ── OPcache ───────────────────────────────────────────────────────────
+        $opcache = null;
+        if ( function_exists( 'opcache_get_status' ) ) {
+            // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+            $oc = @opcache_get_status( false );
+            if ( false === $oc ) {
+                $opcache = [ 'enabled' => false ];
+            } elseif ( is_array( $oc ) ) {
+                $oc_used_mb    = round( ( (float) ( $oc['memory_usage']['used_memory']   ?? 0 ) ) / 1048576, 1 );
+                $oc_free_mb    = round( ( (float) ( $oc['memory_usage']['free_memory']   ?? 0 ) ) / 1048576, 1 );
+                $oc_wasted_mb  = round( ( (float) ( $oc['memory_usage']['wasted_memory'] ?? 0 ) ) / 1048576, 1 );
+                $oc_total_mb   = $oc_used_mb + $oc_free_mb + $oc_wasted_mb;
+                $opcache = [
+                    'enabled'        => true,
+                    'hit_rate'       => round( (float) ( $oc['opcache_statistics']['opcache_hit_rate']   ?? 0 ), 1 ),
+                    'used_mb'        => $oc_used_mb,
+                    'free_mb'        => $oc_free_mb,
+                    'wasted_mb'      => $oc_wasted_mb,
+                    'mem_pct'        => $oc_total_mb > 0 ? (int) round( $oc_used_mb / $oc_total_mb * 100 ) : 0,
+                    'oom_restarts'   => (int) ( $oc['opcache_statistics']['oom_restarts']       ?? 0 ),
+                    'cached_scripts' => (int) ( $oc['opcache_statistics']['num_cached_scripts'] ?? 0 ),
+                ];
+            }
+        }
+
+        // ── PHP limits ────────────────────────────────────────────────────────
+        $php_upload_max  = ini_get( 'upload_max_filesize' ) ?: '2M';
+        $php_post_max    = ini_get( 'post_max_size' )       ?: '8M';
+        $php_max_exec    = (int) ini_get( 'max_execution_time' );
+
+        // ── Uploads directory writable ────────────────────────────────────────
+        $upload_info      = wp_upload_dir();
+        $uploads_writable = is_writable( $upload_info['basedir'] );
+
+        // ── WordPress core update available ───────────────────────────────────
+        $wp_update_available = false;
+        $wp_latest_version   = '';
+        $update_core = get_site_transient( 'update_core' );
+        if ( $update_core && isset( $update_core->updates ) && is_array( $update_core->updates ) ) {
+            foreach ( $update_core->updates as $update ) {
+                if ( isset( $update->response ) && 'upgrade' === $update->response ) {
+                    $wp_update_available = true;
+                    $wp_latest_version   = isset( $update->version ) ? (string) $update->version : '';
+                    break;
+                }
+            }
+        }
+
+        // ── MySQL / MariaDB full version (db_version() strips MariaDB suffix) ─
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $db_full_version = (string) $wpdb->get_var( 'SELECT VERSION()' );
+        $is_mariadb      = false !== stripos( $db_full_version, 'mariadb' );
+
+        // ── Maintenance mode stuck ────────────────────────────────────────────
+        $maintenance_file = ABSPATH . '.maintenance';
+        $maintenance_stale = false;
+        if ( file_exists( $maintenance_file ) ) {
+            $mtime = filemtime( $maintenance_file );
+            $maintenance_stale = ( false !== $mtime ) && ( time() - $mtime > 600 ); // >10 min
+        }
+
+        // ── siteurl / home URL mismatch vs current request host ───────────────
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        $current_host    = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) ) : '';
+        $siteurl_host    = strtolower( (string) parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) );
+        $home_host       = strtolower( (string) parse_url( get_option( 'home' ), PHP_URL_HOST ) );
+        $url_host_mismatch = ( '' !== $current_host )
+            && ( ( '' !== $siteurl_host && $siteurl_host !== $current_host )
+              || ( '' !== $home_host    && $home_host    !== $current_host ) );
+        // Also flag if WP_SITEURL / WP_HOME constants conflict with DB values.
+        $url_const_override = ( defined( 'WP_SITEURL' ) && WP_SITEURL !== get_option( 'siteurl' ) )
+                           || ( defined( 'WP_HOME' )    && WP_HOME    !== get_option( 'home' ) );
+
+        // ── Rewrite rules need flushing ───────────────────────────────────────
+        $has_pretty_permalinks = ! empty( get_option( 'permalink_structure' ) );
+        $rewrite_rules_missing = $has_pretty_permalinks && empty( get_option( 'rewrite_rules' ) );
+
+        // ── wp-config.php world-readable ─────────────────────────────────────
+        $wpconfig_path           = ABSPATH . 'wp-config.php';
+        $wpconfig_world_readable = file_exists( $wpconfig_path )
+            && ( fileperms( $wpconfig_path ) & 0004 );   // world-readable bit
+
+        // ── debug.log size ────────────────────────────────────────────────────
+        $debug_log_mb = null;
+        if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+            $log_path = is_string( WP_DEBUG_LOG ) ? WP_DEBUG_LOG : ( WP_CONTENT_DIR . '/debug.log' );
+            if ( file_exists( $log_path ) ) {
+                $debug_log_mb = round( (float) filesize( $log_path ) / 1048576, 1 );
+            }
+        }
+
+        // ── System load average (Unix only) ───────────────────────────────────
+        $load_avg  = function_exists( 'sys_getloadavg' )
+            ? array_map( fn( float $v ): float => round( $v, 2 ), sys_getloadavg() )
+            : [];
+        $cpu_count = 1;
+        if ( is_readable( '/proc/cpuinfo' ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+            $cpuinfo = file_get_contents( '/proc/cpuinfo' );
+            if ( false !== $cpuinfo ) {
+                preg_match_all( '/^processor\s*:/m', $cpuinfo, $cpu_matches );
+                $cpu_count = max( 1, count( $cpu_matches[0] ) );
+            }
+        }
+
         return [
             'autoload_kb'          => $autoload_kb,
             'autoload_count'       => $autoload_count,
@@ -3138,6 +3253,24 @@ class CloudScale_DevTools {
             'failed_logins_24h'    => $failed_logins_24h,
             'author_enum_risk'     => $author_enum_risk,
             'plugins_with_updates' => $plugins_with_updates,
+            'load_avg'             => $load_avg,
+            'cpu_count'            => $cpu_count,
+            'disk_pct_used'        => $disk_pct_used,
+            'disk_free_gb'         => $disk_free_gb,
+            'opcache'              => $opcache,
+            'php_upload_max'       => $php_upload_max,
+            'php_post_max'         => $php_post_max,
+            'php_max_exec'         => $php_max_exec,
+            'uploads_writable'       => $uploads_writable,
+            'maintenance_stale'      => $maintenance_stale,
+            'url_host_mismatch'      => $url_host_mismatch,
+            'url_const_override'     => $url_const_override,
+            'rewrite_rules_missing'  => $rewrite_rules_missing,
+            'wpconfig_world_readable'=> (bool) $wpconfig_world_readable,
+            'debug_log_mb'           => $debug_log_mb,
+            'wp_update_available'    => $wp_update_available,
+            'wp_latest_version'      => $wp_latest_version,
+            'is_mariadb'             => $is_mariadb,
         ];
     }
 
@@ -3202,7 +3335,7 @@ class CloudScale_DevTools {
 
         foreach ( $wpdb->queries as $q ) {
             $sql     = isset( $q[0] ) ? trim( (string) $q[0] ) : '';
-            $time_ms = isset( $q[1] ) ? round( (float) $q[1] * 1000, 4 ) : 0.0;
+            $time_ms = isset( $q[1] ) ? round( (float) $q[1] * 1000, 1 ) : 0.0;
             $bt_str  = isset( $q[2] ) ? (string) $q[2] : '';
             // Index 4 = row count for SELECT queries, rows_affected for write queries.
             $rows = isset( $q[4] ) && is_numeric( $q[4] ) ? (int) $q[4] : -1;

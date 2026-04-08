@@ -845,6 +845,28 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
     gap: 14px;
 }
 
+/* ── Summary toolbar (PDF button) ──────────────────────────────────────── */
+.cs-sum-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 12px 4px;
+}
+.cs-sum-pdf-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #0e639c;
+    border: none;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.cs-sum-pdf-btn:hover { background: #1177bb; }
+
 /* ── Stat cards row ─────────────────────────────────────────────────────── */
 .cs-sum-cards {
     display: grid;
@@ -1220,6 +1242,34 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
 
 /* ── Issues list ─────────────────────────────────────────────────────────── */
 .cs-issues-wrap { padding: 0; }
+
+.cs-issues-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px 6px;
+    border-bottom: 1px solid #2a2d2e;
+    background: #1e1e1e;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.cs-issues-summary {
+    font-size: 11px;
+    color: #777;
+}
+.cs-issues-copy-btn {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 3px;
+    border: 1px solid #3c3f41;
+    background: #2d2d30;
+    color: #ccc;
+    cursor: pointer;
+    line-height: 1.5;
+    transition: background .12s, color .12s;
+}
+.cs-issues-copy-btn:hover { background: #3a3d3e; color: #fff; }
 
 .cs-issues-group { }
 .cs-issues-group-title {

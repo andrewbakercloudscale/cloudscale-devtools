@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.8.77
+Stable tag: 1.8.86
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,37 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.8.86 =
+* Fixed: PDF button moved from cramped header toolbar into the Summary pane itself — blue "↓ Download PDF" button at top of Summary tab, always visible
+* Fixed: ms precision — all timings now show 1 decimal place consistently (was 0–4dp depending on magnitude)
+
+= 1.8.84 =
+* Fixed: ms formatting reduced to 1 decimal place throughout (was showing 4dp e.g. "0.000ms")
+* Added: CS Monitor Summary tab — Download PDF button generates a print-ready report with all Issues (including full Explain steps) + request timeline + site health
+* Added: CS Monitor Issues — WordPress core update check (flags outdated WP with remediation steps)
+* Added: CS Monitor Issues — MySQL/MariaDB EOL version detection with version-specific upgrade steps
+* Added: CS Monitor Summary — "PHP Errors & Warnings" section shows up to 8 recent log entries inline (errors, warnings, deprecated notices)
+* Added: CS Monitor Site Health — WordPress core, MySQL/MariaDB version badges
+
+= 1.8.83 =
+* Added: CS Monitor — disk space check (warning ≥85%, critical ≥95%) with SSH diagnostics in Explain
+* Added: CS Monitor — PHP OPcache check: disabled warning, OOM restarts critical, low hit rate and memory pressure warnings
+* Added: CS Monitor — uploads directory writable check
+* Added: CS Monitor — PHP upload_max_filesize, post_max_size, max_execution_time checks
+* Added: CS Monitor — stale .maintenance file detection (maintenance mode loop)
+* Added: CS Monitor — siteurl/home URL mismatch detection (login redirect loop cause)
+* Added: CS Monitor — missing rewrite rules detection (404 on pretty permalinks)
+* Added: CS Monitor — wp-config.php world-readable permission check
+* Added: CS Monitor — debug.log size check (warning ≥10MB, critical ≥100MB)
+* Added: CS Monitor Issues tab — Copy All button copies every issue with full Explain remediation steps as plain text
+* Added: CS Monitor Issues tab — summary badge count in toolbar
+* Improved: CS Monitor Summary Site Health section now shows disk, OPcache, uploads, PHP limits, URL config, maintenance, rewrite rules, wp-config perms, debug.log, and load average rows
+
+= 1.8.82 =
+* Added: CS Monitor Issues tab now flags high memory usage (≥75% of memory_limit → warning, ≥90% → critical) with remediation steps
+* Added: CS Monitor reads system load average (via sys_getloadavg) and CPU count (via /proc/cpuinfo) — flags high CPU load as warning/critical
+* Added: CS Monitor raises a critical issue when XML-RPC is enabled and ≥5 failed logins/hour are detected (active XML-RPC brute force correlation)
 
 = 1.8.56 =
 * Changed: Admin page slug renamed from cloudscale-code-sql to cloudscale-devtools (URL is now tools.php?page=cloudscale-devtools); legacy URL redirects automatically
