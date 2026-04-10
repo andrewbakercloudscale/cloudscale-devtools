@@ -191,14 +191,22 @@
                     }
                     if ( emailPendingMsg ) {
                         emailPendingMsg.style.display = '';
-                        emailPendingMsg.innerHTML = '<span class="cs-pending-notice">📬 ' + ( d.message || 'Verification email sent — click the link in the email to activate.' ) + '</span>';
+                        const span = document.createElement( 'span' );
+                        span.className   = 'cs-pending-notice';
+                        span.textContent = '📬 ' + ( d.message || 'Verification email sent — click the link in the email to activate.' );
+                        emailPendingMsg.textContent = '';
+                        emailPendingMsg.appendChild( span );
                     }
                 } else {
                     emailEnableBtn.disabled    = false;
                     emailEnableBtn.textContent = 'Enable';
                     if ( emailPendingMsg ) {
                         emailPendingMsg.style.display = '';
-                        emailPendingMsg.innerHTML = '<span style="color:#e53e3e;font-size:12px">✗ ' + ( d.message || 'Failed to send.' ) + '</span>';
+                        const span = document.createElement( 'span' );
+                        span.style.cssText = 'color:#e53e3e;font-size:12px';
+                        span.textContent   = '✗ ' + ( d.message || 'Failed to send.' );
+                        emailPendingMsg.textContent = '';
+                        emailPendingMsg.appendChild( span );
                     }
                 }
             } ).catch( () => {
@@ -206,7 +214,11 @@
                 emailEnableBtn.textContent = 'Enable';
                 if ( emailPendingMsg ) {
                     emailPendingMsg.style.display = '';
-                    emailPendingMsg.innerHTML = '<span style="color:#e53e3e;font-size:12px">✗ Network error. Try again.</span>';
+                    const span = document.createElement( 'span' );
+                    span.style.cssText = 'color:#e53e3e;font-size:12px';
+                    span.textContent   = '✗ Network error. Try again.';
+                    emailPendingMsg.textContent = '';
+                    emailPendingMsg.appendChild( span );
                 }
             } );
         } );
@@ -345,6 +357,8 @@
                 totpVerifyBtn.textContent = '✓ Verify & Activate';
                 if ( res.success ) {
                     showTotpMsg( '✅ ' + ( res.data?.message || 'Activated!' ), true );
+                    // Clear the secret from the DOM now that setup is complete.
+                    if ( totpSecret ) totpSecret.textContent = '';
                     setTimeout( () => location.reload(), 1200 );
                 } else {
                     showTotpMsg( '❌ ' + ( res.data || 'Incorrect code.' ), false );

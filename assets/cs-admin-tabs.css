@@ -26,10 +26,10 @@
         padding: 16px;
     }
     #cs-tab-bar {
-        padding: 0 4px;
+        padding: 0 8px;
     }
     .cs-tab {
-        padding: 10px 12px;
+        padding: 10px 14px;
         font-size: 12px;
     }
 }
@@ -75,7 +75,11 @@
     display: flex;
     gap: 0;
     padding: 0 20px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;        /* Firefox */
 }
+#cs-tab-bar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
 .cs-tab {
     background: transparent;
     border: none;
@@ -90,6 +94,8 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 .cs-tab:hover { color: #fff; }
 .cs-tab:focus { outline: none; box-shadow: none; }
@@ -128,6 +134,14 @@
     font-size: 11px;
     font-weight: 400;
     opacity: .85;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@media (max-width: 480px) {
+    .cs-header-hint { display: none; }
+    .cs-section-header { gap: 8px; }
 }
 
 /* ── Panels / Cards ──────────────────────────────── */
