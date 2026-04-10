@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.8.95
+Stable tag: 1.8.109
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,7 +79,16 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.8.95 =
+= 1.8.109 =
+* Added: "Fix All Posts on Site" button — batch-processes every published post on the site in groups of 10, generating platform-specific social format images with live progress counter (e.g. "Fixing 45 / 320")
+* Added: Crawler UA detection — `wp_head` at priority 1 outputs platform-specific `og:image` meta tag before SEO plugins, so Facebook, X/Twitter, WhatsApp, LinkedIn, and Instagram each receive the correctly-sized image for their platform
+* Fixed: WebP featured images were excluded from Fix / Fix all — added `webp` to the supported source formats list
+* Security: Added SSRF protection on admin URL-check endpoints — URLs that resolve to private/reserved IP ranges (localhost, RFC-1918, link-local) are now rejected before outbound HTTP requests are made
+* Security: Cloudflare cache-purge endpoint now validates that the supplied URL belongs to the current site before calling the Cloudflare API
+* Security: Fixed DOM XSS in email 2FA enable flow — AJAX response message was concatenated into innerHTML; replaced with safe DOM element creation + textContent
+* Security: TOTP secret is now cleared from the DOM immediately after successful activation
+
+= 1.8.107 =
 * Fixed: session cookie hook was wrong — login_form_login is a display hook that never fires on a successful login POST; moved to login_init so the persistent-cookie flag is set before WordPress processes credentials
 
 = 1.8.89 =

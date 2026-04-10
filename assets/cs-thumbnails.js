@@ -1,7 +1,7 @@
 /* ===========================================================
-   CloudScale DevTools — Thumbnails / Social Preview  v1.9.5
-   Handles: URL checker, recent posts scan, Cloudflare
-            crawler test, CF cache purge, media auditor.
+   CloudScale DevTools — Thumbnails / Social Preview  v1.9.6
+   Handles: URL checker, post social scan, Cloudflare
+            crawler test, CF cache purge, platform formats.
    =========================================================== */
 ( function () {
     'use strict';
@@ -87,9 +87,12 @@
                 <ul class="cs-thumb-results-list">`;
             for ( const r of sec.results ) {
                 const icon = icons[ r.type ] || 'ℹ';
+                const fixHtml = r.fix
+                    ? `<div class="cs-thumb-fix">💡 ${esc( r.fix )}</div>`
+                    : '';
                 html += `<li class="cs-thumb-result cs-thumb-${r.type || 'info'}">
                     <span>${icon}</span>
-                    <span>${esc( r.msg )}</span>
+                    <span>${esc( r.msg )}${fixHtml}</span>
                 </li>`;
             }
             html += '</ul></div>';
@@ -97,59 +100,285 @@
         return html;
     }
 
-    // ── Recent Posts Scan ─────────────────────────────────────────────────
+    // ── Post Social Preview Scan ──────────────────────────────────────────
 
-    const scanBtn     = document.getElementById( 'cs-thumb-scan-btn' );
-    const scanResults = document.getElementById( 'cs-thumb-scan-results' );
+    const auditBtn      = document.getElementById( 'cs-thumb-audit-btn' );
+    const auditTopBtn   = document.getElementById( 'cs-thumb-audit-top-btn' );
+    const auditProgress = document.getElementById( 'cs-thumb-audit-progress' );
+    const auditResults  = document.getElementById( 'cs-thumb-audit-results' );
+    const fixAllBtn     = document.getElementById( 'cs-thumb-fix-all-btn' );
+    const fixSiteBtn    = document.getElementById( 'cs-thumb-fix-site-btn' );
 
-    if ( scanBtn ) {
-        scanBtn.addEventListener( 'click', () => {
-            scanBtn.disabled = true;
-            scanBtn.textContent = 'Scanning…';
-            setLoading( scanResults, 'Checking last 10 posts — each takes 10–20 seconds…' );
+    let lastScanPosts = [];
 
-            post( 'cs_devtools_social_scan_posts', {} ).then( res => {
-                scanBtn.disabled = false;
-                scanBtn.textContent = '📋 Scan Recent Posts';
-                if ( ! res.success ) {
-                    scanResults.innerHTML = `<p style="color:#8c2020">${esc( res.data?.message || 'Error' )}</p>`;
-                    return;
-                }
-                scanResults.innerHTML = renderPostsTable( res.data );
-            } ).catch( () => {
-                scanBtn.disabled = false;
-                scanBtn.textContent = '📋 Scan Recent Posts';
-                scanResults.innerHTML = '<p style="color:#8c2020">Request failed.</p>';
-            } );
+    function runScan( mode ) {
+        const btn       = mode === 'top' ? auditTopBtn : auditBtn;
+        const otherBtn  = mode === 'top' ? auditBtn : auditTopBtn;
+        const loadMsg   = mode === 'top'
+            ? 'Reading featured images for the top 50 posts by view count…'
+            : 'Reading featured images for the last 50 published posts…';
+        const origLabel = btn ? btn.innerHTML : '';
+
+        if ( btn ) btn.disabled = true;
+        if ( btn ) btn.textContent = 'Scanning…';
+        if ( otherBtn ) otherBtn.disabled = true;
+        if ( auditProgress ) auditProgress.textContent = 'Checking featured images…';
+        if ( fixAllBtn ) fixAllBtn.style.display = 'none';
+        setLoading( auditResults, loadMsg );
+
+        post( 'cs_devtools_social_scan_media', { mode } ).then( res => {
+            if ( btn ) { btn.disabled = false; btn.innerHTML = origLabel; }
+            if ( otherBtn ) otherBtn.disabled = false;
+            if ( auditProgress ) auditProgress.textContent = '';
+            if ( ! res.success ) {
+                auditResults.innerHTML = `<p style="color:#8c2020">${esc( res.data?.message || 'Error' )}</p>`;
+                return;
+            }
+            lastScanPosts = res.data.posts || [];
+            auditResults.style.display = 'block';
+            auditResults.innerHTML = renderPostScan( res.data );
+            const fixable = lastScanPosts.filter( p => p.can_fix && p.status !== 'pass' );
+            if ( fixAllBtn && fixable.length ) fixAllBtn.style.display = '';
+        } ).catch( () => {
+            if ( btn ) { btn.disabled = false; btn.innerHTML = origLabel; }
+            if ( otherBtn ) otherBtn.disabled = false;
+            if ( auditProgress ) auditProgress.textContent = '';
+            auditResults.innerHTML = '<p style="color:#8c2020">Request failed.</p>';
         } );
     }
 
-    function renderPostsTable( posts ) {
-        if ( ! posts.length ) {
-            return '<p style="color:#555;font-size:13px">No published posts with featured images found.</p>';
+    if ( auditBtn )    auditBtn.addEventListener(    'click', () => runScan( 'recent' ) );
+    if ( auditTopBtn ) auditTopBtn.addEventListener( 'click', () => runScan( 'top' ) );
+
+    // Fix all posts in one go.
+    if ( fixAllBtn ) {
+        fixAllBtn.addEventListener( 'click', () => {
+            const fixable = lastScanPosts.filter( p => p.can_fix );
+            if ( ! fixable.length ) return;
+            fixAllBtn.disabled = true;
+            let done = 0;
+            fixAllBtn.textContent = `Fixing 0 / ${fixable.length}…`;
+            const next = () => {
+                if ( done >= fixable.length ) {
+                    fixAllBtn.disabled = false;
+                    fixAllBtn.textContent = `✔ Fixed ${done} posts`;
+                    return;
+                }
+                const p = fixable[ done ];
+                fixAllBtn.textContent = `Fixing ${done + 1} / ${fixable.length}…`;
+                post( 'cs_devtools_social_generate_formats', { post_id: p.post_id } ).then( () => {
+                    const fixRow = document.getElementById( `cs-scan-fix-row-${p.post_id}` );
+                    if ( fixRow ) fixRow.innerHTML = '<span style="color:#276227;font-size:11px">✔ Formats generated</span>';
+                    done++;
+                    next();
+                } ).catch( () => { done++; next(); } );
+            };
+            next();
+        } );
+    }
+
+    // Fix All Posts on Site — batch endpoint, processes all published posts.
+    if ( fixSiteBtn ) {
+        fixSiteBtn.addEventListener( 'click', () => {
+            if ( ! confirm( 'This will generate social format images for every published post on the site. It may take a few minutes for large sites. Continue?' ) ) return;
+
+            fixSiteBtn.disabled = true;
+            if ( auditProgress ) auditProgress.textContent = 'Starting…';
+
+            let totalPosts  = 0;
+            let processed   = 0;
+            let skipped     = 0;
+            let errored     = 0;
+
+            function runBatch( offset ) {
+                post( 'cs_devtools_social_fix_all_batch', { offset } ).then( res => {
+                    if ( ! res.success ) {
+                        fixSiteBtn.disabled    = false;
+                        fixSiteBtn.textContent = '🌐 Fix All Posts on Site';
+                        if ( auditProgress ) auditProgress.textContent = '✗ Batch error — see console.';
+                        console.error( 'cs_devtools_social_fix_all_batch error', res );
+                        return;
+                    }
+                    const d = res.data;
+                    if ( totalPosts === 0 ) totalPosts = d.total;
+
+                    ( d.batch || [] ).forEach( item => {
+                        if ( item.skipped )    skipped++;
+                        else if ( item.ok )    processed++;
+                        else                   errored++;
+                    } );
+
+                    const done = processed + skipped + errored;
+                    fixSiteBtn.textContent = `Fixing ${done} / ${totalPosts}…`;
+                    if ( auditProgress ) auditProgress.textContent = `${processed} fixed, ${skipped} skipped, ${errored} errors`;
+
+                    if ( d.has_more ) {
+                        runBatch( d.next_offset );
+                    } else {
+                        fixSiteBtn.disabled    = false;
+                        fixSiteBtn.textContent = `✔ Done — ${processed} fixed, ${skipped} skipped`;
+                        if ( auditProgress ) auditProgress.textContent = '';
+                    }
+                } ).catch( err => {
+                    fixSiteBtn.disabled    = false;
+                    fixSiteBtn.textContent = '🌐 Fix All Posts on Site';
+                    if ( auditProgress ) auditProgress.textContent = '✗ Network error.';
+                    console.error( 'fix_all_batch network error', err );
+                } );
+            }
+
+            runBatch( 0 );
+        } );
+    }
+
+    const PLATFORM_LABELS = {
+        facebook:  'FB',
+        twitter:   'X',
+        whatsapp:  'WA',
+        linkedin:  'LI',
+        instagram: 'IG',
+    };
+
+    const PLATFORM_FULL = {
+        facebook:  'Facebook',
+        twitter:   'X / Twitter',
+        whatsapp:  'WhatsApp',
+        linkedin:  'LinkedIn',
+        instagram: 'Instagram',
+    };
+
+    // ── Platform detail modal (shared, one per page) ──────────────────────
+
+    const platformModal = ( () => {
+        const overlay = document.createElement( 'div' );
+        overlay.id = 'cs-platform-modal-overlay';
+        overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998;overflow-y:auto;padding:40px 16px';
+        const box = document.createElement( 'div' );
+        box.style.cssText = 'background:#fff;border-radius:8px;max-width:520px;margin:0 auto;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden';
+        overlay.appendChild( box );
+        document.body.appendChild( overlay );
+        overlay.addEventListener( 'click', ( e ) => { if ( e.target === overlay ) close(); } );
+        document.addEventListener( 'keydown', ( e ) => { if ( e.key === 'Escape' ) close(); } );
+        function close() { overlay.style.display = 'none'; }
+        function open( title, platforms ) {
+            const STATUS_LABELS = { pass: 'Ready', warn: 'Warning', fail: 'Issue' };
+            const cols = { pass: '#276227', warn: '#7a5a00', fail: '#8c2020' };
+            const bgs  = { pass: '#edfaed', warn: '#fff8e5', fail: '#fdf0f0' };
+            const icons = { pass: '✔', warn: '⚠', fail: '✘' };
+            let rows = '';
+            for ( const [ key, p ] of Object.entries( platforms ) ) {
+                const full  = PLATFORM_FULL[ key ] || key;
+                const col   = cols[ p.status ]  || '#555';
+                const bg    = bgs[ p.status ]   || '#f6f7f7';
+                const icon  = icons[ p.status ] || 'ℹ';
+                const badge = STATUS_LABELS[ p.status ] || p.status;
+                rows += `<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 20px;border-bottom:1px solid #f0f0f0">
+                    <div style="min-width:96px;font-size:13px;font-weight:600;color:#333;padding-top:2px">${esc( full )}</div>
+                    <div style="flex:1">
+                        <span style="display:inline-block;background:${bg};color:${col};padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-bottom:4px">${icon} ${esc( badge )}</span>
+                        <div style="font-size:12px;color:#50575e;line-height:1.5">${esc( p.msg )}</div>
+                    </div>
+                </div>`;
+            }
+            box.innerHTML = `
+                <div style="background:#1d2327;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
+                    <strong style="font-size:14px">📋 Social Platform Compatibility</strong>
+                    <button onclick="document.getElementById('cs-platform-modal-overlay').style.display='none'"
+                        style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;padding:0 2px">&times;</button>
+                </div>
+                <div style="padding:12px 20px 6px;font-size:12px;color:#555;border-bottom:1px solid #eee">${esc( title )}</div>
+                ${rows}
+                <div style="padding:10px 20px;font-size:11px;color:#999;text-align:right">Click outside or press Esc to close</div>`;
+            overlay.style.display = 'block';
         }
-        let html = `<table class="cs-thumb-posts-table">
-            <thead><tr>
-                <th>Post</th><th>Status</th><th>Image Size</th><th>Dimensions</th><th>Actions</th>
-            </tr></thead><tbody>`;
-        for ( const p of posts ) {
-            const t = p.totals;
-            const badgeCls  = t.fail > 0 ? 'fail' : t.warn > 0 ? 'warn' : 'ok';
-            const badgeText = t.fail > 0 ? `✘ ${t.fail} issue(s)` : t.warn > 0 ? `⚠ ${t.warn} warning(s)` : '✔ OK';
-            const sizeText  = p.img_kb !== null ? `${p.img_kb} KB${p.img_kb > 300 ? ' ⚠ over limit' : ''}` : '—';
-            const dimText   = ( p.img_w && p.img_h ) ? `${p.img_w}×${p.img_h}px` : '—';
-            html += `<tr>
-                <td><a href="${esc( p.url )}" target="_blank" rel="noopener">${esc( p.title )}</a></td>
-                <td><span class="cs-thumb-badge-${badgeCls}">${esc( badgeText )}</span></td>
-                <td>${esc( sizeText )}</td>
-                <td>${esc( dimText )}</td>
-                <td>
-                    <button class="button button-small cs-thumb-recheck-btn" data-url="${esc( p.url )}">Re-check</button>
-                    <a href="${esc( p.url )}" target="_blank" rel="noopener" class="button button-small" style="margin-left:4px">View</a>
-                </td>
-            </tr>`;
+        return { open };
+    } )();
+
+    function renderPlatformChips( platforms, postId, title ) {
+        if ( ! platforms ) return '';
+        const jsonAttr = esc( JSON.stringify( platforms ) );
+        const titleAttr = esc( title || '' );
+        let html = `<div class="cs-platform-chips" data-platforms="${jsonAttr}" data-title="${titleAttr}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;cursor:pointer" title="Click any chip to see full details">`;
+        for ( const [ key, p ] of Object.entries( platforms ) ) {
+            const label = PLATFORM_LABELS[ key ] || key;
+            const bg    = p.status === 'pass' ? '#edfaed' : p.status === 'warn' ? '#fff8e5' : '#fdf0f0';
+            const col   = p.status === 'pass' ? '#276227' : p.status === 'warn' ? '#7a5a00' : '#8c2020';
+            const icon  = p.status === 'pass' ? '✔' : p.status === 'warn' ? '⚠' : '✘';
+            html += `<span class="cs-chip" style="display:inline-flex;align-items:center;gap:3px;background:${bg};color:${col};padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;user-select:none"
+                >${icon} ${esc( label )}</span>`;
         }
-        html += '</tbody></table>';
+        html += '</div>';
+        return html;
+    }
+
+    // Any chip click → open modal with all platforms for that post.
+    document.addEventListener( 'click', ( e ) => {
+        const chip = e.target.closest( '.cs-chip' );
+        if ( ! chip ) return;
+        const wrap = chip.closest( '.cs-platform-chips' );
+        if ( ! wrap ) return;
+        try {
+            const platforms = JSON.parse( wrap.dataset.platforms || '{}' );
+            platformModal.open( wrap.dataset.title || '', platforms );
+        } catch ( err ) { /* ignore */ }
+    } );
+
+    function renderPostScan( data ) {
+        const { total_scanned, pass, warn, fail, posts, mode, sort_note } = data;
+        const modeLabel = mode === 'top' ? 'top' : 'most recent';
+        const sortHint  = sort_note ? ` <span style="color:#888;font-size:11px">(${esc( sort_note )})</span>` : '';
+
+        let html = `<div style="margin-bottom:12px;font-size:13px">
+            Checked <strong>${esc( String( total_scanned ) )}</strong> ${esc( modeLabel )} posts${sortHint} —
+            <span style="color:#276227">✔ ${esc( String( pass ) )} all platforms OK</span> &nbsp;
+            <span style="color:#7a5a00">⚠ ${esc( String( warn ) )} warnings</span> &nbsp;
+            <span style="color:#8c2020">✘ ${esc( String( fail ) )} issues</span>
+        </div>`;
+
+        const problem = posts.filter( p => p.status !== 'pass' );
+
+        for ( const p of problem ) {
+            const dims = p.width && p.height ? `${p.width}×${p.height}px` : '';
+            const size = p.size_kb !== null ? `${p.size_kb} KB` : '';
+            const meta = [ dims, size ].filter( Boolean ).join( ' · ' );
+
+            const imgPreview = p.img_url
+                ? `<img src="${esc( p.img_url )}" style="width:60px;height:40px;object-fit:cover;border-radius:3px;flex-shrink:0;border:1px solid #ddd" loading="lazy" alt="">`
+                : `<div style="width:60px;height:40px;background:#f0f0f0;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;border:1px solid #ddd">🖼</div>`;
+
+            const overallCol = p.status === 'fail' ? '#8c2020' : '#7a5a00';
+            const overallIcon = p.status === 'fail' ? '✘' : '⚠';
+
+            const fixBtn = p.can_fix
+                ? `<button class="button button-small cs-scan-fix-btn" data-post-id="${esc( String( p.post_id ) )}" style="font-size:11px">🔧 Fix</button>`
+                : '';
+
+            html += `<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f0f0f0">
+                ${imgPreview}
+                <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                        <span style="color:${overallCol};font-weight:700;font-size:13px">${overallIcon}</span>
+                        <a href="${esc( p.post_url )}" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;color:#1a3a8f;text-decoration:none;word-break:break-word">${esc( p.title )}</a>
+                    </div>
+                    ${meta ? `<div style="font-size:11px;color:#888;margin-top:2px">${esc( meta )}</div>` : ''}
+                    ${p.no_image ? '<div style="font-size:12px;color:#8c2020;margin-top:3px">No featured image set</div>' : renderPlatformChips( p.platforms, p.post_id, p.title )}
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center">
+                        <button class="button button-small cs-thumb-recheck-btn" data-url="${esc( p.post_url )}" style="font-size:11px">Re-check</button>
+                        <a href="${esc( p.post_url )}" target="_blank" rel="noopener" class="button button-small" style="font-size:11px">View Post</a>
+                        ${fixBtn}
+                    </div>
+                    <div id="cs-scan-fix-row-${esc( String( p.post_id ) )}" style="margin-top:4px"></div>
+                </div>
+            </div>`;
+        }
+
+        if ( fail === 0 && warn === 0 ) {
+            html += `<p style="color:#276227;font-weight:600;margin-top:8px">✔ All ${esc( String( total_scanned ) )} posts are ready for all social platforms.</p>`;
+        } else if ( problem.length < total_scanned ) {
+            const okCount = total_scanned - problem.length;
+            html += `<p style="color:#276227;font-size:12px;margin-top:10px">✔ ${esc( String( okCount ) )} post${okCount === 1 ? '' : 's'} already ready for all platforms — not shown above.</p>`;
+        }
+
         return html;
     }
 
@@ -174,6 +403,59 @@
             checkResults.innerHTML = '<p style="color:#8c2020">Request failed.</p>';
         } );
     } );
+
+    // Fix individual post — generate platform formats.
+    document.addEventListener( 'click', ( e ) => {
+        const btn = e.target.closest( '.cs-scan-fix-btn' );
+        if ( ! btn ) return;
+        const postId = btn.dataset.postId;
+        const fixRow = document.getElementById( `cs-scan-fix-row-${postId}` );
+        btn.disabled = true;
+        btn.textContent = 'Generating…';
+        if ( fixRow ) fixRow.innerHTML = '<span style="color:#555;font-size:11px">⏳ Generating platform formats…</span>';
+
+        post( 'cs_devtools_social_generate_formats', { post_id: postId } ).then( res => {
+            btn.style.display = 'none';
+            if ( ! res.success ) {
+                if ( fixRow ) fixRow.innerHTML = `<span style="color:#8c2020;font-size:11px">✘ ${esc( res.data?.message || 'Failed' )}</span>`;
+                btn.disabled = false;
+                btn.textContent = '🔧 Fix';
+                btn.style.display = '';
+                return;
+            }
+            if ( fixRow ) fixRow.innerHTML = renderFixResult( res.data );
+        } ).catch( () => {
+            btn.disabled = false;
+            btn.textContent = '🔧 Fix';
+            if ( fixRow ) fixRow.innerHTML = '<span style="color:#8c2020;font-size:11px">✘ Request failed</span>';
+        } );
+    } );
+
+    function renderFixResult( platforms ) {
+        let html = '<div class="cs-fix-modal-wrap">';
+        for ( const [ key, r ] of Object.entries( platforms ) ) {
+            if ( ! r.success ) {
+                html += `<div class="cs-fix-platform-row">
+                    <span class="cs-fix-platform-label">${esc( r.label || key )}</span>
+                    <span class="cs-fix-platform-status" style="color:#8c2020">✘ ${esc( r.error || 'Failed' )}</span>
+                </div>`;
+                continue;
+            }
+            const sizeOk  = r.under_limit;
+            const sizeCol = sizeOk ? '#276227' : '#8c2020';
+            const sizeIcon = sizeOk ? '✔' : '⚠ over limit';
+            html += `<div class="cs-fix-platform-row">
+                <span class="cs-fix-platform-label">${esc( r.label )}</span>
+                <span class="cs-fix-platform-dims">${esc( r.w + '×' + r.h )}</span>
+                <span class="cs-fix-platform-status" style="color:${sizeCol}">${sizeIcon} ${esc( String( r.kb ) )} KB</span>
+                <a href="${esc( r.preview_url )}" target="_blank" rel="noopener" title="Preview" style="flex-shrink:0">
+                    <img src="${esc( r.preview_url )}" class="cs-fix-preview-thumb" alt="${esc( r.label )}">
+                </a>
+            </div>`;
+        }
+        html += '</div>';
+        return html;
+    }
 
     // ── Cloudflare Crawler Test ───────────────────────────────────────────
 
@@ -280,96 +562,42 @@
         } );
     }
 
-    // ── Media Library Audit ───────────────────────────────────────────────
+    // ── Platform settings save ────────────────────────────────────────────
 
-    const auditBtn      = document.getElementById( 'cs-thumb-audit-btn' );
-    const auditProgress = document.getElementById( 'cs-thumb-audit-progress' );
-    const auditResults  = document.getElementById( 'cs-thumb-audit-results' );
+    const platformSaveBtn = document.getElementById( 'cs-platform-save-btn' );
+    const platformSaved   = document.getElementById( 'cs-platform-saved' );
 
-    if ( auditBtn ) {
-        auditBtn.addEventListener( 'click', () => {
-            auditBtn.disabled = true;
-            auditBtn.textContent = 'Scanning…';
-            if ( auditProgress ) auditProgress.textContent = 'Querying media library…';
-            setLoading( auditResults, 'Scanning media library for oversized or under-dimensioned images…' );
-
-            post( 'cs_devtools_social_scan_media', {} ).then( res => {
-                auditBtn.disabled = false;
-                auditBtn.textContent = '🔎 Audit Media Library';
-                if ( auditProgress ) auditProgress.textContent = '';
-                if ( ! res.success ) {
-                    auditResults.innerHTML = `<p style="color:#8c2020">${esc( res.data?.message || 'Error' )}</p>`;
-                    return;
-                }
-                auditResults.innerHTML = renderAuditTable( res.data );
-            } ).catch( () => {
-                auditBtn.disabled = false;
-                auditBtn.textContent = '🔎 Audit Media Library';
-                if ( auditProgress ) auditProgress.textContent = '';
-                auditResults.innerHTML = '<p style="color:#8c2020">Request failed.</p>';
-            } );
-        } );
-    }
-
-    // Fix button handler (event delegation).
-    document.addEventListener( 'click', ( e ) => {
-        const btn = e.target.closest( '.cs-thumb-fix-btn' );
-        if ( ! btn ) return;
-        const id     = btn.dataset.id;
-        const status = document.getElementById( `cs-fix-status-${id}` );
-        btn.disabled = true;
-        btn.textContent = 'Working…';
-
-        post( 'cs_devtools_social_fix_image', { attachment_id: id } ).then( res => {
-            if ( ! res.success ) {
-                if ( status ) { status.style.color = '#8c2020'; status.textContent = res.data?.message || 'Failed'; }
-                btn.disabled = false;
-                btn.textContent = 'Retry';
-                return;
-            }
-            const r = res.data;
-            if ( status ) {
-                status.style.color = r.under_limit ? '#276227' : '#7a5a00';
-                status.textContent = r.message + ( r.backup ? ` (backup: ${r.backup})` : '' );
-            }
-            btn.remove();
-            const row = document.getElementById( `cs-audit-row-${id}` );
-            if ( row ) row.querySelector( 'td:nth-child(2)' ).textContent = `${r.new_size_kb} KB ✔`;
-        } ).catch( () => {
-            if ( status ) { status.style.color = '#8c2020'; status.textContent = 'AJAX error'; }
-            btn.disabled = false;
-            btn.textContent = 'Retry';
+    // Highlight card on checkbox change.
+    document.querySelectorAll( '.cs-platform-cb' ).forEach( cb => {
+        cb.addEventListener( 'change', () => {
+            const card = cb.closest( '.cs-platform-card' );
+            if ( card ) card.classList.toggle( 'cs-platform-checked', cb.checked );
         } );
     } );
 
-    function renderAuditTable( data ) {
-        const { total_scanned, issues_found, issues } = data;
-        if ( ! issues_found ) {
-            return `<p style="color:#276227;font-weight:600">✔ Scanned ${esc( total_scanned )} images — no issues found.</p>`;
-        }
-        let html = `<p style="margin-bottom:10px;font-size:13px">Scanned <strong>${esc( total_scanned )}</strong> images — <strong>${esc( issues_found )}</strong> have potential social-preview issues.</p>
-        <table class="cs-thumb-audit-table">
-            <thead><tr>
-                <th>Image</th><th>Size</th><th>Dimensions</th><th>Issues</th><th>Action</th>
-            </tr></thead><tbody>`;
-        for ( const img of issues ) {
-            const flagHtml = img.flags.map( f =>
-                `<span style="color:${f.severity==='fail'?'#8c2020':'#7a5a00'};display:block">${esc( f.issue )}</span>`
-            ).join( '' );
-            const action = img.can_fix
-                ? `<button class="button button-small cs-thumb-fix-btn" data-id="${esc( img.id )}">Recompress</button>
-                   <span id="cs-fix-status-${esc( img.id )}" style="display:block;font-size:11px;margin-top:4px"></span>`
-                : '<span style="color:#999;font-size:11px">Manual fix needed</span>';
-            html += `<tr id="cs-audit-row-${esc( img.id )}">
-                <td><a href="${esc( img.url )}" target="_blank" rel="noopener">${esc( img.file )}</a></td>
-                <td>${esc( String( img.size_kb ) )} KB</td>
-                <td>${esc( `${img.width}×${img.height}px` )}</td>
-                <td>${flagHtml}</td>
-                <td>${action}</td>
-            </tr>`;
-        }
-        html += '</tbody></table>';
-        return html;
+    if ( platformSaveBtn ) {
+        platformSaveBtn.addEventListener( 'click', () => {
+            const selected = Array.from( document.querySelectorAll( '.cs-platform-cb:checked' ) )
+                .map( cb => cb.value );
+            platformSaveBtn.disabled = true;
+            const params = { nonce, action: 'cs_devtools_social_platform_save' };
+            selected.forEach( ( v, i ) => { params[ `platforms[${i}]` ] = v; } );
+            const body = new URLSearchParams( params );
+            fetch( ajaxUrl, { method: 'POST', body } )
+                .then( r => r.json() )
+                .then( res => {
+                    platformSaveBtn.disabled = false;
+                    if ( res.success ) {
+                        if ( platformSaved ) {
+                            platformSaved.classList.add( 'visible' );
+                            setTimeout( () => platformSaved.classList.remove( 'visible' ), 3000 );
+                        }
+                    } else {
+                        alert( res.data?.message || 'Save failed.' );
+                    }
+                } )
+                .catch( () => { platformSaveBtn.disabled = false; alert( 'Request failed.' ); } );
+        } );
     }
 
 } )();
