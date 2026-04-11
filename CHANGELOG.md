@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.8.111] - 2026-04-11
+
+### Added
+- Thumbnails: "Fix All Posts on Site" batch button — processes every published post in groups of 10 with live progress counter
+- Thumbnails: Crawler UA detection — wp_head priority-1 og:image output so each platform receives its correctly-sized image
+
+### Fixed
+- Thumbnails: PNG and WebP featured images now converted to JPEG during social format generation so lossy compression can meet platform size targets
+- Thumbnails: WebP source images were silently skipped by Fix/Fix All — webp now in supported formats list
+- CS Monitor: performance data was injected after footer scripts ran (priority 9999), so the panel always showed empty data; data now injected at priority 15 via wp_add_inline_script() before scripts print at priority 20
+- PCP: email-verified modal countdown script moved from inline PHP `<script>` to wp_add_inline_script()
+- PCP: Thumbnails tab inline `<style>` block moved to wp_add_inline_style() on the cs-admin-tabs handle
+- PCP: wp_delete_file() replaces unlink() for image backup temp-file cleanup
+- PCP: REST hi-score endpoints use explicit anonymous permission callbacks instead of `__return_true` string
+- PCP: Missing wp_unslash() before sanitize_text_field() on $wp->query_vars values in perf monitor
+
+### Security
+- SSRF protection on admin URL-check endpoints — private/reserved IP ranges rejected before outbound HTTP
+- Cloudflare cache-purge endpoint validates supplied URL belongs to the current site
+- DOM XSS fixed in email 2FA enable flow — innerHTML concatenation replaced with safe DOM + textContent
+- TOTP secret cleared from DOM immediately after successful activation
+
+## [1.8.107] - 2026-04-10
+
+### Fixed
+- Session cookie: hook moved from login_form_login (display-only, never fires on POST) to login_init so persistent-cookie flag is set before WordPress processes credentials
+
+## [1.8.89] - 2026-04-10
+
+### Added
+- Login: brute-force protection — configurable per-account lockout after N failed attempts (default 5 attempts, 5-minute lock) with admin UI
+- Thumbnails tab: Social Preview Diagnostics — URL checker (9-point OG/image diagnostic), recent posts auto-scan, Cloudflare WAF setup guide, crawler UA tester, cache purge, Media Library auditor with one-click recompress
+
+### Fixed
+- Login: session persistence — auth cookie is now persistent (not a session cookie) when a custom session duration is set
+
 ## [1.7.48] - 2026-04-05
 
 ### Added

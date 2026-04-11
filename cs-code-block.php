@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.109
+ * Version: 1.8.111
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.109';
+    const VERSION      = '1.8.111';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -365,11 +365,15 @@ class CloudScale_DevTools {
 
             // Performance monitor — panel rendering (admin pages).
             add_action( 'admin_enqueue_scripts', [ __CLASS__, 'perf_enqueue' ] );
-            add_action( 'admin_footer',          [ __CLASS__, 'perf_output_panel' ], 9999 );
+            // Inject JSON data at priority 15 — before wp_print_footer_scripts (priority 20) so
+            // cs-perf-monitor.js reads window.csDevtoolsPerfData when its IIFE runs.
+            add_action( 'admin_footer', [ __CLASS__, 'perf_inject_data' ],   15 );
+            add_action( 'admin_footer', [ __CLASS__, 'perf_output_panel' ], 9999 );
 
             // Performance monitor — panel rendering (frontend, admin users only).
             add_action( 'wp_enqueue_scripts', [ __CLASS__, 'perf_frontend_enqueue' ] );
-            add_action( 'wp_footer',          [ __CLASS__, 'perf_output_panel' ], 9999 );
+            add_action( 'wp_footer', [ __CLASS__, 'perf_inject_data' ],   15 );
+            add_action( 'wp_footer', [ __CLASS__, 'perf_output_panel' ], 9999 );
 
             // Capture the active template filename for the page-context strip.
             add_filter( 'template_include', [ __CLASS__, 'perf_capture_template' ], 9999 );
@@ -1064,6 +1068,28 @@ class CloudScale_DevTools {
                 'nonce'    => wp_create_nonce( 'cs_devtools_thumbnails' ),
                 'siteUrl'  => home_url( '/' ),
             ] );
+            // Thumbnails-tab-specific CSS — injected as inline style to avoid an
+            // extra HTTP request and keep the render method free of <style> tags.
+            wp_add_inline_style( 'cs-admin-tabs', self::get_thumbnails_admin_css() );
+        }
+
+        // Email-verified modal countdown — only needed when the verification
+        // redirect lands back on the login tab with ?email_verified=1.
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( $active_tab === 'login' && isset( $_GET['email_verified'] ) && '1' === $_GET['email_verified'] ) {
+            wp_add_inline_script(
+                'cs-admin-settings',
+                '(function(){' .
+                'var modal=document.getElementById("cs-email-verified-modal");' .
+                'var cd=document.getElementById("cs-modal-countdown");' .
+                'var closeBtn=document.getElementById("cs-email-modal-close");' .
+                'var n=6;' .
+                'var t=setInterval(function(){n--;if(cd)cd.textContent=n;if(n<=0){clearInterval(t);if(modal)modal.style.display="none";}},1000);' .
+                'function dismiss(){clearInterval(t);if(modal)modal.style.display="none";}' .
+                'if(closeBtn)closeBtn.addEventListener("click",dismiss);' .
+                'if(modal)modal.addEventListener("click",function(e){if(e.target===modal)dismiss();});' .
+                '})()'
+            );
         }
     }
 
@@ -1170,6 +1196,32 @@ class CloudScale_DevTools {
      * @param string $title Modal title.
      * @param array  $items Array of ['name'=>'', 'rec'=>'', 'desc'=>''] entries.
      */
+    /**
+     * Allowed HTML tags/attrs for item descriptions that contain links.
+     *
+     * @var array<string,array<string,bool>>
+     */
+    private static array $explain_kses = [
+        'a'      => [ 'href' => true, 'target' => true, 'rel' => true ],
+        'strong' => [],
+        'em'     => [],
+        'code'   => [],
+        'br'     => [],
+    ];
+
+    /**
+     * Renders an "Explain…" button + inline modal.
+     *
+     * Each item in $items may have:
+     *   'name' => string   — section heading
+     *   'rec'  => string   — badge label (Recommended | Note | Optional)
+     *   'desc' => string   — plain-text description (escaped with esc_html)
+     *   'html' => string   — HTML description rendered via wp_kses (overrides 'desc')
+     *
+     * @param string $id    Unique slug used to build element IDs.
+     * @param string $title Modal title.
+     * @param array  $items Array of item arrays.
+     */
     private static function render_explain_btn( string $id, string $title, array $items ): void {
         $btn_id   = 'cs-explain-btn-' . $id;
         $modal_id = 'cs-explain-modal-' . $id;
@@ -1192,18 +1244,26 @@ class CloudScale_DevTools {
                 <div style="padding:16px 22px 20px">
                     <?php foreach ( $items as $item ) :
                         $rec    = $item['rec'];
-                        $is_on  = str_contains( $rec, 'Recommended' );
+                        $is_rec = str_contains( $rec, 'Recommended' );
                         $is_opt = str_contains( $rec, 'Optional' );
-                        $bg     = $is_on ? '#edfaef' : ( $is_opt ? '#f6f7f7' : '#f0f6fc' );
-                        $col    = $is_on ? '#1a7a34' : ( $is_opt ? '#50575e' : '#1a4a7a' );
-                        $bdr    = $is_on ? '#1a7a34' : ( $is_opt ? '#c3c4c7' : '#2271b1' );
+                        $bg     = $is_rec ? '#edfaef' : ( $is_opt ? '#f6f7f7' : '#f0f6fc' );
+                        $col    = $is_rec ? '#1a7a34' : ( $is_opt ? '#50575e' : '#1a4a7a' );
+                        $bdr    = $is_rec ? '#1a7a34' : ( $is_opt ? '#c3c4c7' : '#2271b1' );
                     ?>
-                    <div style="border:1px solid #e0e0e0;border-radius:6px;padding:12px 14px;margin-bottom:10px">
-                        <div style="text-align:center;margin-bottom:6px">
-                            <span style="display:inline-block;background:<?php echo esc_attr( $bg ); ?>;color:<?php echo esc_attr( $col ); ?>;border:1px solid <?php echo esc_attr( $bdr ); ?>;border-radius:4px;font-size:11px;font-weight:600;padding:1px 8px;white-space:nowrap"><?php echo esc_html( $rec ); ?></span>
+                    <div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;margin-bottom:10px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+                            <strong style="font-size:13px;color:#111;line-height:1.3"><?php echo esc_html( $item['name'] ); ?></strong>
+                            <span style="flex-shrink:0;display:inline-block;background:<?php echo esc_attr( $bg ); ?>;color:<?php echo esc_attr( $col ); ?>;border:1px solid <?php echo esc_attr( $bdr ); ?>;border-radius:4px;font-size:10px;font-weight:700;padding:2px 8px;white-space:nowrap;letter-spacing:0.02em;text-transform:uppercase"><?php echo esc_html( $rec ); ?></span>
                         </div>
-                        <strong style="display:block;font-size:13px;margin-bottom:4px"><?php echo esc_html( $item['name'] ); ?></strong>
-                        <p style="margin:0;color:#50575e;font-size:12px;line-height:1.5;white-space:pre-line"><?php echo esc_html( $item['desc'] ); ?></p>
+                        <p style="margin:0;color:#50575e;font-size:12px;line-height:1.6">
+                            <?php
+                            if ( ! empty( $item['html'] ) ) {
+                                echo wp_kses( $item['html'], self::$explain_kses ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitised via wp_kses with restricted allowlist
+                            } else {
+                                echo esc_html( $item['desc'] ?? '' );
+                            }
+                            ?>
+                        </p>
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -1498,22 +1558,6 @@ class CloudScale_DevTools {
                 <p class="cs-modal-auto"><?php esc_html_e( 'Closing in', 'cloudscale-devtools' ); ?> <span id="cs-modal-countdown">6</span>s…</p>
             </div>
         </div>
-        <script>
-        (function () {
-            var modal    = document.getElementById( 'cs-email-verified-modal' );
-            var cd       = document.getElementById( 'cs-modal-countdown' );
-            var closeBtn = document.getElementById( 'cs-email-modal-close' );
-            var n = 6;
-            var t = setInterval( function () {
-                n--;
-                if ( cd ) cd.textContent = n;
-                if ( n <= 0 ) { clearInterval( t ); if ( modal ) modal.style.display = 'none'; }
-            }, 1000 );
-            function dismiss() { clearInterval( t ); if ( modal ) modal.style.display = 'none'; }
-            if ( closeBtn ) closeBtn.addEventListener( 'click', dismiss );
-            if ( modal ) modal.addEventListener( 'click', function ( e ) { if ( e.target === modal ) dismiss(); } );
-        })();
-        </script>
         <?php endif; ?>
         <?php
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -2842,14 +2886,16 @@ class CloudScale_DevTools {
     }
 
     /**
-     * Outputs the performance monitor panel HTML and JSON payload at footer.
+     * Injects performance data as a JS global before footer scripts are printed.
      *
-     * Fires on both admin_footer and wp_footer so the panel appears on all
-     * pages for manage_options users.
+     * Hooked to admin_footer / wp_footer at priority 15, before WordPress
+     * calls wp_print_footer_scripts() at priority 20. This ensures
+     * window.csDevtoolsPerfData is set before cs-perf-monitor.js IIFE runs.
      *
+     * @since  1.8.111
      * @return void
      */
-    public static function perf_output_panel() {
+    public static function perf_inject_data(): void {
         global $wpdb;
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
@@ -2875,7 +2921,7 @@ class CloudScale_DevTools {
             $h_total += $h['time_ms'];
         }
 
-        // Request time from PHP superglobal (µs precision, PHP 5.4+).
+        // Request time snapshot at data-injection time (priority 15).
         $page_ms = isset( $_SERVER['REQUEST_TIME_FLOAT'] )
             ? round( ( microtime( true ) - (float) $_SERVER['REQUEST_TIME_FLOAT'] ) * 1000, 2 )
             : 0;
@@ -2932,15 +2978,96 @@ class CloudScale_DevTools {
             'health'     => self::perf_build_health_data(),
             'milestones' => array_merge(
                 [ [ 'label' => 'Request start', 'ms' => 0.0 ] ],
-                self::$perf_milestones,
-                [ [ 'label' => 'Panel output', 'ms' => $page_ms ] ]
+                self::$perf_milestones
             ),
         ];
 
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-        echo '<script>window.csDevtoolsPerfData=' . wp_json_encode( $data ) . ';</script>' . "\n";
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        wp_add_inline_script( 'cs-perf-monitor', 'window.csDevtoolsPerfData=' . wp_json_encode( $data ) . ';', 'before' );
+    }
+
+    /**
+     * Outputs the performance monitor panel HTML skeleton at footer.
+     *
+     * Fires at priority 9999 so it appears at the very end of the page body.
+     * Data is injected earlier via perf_inject_data() at priority 15.
+     *
+     * @since  1.8.0
+     * @return void
+     */
+    public static function perf_output_panel(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( get_option( 'cs_devtools_perf_monitor_enabled', '1' ) === '0' ) {
+            return;
+        }
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static HTML, no user data
         echo self::perf_panel_html();
+    }
+
+    // ─── Thumbnails admin CSS ─────────────────────────────────────────────────
+
+    /**
+     * Returns the CSS for the Thumbnails admin tab.
+     *
+     * Injected via wp_add_inline_style() on the cs-admin-tabs handle when the
+     * thumbnails tab is active, keeping the render method free of <style> tags.
+     *
+     * @since  1.8.111
+     * @return string
+     */
+    private static function get_thumbnails_admin_css(): string {
+        return '
+.cs-thumb-cf-steps{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.cs-thumb-cf-step{display:flex;gap:12px;align-items:flex-start}
+.cs-thumb-cf-step-num{min-width:26px;height:26px;background:#e65100;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:2px}
+.cs-thumb-cf-code{background:#1e1e1e;color:#e8e8e8;padding:10px 14px;border-radius:4px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:6px 0}
+.cs-thumb-report-hdr{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-radius:4px;margin-bottom:10px;font-size:13px;font-weight:600}
+.cs-thumb-pass-hdr{background:#edfaed;color:#276227}
+.cs-thumb-warn-hdr{background:#fff8e5;color:#7a5a00}
+.cs-thumb-fail-hdr{background:#fdf0f0;color:#8c2020}
+.cs-thumb-tally{display:flex;gap:12px;font-size:13px}
+.cs-thumb-section{border:1px solid #e0e0e0;border-radius:4px;margin-bottom:10px;overflow:hidden}
+.cs-thumb-section-title{background:#f6f7f7;padding:6px 12px;font-size:12px;font-weight:700;color:#333;border-bottom:1px solid #e0e0e0;text-transform:uppercase;letter-spacing:.4px}
+.cs-thumb-results-list{margin:0;padding:6px 10px;list-style:none}
+.cs-thumb-result{display:flex;gap:8px;padding:3px 0;font-size:12px;align-items:flex-start}
+.cs-thumb-pass{color:#276227}
+.cs-thumb-warn{color:#7a5a00}
+.cs-thumb-fail{color:#8c2020}
+.cs-thumb-fix{margin-top:3px;font-size:11px;color:#1a4a7a;background:#f0f6fc;border-left:3px solid #2271b1;padding:3px 7px;border-radius:0 3px 3px 0}
+.cs-thumb-info{color:#555}
+.cs-thumb-ua-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.cs-thumb-ua-chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.cs-thumb-ua-ok{background:#edfaed;color:#276227}
+.cs-thumb-ua-fail{background:#fdf0f0;color:#8c2020}
+.cs-thumb-ua-warn{background:#fff8e5;color:#7a5a00}
+.cs-input-light-placeholder::placeholder{color:#bbb;font-weight:400}
+.cs-thumb-posts-table{width:100%;border-collapse:collapse;font-size:13px}
+.cs-thumb-posts-table th{background:#f6f7f7;padding:7px 10px;text-align:left;border-bottom:2px solid #ddd}
+.cs-thumb-posts-table td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:top}
+.cs-thumb-badge-ok{display:inline-block;background:#edfaed;color:#276227;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.cs-thumb-badge-warn{display:inline-block;background:#fff8e5;color:#7a5a00;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.cs-thumb-badge-fail{display:inline-block;background:#fdf0f0;color:#8c2020;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.cs-thumb-audit-table{font-size:12px;width:100%;border-collapse:collapse}
+.cs-thumb-audit-table th{background:#f6f7f7;padding:6px 10px;text-align:left;border-bottom:2px solid #ddd}
+.cs-thumb-audit-table td{padding:6px 10px;border-bottom:1px solid #eee;vertical-align:top}
+.cs-platform-grid{display:flex;flex-wrap:wrap;gap:10px}
+.cs-platform-card{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:2px solid #ddd;border-radius:6px;cursor:pointer;transition:border-color .15s,background .15s;min-width:160px;flex:1 1 auto;max-width:200px}
+.cs-platform-card:hover{border-color:#2271b1}
+.cs-platform-checked{border-color:#2271b1;background:#f0f6ff}
+.cs-platform-card input{margin-top:2px;flex-shrink:0}
+.cs-platform-card-body{display:flex;flex-direction:column;gap:2px}
+.cs-platform-name{font-size:13px;font-weight:600;color:#333}
+.cs-platform-dims{font-size:11px;color:#555}
+.cs-platform-limit{font-size:11px;color:#888}
+.cs-fix-modal-wrap{margin-top:8px;padding:10px 12px;background:#f6f7f7;border:1px solid #e0e0e0;border-radius:5px;font-size:12px}
+.cs-fix-platform-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #ebebeb}
+.cs-fix-platform-row:last-child{border-bottom:none}
+.cs-fix-platform-label{min-width:90px;font-weight:600;color:#333;font-size:12px}
+.cs-fix-platform-dims{color:#888;font-size:11px;min-width:80px}
+.cs-fix-platform-status{font-size:11px;flex:1}
+.cs-fix-preview-thumb{width:48px;height:28px;object-fit:cover;border-radius:2px;border:1px solid #ddd;flex-shrink:0}
+';
     }
 
     /* ==================================================================
@@ -2978,7 +3105,7 @@ class CloudScale_DevTools {
                 }
                 $query_vars[ sanitize_key( $k ) ] = is_array( $v )
                     ? '(array)'
-                    : sanitize_text_field( (string) $v );
+                    : sanitize_text_field( wp_unslash( (string) $v ) );
             }
         }
 
@@ -5413,9 +5540,28 @@ class CloudScale_DevTools {
                 <span>📧 SMTP CONFIGURATION</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Replace PHP mail() with a real SMTP connection', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'smtp', 'SMTP Configuration', [
-                    [ 'name' => 'Enable SMTP',        'rec' => 'Recommended', 'desc' => 'Routes all WordPress emails through your own SMTP server instead of the server\'s PHP mail() function. This dramatically improves deliverability and lets you use Gmail, Outlook, or any hosted mail service.' ],
-                    [ 'name' => 'App Passwords',      'rec' => 'Note',        'desc' => 'Gmail and most modern providers require an App Password rather than your regular account password. Generate one in your Google or provider account security settings and paste it here.' ],
-                    [ 'name' => 'Send Test Email',    'rec' => 'Note',        'desc' => 'Sends a test message to your admin email using your current saved settings. If it fails, check your host, port, and encryption match your provider\'s requirements (port 587 + TLS is the safest default), and that you\'re using an App Password where required.' ],
+                    [
+                        'name' => 'Enable SMTP',
+                        'rec'  => 'Recommended',
+                        'desc' => 'Routes all WordPress emails through your own SMTP server instead of the server\'s PHP mail() function. This dramatically improves deliverability and lets you use Gmail, Outlook, or any hosted mail service.',
+                    ],
+                    [
+                        'name' => 'App Passwords',
+                        'rec'  => 'Note',
+                        'html' => 'Gmail and most modern providers require an <strong>App Password</strong> — a separate password generated specifically for third-party apps — rather than your regular account password. This is required when two-factor authentication (2FA) is enabled on the account.'
+                            . '<br><br>'
+                            . 'Generate an App Password from your provider\'s security settings and paste it into the Password field below:'
+                            . '<br><br>'
+                            . '<strong>Gmail</strong> — <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noopener noreferrer">support.google.com/accounts/answer/185833</a><br>'
+                            . '<strong>Outlook / Microsoft 365</strong> — <a href="https://support.microsoft.com/en-us/account-billing/using-app-passwords-with-apps-that-don-t-support-two-step-verification-5896ed9b-4263-e681-128a-a6f2979a7944" target="_blank" rel="noopener noreferrer">support.microsoft.com — App passwords</a><br>'
+                            . '<strong>Yahoo Mail</strong> — <a href="https://help.yahoo.com/kb/generate-third-party-passwords-sln15241.html" target="_blank" rel="noopener noreferrer">help.yahoo.com — Generate app passwords</a><br>'
+                            . '<strong>Zoho Mail</strong> — <a href="https://www.zoho.com/mail/help/adminconsole/two-factor-authentication.html" target="_blank" rel="noopener noreferrer">zoho.com/mail/help — Two-factor authentication</a>',
+                    ],
+                    [
+                        'name' => 'Send Test Email',
+                        'rec'  => 'Note',
+                        'desc' => 'Sends a test message to your admin email using your current saved settings. If it fails, check that your host, port, and encryption match your provider\'s requirements (port 587 + TLS is the safest default), and that you\'re using an App Password where required.',
+                    ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -6241,13 +6387,16 @@ class CloudScale_DevTools {
             [
                 'methods'             => 'GET',
                 'callback'            => [ __CLASS__, 'rest_get_hiscore' ],
-                'permission_callback' => '__return_true',
+                // Public leaderboard read — no authentication required.
+                'permission_callback' => static fn() => true,
                 'args'                => [ 'game' => [ 'required' => true, 'type' => 'string' ] ],
             ],
             [
                 'methods'             => 'POST',
                 'callback'            => [ __CLASS__, 'rest_set_hiscore' ],
-                'permission_callback' => '__return_true',
+                // Public score submission — open to guests by design (404 mini-games).
+                // CSRF protection is enforced via nonce verification in the callback.
+                'permission_callback' => static fn() => true,
                 'args'                => [
                     'game'  => [ 'required' => true, 'type' => 'string' ],
                     'score' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 999999 ],
@@ -6606,60 +6755,9 @@ class CloudScale_DevTools {
             </div>
         </div>
 
-        <style>
-        .cs-thumb-cf-steps { display:flex;flex-direction:column;gap:12px;margin-top:10px }
-        .cs-thumb-cf-step  { display:flex;gap:12px;align-items:flex-start }
-        .cs-thumb-cf-step-num { min-width:26px;height:26px;background:#e65100;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:2px }
-        .cs-thumb-cf-code  { background:#1e1e1e;color:#e8e8e8;padding:10px 14px;border-radius:4px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:6px 0 }
-        .cs-thumb-report-hdr { display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-radius:4px;margin-bottom:10px;font-size:13px;font-weight:600 }
-        .cs-thumb-pass-hdr { background:#edfaed;color:#276227 }
-        .cs-thumb-warn-hdr { background:#fff8e5;color:#7a5a00 }
-        .cs-thumb-fail-hdr { background:#fdf0f0;color:#8c2020 }
-        .cs-thumb-tally { display:flex;gap:12px;font-size:13px }
-        .cs-thumb-section { border:1px solid #e0e0e0;border-radius:4px;margin-bottom:10px;overflow:hidden }
-        .cs-thumb-section-title { background:#f6f7f7;padding:6px 12px;font-size:12px;font-weight:700;color:#333;border-bottom:1px solid #e0e0e0;text-transform:uppercase;letter-spacing:.4px }
-        .cs-thumb-results-list { margin:0;padding:6px 10px;list-style:none }
-        .cs-thumb-result { display:flex;gap:8px;padding:3px 0;font-size:12px;align-items:flex-start }
-        .cs-thumb-pass { color:#276227 }
-        .cs-thumb-warn { color:#7a5a00 }
-        .cs-thumb-fail { color:#8c2020 }
-        .cs-thumb-fix { margin-top:3px;font-size:11px;color:#1a4a7a;background:#f0f6fc;border-left:3px solid #2271b1;padding:3px 7px;border-radius:0 3px 3px 0 }
-        .cs-thumb-info { color:#555 }
-        .cs-thumb-ua-grid { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px }
-        .cs-thumb-ua-chip { padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600 }
-        .cs-thumb-ua-ok   { background:#edfaed;color:#276227 }
-        .cs-thumb-ua-fail { background:#fdf0f0;color:#8c2020 }
-        .cs-thumb-ua-warn { background:#fff8e5;color:#7a5a00 }
-        .cs-input-light-placeholder::placeholder { color:#bbb;font-weight:400 }
-        .cs-thumb-posts-table { width:100%;border-collapse:collapse;font-size:13px }
-        .cs-thumb-posts-table th { background:#f6f7f7;padding:7px 10px;text-align:left;border-bottom:2px solid #ddd }
-        .cs-thumb-posts-table td { padding:7px 10px;border-bottom:1px solid #eee;vertical-align:top }
-        .cs-thumb-badge-ok   { display:inline-block;background:#edfaed;color:#276227;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600 }
-        .cs-thumb-badge-warn { display:inline-block;background:#fff8e5;color:#7a5a00;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600 }
-        .cs-thumb-badge-fail { display:inline-block;background:#fdf0f0;color:#8c2020;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600 }
-        .cs-thumb-audit-table { font-size:12px;width:100%;border-collapse:collapse }
-        .cs-thumb-audit-table th { background:#f6f7f7;padding:6px 10px;text-align:left;border-bottom:2px solid #ddd }
-        .cs-thumb-audit-table td { padding:6px 10px;border-bottom:1px solid #eee;vertical-align:top }
-        /* Platform settings grid */
-        .cs-platform-grid { display:flex;flex-wrap:wrap;gap:10px }
-        .cs-platform-card { display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:2px solid #ddd;border-radius:6px;cursor:pointer;transition:border-color .15s,background .15s;min-width:160px;flex:1 1 auto;max-width:200px }
-        .cs-platform-card:hover { border-color:#2271b1 }
-        .cs-platform-checked { border-color:#2271b1;background:#f0f6ff }
-        .cs-platform-card input { margin-top:2px;flex-shrink:0 }
-        .cs-platform-card-body { display:flex;flex-direction:column;gap:2px }
-        .cs-platform-name { font-size:13px;font-weight:600;color:#333 }
-        .cs-platform-dims { font-size:11px;color:#555 }
-        .cs-platform-limit { font-size:11px;color:#888 }
-        /* Fix modal overlay */
-        .cs-fix-modal-wrap { margin-top:8px;padding:10px 12px;background:#f6f7f7;border:1px solid #e0e0e0;border-radius:5px;font-size:12px }
-        .cs-fix-platform-row { display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #ebebeb }
-        .cs-fix-platform-row:last-child { border-bottom:none }
-        .cs-fix-platform-label { min-width:90px;font-weight:600;color:#333;font-size:12px }
-        .cs-fix-platform-dims  { color:#888;font-size:11px;min-width:80px }
-        .cs-fix-platform-status { font-size:11px;flex:1 }
-        .cs-fix-preview-thumb { width:48px;height:28px;object-fit:cover;border-radius:2px;border:1px solid #ddd;flex-shrink:0 }
-        </style>
         <?php
+        // CSS for this tab is injected via wp_add_inline_style() in enqueue_admin_assets().
+        // See get_thumbnails_admin_css() for the ruleset.
     }
 
     /**
@@ -7571,7 +7669,7 @@ class CloudScale_DevTools {
         }
         $editor = wp_get_image_editor( $file_path );
         if ( is_wp_error( $editor ) ) {
-            unlink( $backup );
+            wp_delete_file( $backup );
             return $editor;
         }
         // Resize if larger than 1200×630 (maintaining aspect ratio, no upscaling).
@@ -7583,7 +7681,7 @@ class CloudScale_DevTools {
         $saved = $editor->save( $file_path );
         if ( is_wp_error( $saved ) ) {
             copy( $backup, $file_path );
-            unlink( $backup );
+            wp_delete_file( $backup );
             return $saved;
         }
         $new_bytes = filesize( $file_path );

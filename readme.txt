@@ -2,9 +2,9 @@
 Contributors: andrewbaker
 Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
-Tested up to: 6.7
+Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.8.109
+Stable tag: 1.8.111
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,10 +79,17 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.8.109 =
+= 1.8.111 =
 * Added: "Fix All Posts on Site" button — batch-processes every published post on the site in groups of 10, generating platform-specific social format images with live progress counter (e.g. "Fixing 45 / 320")
 * Added: Crawler UA detection — `wp_head` at priority 1 outputs platform-specific `og:image` meta tag before SEO plugins, so Facebook, X/Twitter, WhatsApp, LinkedIn, and Instagram each receive the correctly-sized image for their platform
+* Fixed: PNG and WebP featured images now converted to JPEG during social format generation so lossy quality compression can reduce file sizes to platform targets (Fix button was producing oversized files for PNG sources)
 * Fixed: WebP featured images were excluded from Fix / Fix all — added `webp` to the supported source formats list
+* Fixed: Performance monitor data was injected after footer scripts ran, so the panel always showed empty data — data now injected at wp_footer/admin_footer priority 15, before scripts print at priority 20
+* Fixed: Inline email-verified modal countdown script moved from PHP template to wp_add_inline_script() — eliminates echoed <script> tag
+* Fixed: Thumbnails tab inline <style> block moved to wp_add_inline_style() — eliminates echoed <style> tag
+* Fixed: wp_delete_file() now used in place of unlink() when cleaning up image backup temp files
+* Fixed: REST hi-score endpoints changed from __return_true to explicit anonymous permission callbacks
+* Fixed: Missing wp_unslash() before sanitize_text_field() on WP query vars in performance monitor
 * Security: Added SSRF protection on admin URL-check endpoints — URLs that resolve to private/reserved IP ranges (localhost, RFC-1918, link-local) are now rejected before outbound HTTP requests are made
 * Security: Cloudflare cache-purge endpoint now validates that the supplied URL belongs to the current site before calling the Cloudflare API
 * Security: Fixed DOM XSS in email 2FA enable flow — AJAX response message was concatenated into innerHTML; replaced with safe DOM element creation + textContent
