@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.113
+ * Version: 1.8.119
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.113';
+    const VERSION      = '1.8.119';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -227,6 +227,8 @@ class CloudScale_DevTools {
      */
     public static function init() {
         self::maybe_migrate_prefix();
+        self::maybe_migrate_smtp_prefix();
+        self::maybe_migrate_usermeta_prefix();
         add_action( 'init', [ __CLASS__, 'load_textdomain' ] );
         add_action( 'init', [ __CLASS__, 'register_block' ] );
         add_action( 'init', [ __CLASS__, 'register_shortcode' ] );
@@ -268,6 +270,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_social_generate_formats', [ __CLASS__, 'ajax_social_generate_formats' ] );
         add_action( 'wp_ajax_csdt_devtools_social_platform_save',    [ __CLASS__, 'ajax_social_platform_save' ] );
         add_action( 'wp_ajax_csdt_devtools_social_fix_all_batch',   [ __CLASS__, 'ajax_social_fix_all_batch' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_diagnose_formats', [ __CLASS__, 'ajax_social_diagnose_formats' ] );
         add_action( 'save_post_post',  [ __CLASS__, 'on_post_saved' ], 100, 3 );
         add_action( 'admin_notices',   [ __CLASS__, 'social_format_admin_notice' ] );
         // Serve platform-specific og:image based on crawler User-Agent.
@@ -947,6 +950,8 @@ class CloudScale_DevTools {
             [],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-admin-tabs.css' )
         );
+        // Explain modal description styling — scoped to .cs-explain-desc.
+        wp_add_inline_style( 'csdt-admin-tabs', self::get_explain_modal_css() );
 
         // Migrate CSS + JS
         wp_enqueue_style(
@@ -1012,6 +1017,7 @@ class CloudScale_DevTools {
                 'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
                 'nonce'       => wp_create_nonce( 'csdt_devtools_login_nonce' ),
                 'currentUser' => get_current_user_id(),
+                'mailTabUrl'  => admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=mail' ),
             ] );
             wp_enqueue_script(
                 'csdt-passkey',
@@ -1074,9 +1080,9 @@ class CloudScale_DevTools {
         }
 
         // Email-verified modal countdown — only needed when the verification
-        // redirect lands back on the login tab with ?email_verified=1.
+        // redirect lands back on the login tab with ?email_2fa_activated=1.
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        if ( $active_tab === 'login' && isset( $_GET['email_verified'] ) && '1' === $_GET['email_verified'] ) {
+        if ( $active_tab === 'login' && isset( $_GET['email_2fa_activated'] ) && '1' === $_GET['email_2fa_activated'] ) {
             wp_add_inline_script(
                 'csdt-admin-settings',
                 '(function(){' .
@@ -1088,6 +1094,7 @@ class CloudScale_DevTools {
                 'function dismiss(){clearInterval(t);if(modal)modal.style.display="none";}' .
                 'if(closeBtn)closeBtn.addEventListener("click",dismiss);' .
                 'if(modal)modal.addEventListener("click",function(e){if(e.target===modal)dismiss();});' .
+                '(function(){var u=new URL(location.href);u.searchParams.delete("email_2fa_activated");history.replaceState(null,"",u.toString());})();' .
                 '})()'
             );
         }
@@ -1125,10 +1132,6 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'migrate' ? 'active' : ''; ?>">
                     🔄 <?php esc_html_e( 'Code Migrator', 'cloudscale-devtools' ); ?>
                 </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=sql' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'sql' ? 'active' : ''; ?>">
-                    🗄️ <?php esc_html_e( 'SQL Command', 'cloudscale-devtools' ); ?>
-                </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=login' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'login' ? 'active' : ''; ?>">
                     🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?>
@@ -1140,6 +1143,10 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $base_url . '&tab=thumbnails' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'thumbnails' ? 'active' : ''; ?>">
                     🖼️ <?php esc_html_e( 'Thumbnails', 'cloudscale-devtools' ); ?>
+                </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=sql' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'sql' ? 'active' : ''; ?>">
+                    🗄️ <?php esc_html_e( 'SQL Command', 'cloudscale-devtools' ); ?>
                 </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=404' ); ?>"
                    class="cs-tab <?php echo $active_tab === '404' ? 'active' : ''; ?>">
@@ -1207,6 +1214,11 @@ class CloudScale_DevTools {
         'em'     => [],
         'code'   => [],
         'br'     => [],
+        'ul'     => [],
+        'ol'     => [],
+        'li'     => [],
+        'p'      => [],
+        'h4'     => [],
     ];
 
     /**
@@ -1255,7 +1267,7 @@ class CloudScale_DevTools {
                             <strong style="font-size:13px;color:#111;line-height:1.3"><?php echo esc_html( $item['name'] ); ?></strong>
                             <span style="flex-shrink:0;display:inline-block;background:<?php echo esc_attr( $bg ); ?>;color:<?php echo esc_attr( $col ); ?>;border:1px solid <?php echo esc_attr( $bdr ); ?>;border-radius:4px;font-size:10px;font-weight:700;padding:2px 8px;white-space:nowrap;letter-spacing:0.02em;text-transform:uppercase"><?php echo esc_html( $rec ); ?></span>
                         </div>
-                        <p style="margin:0;color:#50575e;font-size:12px;line-height:1.6">
+                        <div class="cs-explain-desc">
                             <?php
                             if ( ! empty( $item['html'] ) ) {
                                 echo wp_kses( $item['html'], self::$explain_kses ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitised via wp_kses with restricted allowlist
@@ -1263,7 +1275,7 @@ class CloudScale_DevTools {
                                 echo esc_html( $item['desc'] ?? '' );
                             }
                             ?>
-                        </p>
+                        </div>
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -1349,9 +1361,9 @@ class CloudScale_DevTools {
             <div class="cs-section-header">
                 <span>🔄 CODE BLOCK MIGRATOR</span>
                 <?php self::render_explain_btn( 'migrator', 'Code Block Migrator', [
-                    [ 'name' => 'Scan Posts',    'rec' => 'Informational', 'desc' => 'Scans all posts and pages for legacy WordPress wp:code and wp:preformatted blocks that can be upgraded to CloudScale Code Blocks with full syntax highlighting.' ],
-                    [ 'name' => 'Preview',       'rec' => 'Recommended',   'desc' => 'Shows a side-by-side before/after diff for each post before committing any changes, so you can review exactly what will be converted.' ],
-                    [ 'name' => 'Migrate',       'rec' => 'Optional',      'desc' => 'Converts detected legacy blocks to CloudScale format. Each post is saved with the converted markup. Take a backup first — this cannot be undone without one.' ],
+                    [ 'name' => 'Scan Posts',    'rec' => 'Informational', 'html' => 'Scans all posts and pages for legacy WordPress <code>wp:code</code> and <code>wp:preformatted</code> blocks that can be upgraded to CloudScale Code Blocks with full syntax highlighting.' ],
+                    [ 'name' => 'Preview',       'rec' => 'Recommended',   'html' => 'Shows a side-by-side before/after diff for each post <em>before</em> committing any changes, so you can review exactly what will be converted.' ],
+                    [ 'name' => 'Migrate',       'rec' => 'Optional',      'html' => 'Converts detected legacy blocks to CloudScale format. Each post is saved with the converted markup.<br><br><strong>Take a backup first</strong> — this cannot be undone without one.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1415,9 +1427,9 @@ class CloudScale_DevTools {
                 <span>🗄️ SQL Query</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Table prefix:', 'cloudscale-devtools' ); ?> <code><?php echo esc_html( $prefix ); ?></code> &nbsp;·&nbsp; ⚠ <?php esc_html_e( 'Read only (SELECT, SHOW, DESCRIBE, EXPLAIN)', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'sql', 'SQL Query Tool', [
-                    [ 'name' => 'Read-only',     'rec' => 'Informational', 'desc' => 'Only SELECT, SHOW, DESCRIBE, and EXPLAIN queries are permitted. INSERT, UPDATE, DELETE, and DROP are blocked to prevent accidental data loss.' ],
-                    [ 'name' => 'Table Prefix',  'rec' => 'Informational', 'desc' => 'Your WordPress table prefix is shown in the header. Use it in your queries (e.g. wp_posts, wp_options).' ],
-                    [ 'name' => 'Quick Queries', 'rec' => 'Recommended',   'desc' => 'Use the preset queries below for common diagnostics without needing to write SQL from scratch.' ],
+                    [ 'name' => 'Read-only',     'rec' => 'Informational', 'html' => 'Only <code>SELECT</code>, <code>SHOW</code>, <code>DESCRIBE</code>, and <code>EXPLAIN</code> queries are permitted. Write operations (<code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>DROP</code>, <code>ALTER</code>, <code>TRUNCATE</code>) are blocked to prevent accidental data loss.' ],
+                    [ 'name' => 'Table Prefix',  'rec' => 'Informational', 'html' => 'Your WordPress table prefix is shown in the header. Use it in your queries, e.g. <code>SELECT * FROM wp_posts LIMIT 10</code> or <code>SELECT * FROM wp_options WHERE option_name = \'siteurl\'</code>.' ],
+                    [ 'name' => 'Quick Queries', 'rec' => 'Recommended',   'html' => 'Use the preset queries below for common diagnostics without needing to write SQL from scratch. Press <code>Enter</code> or <code>Ctrl+Enter</code> to run a query, <code>Shift+Enter</code> to insert a newline.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1451,10 +1463,10 @@ class CloudScale_DevTools {
             <div class="cs-section-header cs-section-header-orange">
                 <span>⚡ <?php esc_html_e( 'Quick Queries', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'quick-queries', 'Quick Queries', [
-                    [ 'name' => 'Health & Diagnostics', 'rec' => 'Recommended',   'desc' => 'MySQL version, table sizes, connection limits, and WordPress table stats at a glance.' ],
-                    [ 'name' => 'Content Summary',      'rec' => 'Informational', 'desc' => 'Counts posts by type and status, revisions, auto-drafts, spam comments, and users for a quick content audit.' ],
-                    [ 'name' => 'Cleanup Candidates',   'rec' => 'Optional',      'desc' => 'Identifies orphaned postmeta, expired transients, and bloated autoloaded options that may be slowing down your database.' ],
-                    [ 'name' => 'Security Checks',      'rec' => 'Optional',      'desc' => 'Looks for HTTP (non-HTTPS) URLs or stale IP addresses in options and post GUIDs — common indicators of old content or unfinished migrations.' ],
+                    [ 'name' => 'Health & Diagnostics', 'rec' => 'Recommended',   'html' => 'MySQL version, table sizes, connection limits, and WordPress table row counts at a glance. Good first check when diagnosing slow sites.' ],
+                    [ 'name' => 'Content Summary',      'rec' => 'Informational', 'html' => 'Counts posts by type and status, revisions, auto-drafts, spam comments, and users for a quick content audit. Useful before a site migration.' ],
+                    [ 'name' => 'Cleanup Candidates',   'rec' => 'Optional',      'html' => 'Identifies orphaned <code>postmeta</code> rows, expired transients, and bloated <code>wp_options</code> autoloaded rows that may be slowing down your database.' ],
+                    [ 'name' => 'Security Checks',      'rec' => 'Optional',      'html' => 'Looks for <code>http://</code> (non-HTTPS) URLs or stale IP addresses in <code>wp_options</code> and post GUIDs — common indicators of old content or unfinished HTTP→HTTPS migrations.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1574,8 +1586,8 @@ class CloudScale_DevTools {
                 <span>🔒 HIDE LOGIN URL</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Move wp-login.php to a secret address', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'hide-login', 'Hide Login URL', [
-                    [ 'name' => 'Enable Hide Login',  'rec' => 'Recommended', 'desc' => 'Moves your login page to a secret URL. Direct requests to /wp-login.php return a 404, stopping bots and credential-stuffing scripts from even finding the login form.' ],
-                    [ 'name' => 'Custom Login Path',  'rec' => 'Recommended', 'desc' => 'The URL slug that serves your login page (e.g. /my-secret-login). Use letters, numbers, and hyphens only. Save the full URL somewhere safe — you will need it to log in.' ],
+                    [ 'name' => 'Enable Hide Login',  'rec' => 'Recommended', 'html' => 'Moves your login page to a secret URL. Direct requests to <code>/wp-login.php</code> return a <code>404</code>, stopping bots and credential-stuffing scripts from even finding the login form.' ],
+                    [ 'name' => 'Custom Login Path',  'rec' => 'Recommended', 'html' => 'The URL slug that serves your login page, e.g. <code>/my-secret-login</code>. Use letters, numbers, and hyphens only.<br><br><strong>Save the full login URL somewhere safe</strong> — you will need it to log in after enabling this feature.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1633,8 +1645,8 @@ class CloudScale_DevTools {
                 <span>⏱ SESSION DURATION</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'How long login sessions stay valid', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'session-duration', 'Session Duration', [
-                    [ 'name' => 'Session Lifetime',     'rec' => 'Recommended', 'desc' => 'Sets how long the WordPress auth cookie stays valid before the user must log in again. Choose a shorter duration (1–7 days) for higher-security environments, or a longer one (30–90 days) for convenience. Leave on WordPress default if you have no specific requirement.' ],
-                    [ 'name' => 'Remember Me & timing', 'rec' => 'Note',        'desc' => "When a custom duration is set, the \"Remember Me\" checkbox is overridden — all new sessions get the same lifetime regardless.\n\nChanging this setting only affects new logins. Users who are already logged in keep their current session cookie until it expires or they log out." ],
+                    [ 'name' => 'Session Lifetime',     'rec' => 'Recommended', 'html' => 'Sets how long the WordPress auth cookie stays valid before the user must log in again.<br><br><ul><li><strong>1–7 days</strong> — higher-security environments (banking, staging, admin-heavy sites)</li><li><strong>30–90 days</strong> — convenience for trusted personal devices</li><li><strong>WordPress default</strong> — 2 days (48 hours), or 14 days when "Remember Me" is checked at login</li></ul>' ],
+                    [ 'name' => 'Remember Me & timing', 'rec' => 'Note',        'html' => 'When a custom duration is set, the <strong>Remember Me</strong> checkbox is overridden — all new sessions get the same lifetime regardless.<br><br>Changing this setting only affects <em>new</em> logins. Users already logged in keep their current session cookie until it expires or they log out.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1667,9 +1679,9 @@ class CloudScale_DevTools {
                 <span>🔒 BRUTE-FORCE PROTECTION</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Temporarily lock accounts after repeated failed logins', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'brute-force', 'Brute-Force Protection', [
-                    [ 'name' => 'How it works',   'rec' => 'Info',        'desc' => 'After N consecutive failed login attempts for the same username, the account is locked for the configured duration. The lock is per-username, not per-IP, so it also stops distributed attacks across multiple IPs. The counter resets automatically after the lockout period expires.' ],
-                    [ 'name' => 'Failed attempts', 'rec' => 'Recommended', 'desc' => 'Default is 5 attempts. Lower values (3) give tighter security but risk locking out users who mistype their password a few times. Higher values (10) are more forgiving. Admins can unlock an account immediately by flushing that user\'s lockout transient from the database.' ],
-                    [ 'name' => 'Lockout period',  'rec' => 'Recommended', 'desc' => 'Default is 5 minutes. The lock lifts automatically — no admin action needed. Longer periods (15–30 minutes) slow down attacks further but delay legitimate users who forgot their password.' ],
+                    [ 'name' => 'How it works',   'rec' => 'Info',        'html' => 'After <em>N</em> consecutive failed login attempts for the same username, the account is locked for the configured duration. The lock is <strong>per-username, not per-IP</strong> — it also stops distributed attacks spread across multiple IPs. The counter resets automatically after the lockout period expires.' ],
+                    [ 'name' => 'Failed attempts', 'rec' => 'Recommended', 'html' => '<ul><li><code>3</code> — tighter security, but risks locking out users who mistype their password</li><li><code>5</code> — default, good balance</li><li><code>10</code> — more forgiving for sites with non-technical users</li></ul>To unlock an account immediately, delete the transient key <code>csdt_devtools_lockout_{username}</code> from the database.' ],
+                    [ 'name' => 'Lockout period',  'rec' => 'Recommended', 'html' => 'Default is <code>5</code> minutes. The lock lifts automatically — no admin action needed.<br><br><ul><li><strong>5 min</strong> — default, enough to stop most automated attacks</li><li><strong>15–30 min</strong> — slows attacks further, slight UX delay for forgotten-password users</li></ul>' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1709,9 +1721,9 @@ class CloudScale_DevTools {
                 <span>👤 YOUR 2FA SETUP</span>
                 <span class="cs-header-hint"><?php echo esc_html( wp_get_current_user()->user_login ); ?></span>
                 <?php self::render_explain_btn( '2fa-setup', 'Your 2FA Setup', [
-                    [ 'name' => 'Authenticator App (TOTP)', 'rec' => 'Recommended', 'desc' => 'Generates a 6-digit code every 30 seconds using an app like Google Authenticator, Authy, or 1Password. Works offline and is the most secure 2FA method.' ],
-                    [ 'name' => 'Email Code',               'rec' => 'Optional',    'desc' => 'Sends a one-time code to your account email on each login. Simpler to set up but depends on email deliverability.' ],
-                    [ 'name' => 'Passkey',                  'rec' => 'Recommended', 'desc' => 'Uses Face ID, Touch ID, Windows Hello, or a hardware security key. Register a passkey in the Passkeys panel, then select this method here.' ],
+                    [ 'name' => 'Authenticator App (TOTP)', 'rec' => 'Recommended', 'html' => 'Generates a <strong>6-digit code every 30 seconds</strong> using a TOTP app. Works offline and is the most secure 2FA method.<br><br><ul><li><strong>Google Authenticator</strong> — iOS / Android</li><li><strong>Authy</strong> — iOS / Android / Desktop</li><li><strong>1Password</strong> — built-in TOTP support</li><li><strong>Apple Passwords</strong> — iOS 18+ / macOS 15+</li></ul>' ],
+                    [ 'name' => 'Email Code',               'rec' => 'Optional',    'html' => 'Sends a one-time code to your account email on each login. Simpler to set up but depends on email deliverability — if your site\'s outgoing email is unreliable, use an authenticator app instead.' ],
+                    [ 'name' => 'Passkey',                  'rec' => 'Recommended', 'html' => 'Uses <strong>Face ID</strong>, <strong>Touch ID</strong>, <strong>Windows Hello</strong>, or a hardware security key (YubiKey, etc.) as your second factor. Register a passkey in the <strong>Passkeys</strong> panel, then select this method here.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1832,11 +1844,11 @@ class CloudScale_DevTools {
                 <span>🔑 TWO-FACTOR AUTHENTICATION</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Email code or Authenticator app', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( '2fa', 'Two-Factor Authentication', [
-                    [ 'name' => 'Off',                      'rec' => 'Not Recommended', 'desc' => 'Disables 2FA site-wide. Passwords alone are vulnerable to phishing and brute-force attacks — not recommended for any public site.' ],
-                    [ 'name' => 'Email Code',               'rec' => 'Optional',        'desc' => 'Requires users to enter a code sent to their email after each password login. Works out of the box with no app required.' ],
-                    [ 'name' => 'Authenticator App (TOTP)', 'rec' => 'Recommended',     'desc' => 'Each user configures their own authenticator app. Most secure option — works without internet or email.' ],
-                    [ 'name' => 'Force 2FA for Admins',     'rec' => 'Recommended',     'desc' => 'Blocks administrator-role users from accessing the dashboard until they have set up 2FA. Strongly recommended on any multi-user site.' ],
-                    [ 'name' => 'Grace Logins',             'rec' => 'Advanced',        'desc' => "Allows a user to log in up to N times before 2FA is required. The counter is per-user and never resets automatically.\n\nDefault is 0 (2FA always required from the first login).\n\nTip for automated test accounts: set to 1. Playwright and similar tools cannot complete a real 2FA challenge, so granting one grace login lets a test account authenticate for setup steps without disabling 2FA site-wide." ],
+                    [ 'name' => 'Off',                      'rec' => 'Not Recommended', 'html' => 'Disables 2FA site-wide. Passwords alone are vulnerable to phishing and brute-force attacks — not recommended for any public site.' ],
+                    [ 'name' => 'Email Code',               'rec' => 'Optional',        'html' => 'Requires users to enter a code sent to their email after each password login. Works out of the box with no app required — but depends on your site\'s outgoing email working reliably.' ],
+                    [ 'name' => 'Authenticator App (TOTP)', 'rec' => 'Recommended',     'html' => 'Each user configures their own TOTP app (<strong>Google Authenticator</strong>, <strong>Authy</strong>, <strong>1Password</strong>). Most secure option — works offline, no email dependency.' ],
+                    [ 'name' => 'Force 2FA for Admins',     'rec' => 'Recommended',     'html' => 'Blocks <code>administrator</code>-role users from accessing the dashboard until they have set up 2FA. Strongly recommended on any multi-user site.' ],
+                    [ 'name' => 'Grace Logins',             'rec' => 'Advanced',        'html' => 'Allows a user to log in up to <em>N</em> times before 2FA is enforced. The counter is per-user and never resets automatically. Default is <code>0</code> (2FA required from the first login).<br><br><strong>Tip for automated test accounts:</strong> set to <code>1</code>. Tools like Playwright cannot complete a real 2FA challenge — one grace login lets a test account authenticate for setup steps without disabling 2FA site-wide.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1905,10 +1917,10 @@ class CloudScale_DevTools {
                 <span>🔑 PASSKEYS (WEBAUTHN)</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Face ID · Touch ID · Windows Hello · Security Keys', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'passkeys', 'Passkeys (WebAuthn)', [
-                    [ 'name' => 'What is a passkey?',    'rec' => 'Informational', 'desc' => 'A passkey is a cryptographic credential stored on your device. It replaces passwords with biometrics (Face ID, Touch ID, Windows Hello) or hardware keys. No secret is ever sent over the network.' ],
-                    [ 'name' => 'Registering a passkey', 'rec' => 'Recommended',  'desc' => 'Click "+ Add Passkey", give it a name (e.g. "iPhone 16"), then follow your device\'s biometric prompt. Register multiple passkeys for different devices.' ],
-                    [ 'name' => 'Test',                  'rec' => 'Optional',     'desc' => 'Verifies a passkey is working correctly without logging out. Use this after registering to confirm the credential round-trips successfully.' ],
-                    [ 'name' => 'Remove',                'rec' => 'Optional',     'desc' => 'Deletes the passkey from your account. You can re-register it at any time.' ],
+                    [ 'name' => 'What is a passkey?',    'rec' => 'Informational', 'html' => 'A passkey is a cryptographic credential stored on your device. It replaces passwords with biometrics (<strong>Face ID</strong>, <strong>Touch ID</strong>, <strong>Windows Hello</strong>) or hardware keys (YubiKey, etc.). No secret is ever sent over the network — the private key never leaves your device.' ],
+                    [ 'name' => 'Registering a passkey', 'rec' => 'Recommended',  'html' => 'Click <strong>+ Add Passkey</strong>, give it a name (e.g. <code>iPhone 16</code> or <code>MacBook Touch ID</code>), then follow your device\'s biometric prompt.<br><br>Register multiple passkeys for different devices so you always have a backup.' ],
+                    [ 'name' => 'Test',                  'rec' => 'Optional',     'html' => 'Verifies a passkey is working correctly <em>without</em> logging out. Use this after registering a new passkey to confirm the credential round-trips successfully.' ],
+                    [ 'name' => 'Remove',                'rec' => 'Optional',     'html' => 'Deletes the passkey from your account. You can re-register it at any time — the device credential itself is not affected.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -3067,6 +3079,31 @@ class CloudScale_DevTools {
 .cs-fix-platform-dims{color:#888;font-size:11px;min-width:80px}
 .cs-fix-platform-status{font-size:11px;flex:1}
 .cs-fix-preview-thumb{width:48px;height:28px;object-fit:cover;border-radius:2px;border:1px solid #ddd;flex-shrink:0}
+';
+    }
+
+    /**
+     * Returns CSS for the Explain modal description content.
+     *
+     * Injected via wp_add_inline_style() on the csdt-admin-tabs handle on
+     * every admin page load, scoped to .cs-explain-desc so it cannot leak.
+     *
+     * @since  1.8.118
+     * @return string
+     */
+    private static function get_explain_modal_css(): string {
+        return '
+.cs-explain-desc{color:#50575e;font-size:12px;line-height:1.7}
+.cs-explain-desc p{margin:0 0 8px 0}
+.cs-explain-desc p:last-child{margin-bottom:0}
+.cs-explain-desc code{display:inline;background:#1e2430;color:#e8b86d;padding:1px 6px;border-radius:3px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;white-space:nowrap;word-break:break-all}
+.cs-explain-desc strong{color:#111827;font-weight:700}
+.cs-explain-desc em{font-style:italic}
+.cs-explain-desc a{color:#2271b1;text-decoration:underline}
+.cs-explain-desc a:hover{color:#135e96}
+.cs-explain-desc ul,.cs-explain-desc ol{margin:6px 0 0 0;padding-left:20px}
+.cs-explain-desc li{margin-bottom:4px}
+.cs-explain-desc h4{margin:10px 0 4px;font-size:12px;font-weight:700;color:#111827;text-transform:uppercase;letter-spacing:.04em}
 ';
     }
 
@@ -5270,9 +5307,13 @@ class CloudScale_DevTools {
             delete_user_meta( $user_id, 'csdt_devtools_email_verify_pending' );
             // Surface the real SMTP error if captured, otherwise the warning from diagnostics.
             $detail = $transport_error ?: $warning ?: __( 'Check your WordPress mail configuration.', 'cloudscale-devtools' );
+            // Flag when SMTP isn't configured so the UI can prompt the user to set it up.
+            $smtp_not_configured = get_option( 'csdt_devtools_smtp_enabled', '0' ) !== '1'
+                || '' === trim( (string) get_option( 'csdt_devtools_smtp_host', '' ) );
             wp_send_json_error( [
-                'message'      => sprintf( __( 'Email not sent: %s', 'cloudscale-devtools' ), $detail ),
-                'port_warning' => $warning,
+                'message'             => sprintf( __( 'Email not sent: %s', 'cloudscale-devtools' ), $detail ),
+                'port_warning'        => $warning,
+                'smtp_not_configured' => $smtp_not_configured,
             ] );
         }
 
@@ -6191,6 +6232,63 @@ class CloudScale_DevTools {
         update_option( 'csdt_devtools_prefix_migrated', '1' );
     }
 
+    /**
+     * One-time migration: renames SMTP options from the cs_devtools_ prefix
+     * (missed by the first migration) to csdt_devtools_.
+     */
+    private static function maybe_migrate_smtp_prefix(): void {
+        if ( get_option( 'csdt_devtools_smtp_prefix_migrated' ) ) {
+            return;
+        }
+
+        $smtp_map = [
+            'cs_devtools_smtp_enabled'    => 'csdt_devtools_smtp_enabled',
+            'cs_devtools_smtp_host'       => 'csdt_devtools_smtp_host',
+            'cs_devtools_smtp_port'       => 'csdt_devtools_smtp_port',
+            'cs_devtools_smtp_encryption' => 'csdt_devtools_smtp_encryption',
+            'cs_devtools_smtp_auth'       => 'csdt_devtools_smtp_auth',
+            'cs_devtools_smtp_user'       => 'csdt_devtools_smtp_user',
+            'cs_devtools_smtp_pass'       => 'csdt_devtools_smtp_pass',
+            'cs_devtools_smtp_from_email' => 'csdt_devtools_smtp_from_email',
+            'cs_devtools_smtp_from_name'  => 'csdt_devtools_smtp_from_name',
+        ];
+        foreach ( $smtp_map as $old => $new ) {
+            $val = get_option( $old );
+            if ( $val !== false ) {
+                update_option( $new, $val );
+                delete_option( $old );
+            }
+        }
+
+        update_option( 'csdt_devtools_smtp_prefix_migrated', '1' );
+    }
+
+    /**
+     * One-time migration: renames TOTP/2FA user meta from cs_devtools_ prefix
+     * (missed by the first migration which used incorrect short keys) to csdt_devtools_.
+     */
+    private static function maybe_migrate_usermeta_prefix(): void {
+        if ( get_option( 'csdt_devtools_usermeta_prefix_migrated' ) ) {
+            return;
+        }
+
+        global $wpdb;
+        $meta_map = [
+            'cs_devtools_totp_enabled'        => 'csdt_devtools_totp_enabled',
+            'cs_devtools_totp_secret'         => 'csdt_devtools_totp_secret',
+            'cs_devtools_totp_secret_pending' => 'csdt_devtools_totp_secret_pending',
+            'cs_devtools_2fa_email_enabled'   => 'csdt_devtools_2fa_email_enabled',
+            'cs_devtools_email_verify_pending' => 'csdt_devtools_email_verify_pending',
+            'cs_devtools_passkeys'            => 'csdt_devtools_passkeys',
+        ];
+        foreach ( $meta_map as $old => $new ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+            $wpdb->update( $wpdb->usermeta, [ 'meta_key' => $new ], [ 'meta_key' => $old ] );
+        }
+
+        update_option( 'csdt_devtools_usermeta_prefix_migrated', '1' );
+    }
+
     /* ==================================================================
        Custom 404 page with games
        ================================================================== */
@@ -6313,7 +6411,7 @@ class CloudScale_DevTools {
         <button class="cs404-tab" data-game="miner">⛏ Miner</button>
         <button class="cs404-tab" data-game="asteroids">🌌 Asteroids</button>
         <button class="cs404-tab" data-game="snake">🐍 Snake</button>
-        <button class="cs404-tab" data-game="pacman">👻 Pac-Man</button>
+        <button class="cs404-tab" data-game="mrdo">🤡 Mr. Do!</button>
     </div>
     <div style="position:relative;display:inline-block;max-width:100%;">
         <canvas id="cs404-game" width="620" height="280" aria-label="404 Olympics mini-games"></canvas>
@@ -6383,7 +6481,7 @@ class CloudScale_DevTools {
 
     /** Registers per-game hi-score REST endpoints. */
     public static function register_hiscore_routes(): void {
-        register_rest_route( self::HISCORE_NS, '/hiscore/(?P<game>runner|jetpack|racer|miner|asteroids|snake|pacman)', [
+        register_rest_route( self::HISCORE_NS, '/hiscore/(?P<game>runner|jetpack|racer|miner|asteroids|snake|mrdo)', [
             [
                 'methods'             => 'GET',
                 'callback'            => [ __CLASS__, 'rest_get_hiscore' ],
@@ -6425,7 +6523,7 @@ class CloudScale_DevTools {
         $score = (int) $request->get_param( 'score' );
         $name  = sanitize_text_field( $request->get_param( 'name' ) );
 
-        $score_caps = [ 'runner' => 999999, 'jetpack' => 999999, 'racer' => 999999, 'miner' => 2000, 'asteroids' => 999999, 'snake' => 9990, 'pacman' => 99990 ];
+        $score_caps = [ 'runner' => 999999, 'jetpack' => 999999, 'racer' => 999999, 'miner' => 2000, 'asteroids' => 999999, 'snake' => 9990, 'mrdo' => 99990 ];
         if ( isset( $score_caps[ $game ] ) && $score > $score_caps[ $game ] ) {
             return new WP_Error( 'score_invalid', __( 'Score exceeds maximum for this game.', 'cloudscale-devtools' ), [ 'status' => 422 ] );
         }
@@ -6489,7 +6587,7 @@ class CloudScale_DevTools {
             <div class="cs-section-header" style="background:linear-gradient(135deg,#f57c00,#e65100);">
                 <span>🎮 404 GAMES PAGE</span>
                 <?php self::render_explain_btn( '404-games', '404 Games Page', [
-                    [ 'name' => 'Enable',        'rec' => 'Toggle', 'desc' => 'When enabled, replaces the default WordPress 404 page with a fun interactive page featuring 5 mini-games: Runner, Jetpack, Racer, Miner, and Asteroids. No theme dependency — works even if the active theme is broken.' ],
+                    [ 'name' => 'Enable',        'rec' => 'Toggle', 'desc' => 'When enabled, replaces the default WordPress 404 page with a fun interactive page featuring 7 mini-games: Runner, Jetpack, Racer, Miner, Asteroids, Snake, and Mr. Do!. No theme dependency — works even if the active theme is broken.' ],
                     [ 'name' => 'Colour Scheme', 'rec' => 'Optional', 'desc' => 'Choose from 12 built-in colour palettes. Changes take effect immediately. Use Preview to see the result before saving.' ],
                 ] ); ?>
             </div>
@@ -6542,11 +6640,11 @@ class CloudScale_DevTools {
     private const SOCIAL_PLATFORMS = [
         // target_kb = optimum file size to aim for during generation.
         // max_kb    = platform's hard limit (used only for compatibility warnings).
-        'facebook'  => [ 'label' => 'Facebook',    'w' => 1200, 'h' => 630,  'target_kb' => 900, 'max_kb' => 8000 ],
-        'twitter'   => [ 'label' => 'X / Twitter', 'w' => 1200, 'h' => 628,  'target_kb' => 900, 'max_kb' => 5000 ],
+        'facebook'  => [ 'label' => 'Facebook',    'w' => 1200, 'h' => 630,  'target_kb' => 400, 'max_kb' => 8000 ],
+        'twitter'   => [ 'label' => 'X / Twitter', 'w' => 1200, 'h' => 628,  'target_kb' => 400, 'max_kb' => 5000 ],
         'whatsapp'  => [ 'label' => 'WhatsApp',    'w' => 1200, 'h' => 630,  'target_kb' => 200, 'max_kb' => 300  ],
-        'linkedin'  => [ 'label' => 'LinkedIn',    'w' => 1200, 'h' => 627,  'target_kb' => 900, 'max_kb' => 5000 ],
-        'instagram' => [ 'label' => 'Instagram',   'w' => 1080, 'h' => 1080, 'target_kb' => 900, 'max_kb' => 8000 ],
+        'linkedin'  => [ 'label' => 'LinkedIn',    'w' => 1200, 'h' => 627,  'target_kb' => 400, 'max_kb' => 5000 ],
+        'instagram' => [ 'label' => 'Instagram',   'w' => 1080, 'h' => 1080, 'target_kb' => 400, 'max_kb' => 8000 ],
     ];
 
     private const SOCIAL_UAS = [
@@ -6569,15 +6667,15 @@ class CloudScale_DevTools {
                 <span>🔍 URL SOCIAL PREVIEW CHECKER</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Run a full social-preview diagnostic on any URL', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'social-checker', 'URL Social Preview Checker', [
-                    [ 'name' => 'HTTPS',                'rec' => 'Required',     'desc' => 'Social crawlers refuse to load preview images served over HTTP. The URL must use HTTPS.' ],
-                    [ 'name' => 'HTTP Response',        'rec' => 'Required',     'desc' => 'The page must return HTTP 200 for the crawler\'s User-Agent. A 403 or bot-block will prevent any preview from loading.' ],
-                    [ 'name' => 'Response Time',        'rec' => 'Recommended',  'desc' => 'Crawlers time out after ~3 seconds. Pages that take longer to respond will show no preview.' ],
-                    [ 'name' => 'og:title',             'rec' => 'Required',     'desc' => 'The title shown in the social card. Without it, platforms fall back to the page <title> tag or show nothing.' ],
-                    [ 'name' => 'og:description',       'rec' => 'Recommended',  'desc' => 'The summary text shown under the title. Recommended for all platforms; Twitter/X truncates to ~200 chars.' ],
-                    [ 'name' => 'og:image',             'rec' => 'Required',     'desc' => 'The preview image. Must be an absolute HTTPS URL. Recommended size: 1200×630px, max 8MB. Facebook enforces a minimum of 200×200px.' ],
-                    [ 'name' => 'og:image dimensions',  'rec' => 'Recommended',  'desc' => 'og:image:width and og:image:height tell crawlers the size without downloading the image. Speeds up card rendering and avoids layout shifts.' ],
-                    [ 'name' => 'robots.txt',           'rec' => 'Info',         'desc' => 'Checks that robots.txt does not block Googlebot, Twitterbot, facebookexternalhit, or other social crawlers from accessing the page.' ],
-                    [ 'name' => 'Crawler UA test',      'rec' => 'Info',         'desc' => 'Re-fetches the page using each platform\'s real crawler User-Agent string to confirm the page is not blocked by a WAF, Cloudflare rule, or bot-protection plugin.' ],
+                    [ 'name' => 'HTTPS',                'rec' => 'Required',     'html' => 'Social crawlers refuse to load preview images served over <code>http://</code>. The URL must use <code>https://</code>.' ],
+                    [ 'name' => 'HTTP Response',        'rec' => 'Required',     'html' => 'The page must return <code>HTTP 200</code> for the crawler\'s User-Agent. A <code>403</code> or bot-block will prevent any preview from loading.' ],
+                    [ 'name' => 'Response Time',        'rec' => 'Recommended',  'html' => 'Crawlers time out after ~<code>3 seconds</code>. Pages that take longer to respond will show no preview — check for slow plugins or uncached pages.' ],
+                    [ 'name' => 'og:title',             'rec' => 'Required',     'html' => 'The title shown in the social card. Without <code>og:title</code>, platforms fall back to the page <code>&lt;title&gt;</code> tag or show nothing.' ],
+                    [ 'name' => 'og:description',       'rec' => 'Recommended',  'html' => 'The summary text shown under the title. Recommended for all platforms; Twitter/X truncates to ~<code>200</code> chars.' ],
+                    [ 'name' => 'og:image',             'rec' => 'Required',     'html' => 'The preview image. Must be an absolute <code>https://</code> URL. Recommended size: <code>1200×630 px</code>, max <code>8 MB</code>. Facebook enforces a minimum of <code>200×200 px</code>.' ],
+                    [ 'name' => 'og:image dimensions',  'rec' => 'Recommended',  'html' => '<code>og:image:width</code> and <code>og:image:height</code> tell crawlers the size without downloading the image. Speeds up card rendering and avoids layout shifts.' ],
+                    [ 'name' => 'robots.txt',           'rec' => 'Info',         'html' => 'Checks that <code>robots.txt</code> does not block <code>Googlebot</code>, <code>Twitterbot</code>, <code>facebookexternalhit</code>, or other social crawlers from accessing the page.' ],
+                    [ 'name' => 'Crawler UA test',      'rec' => 'Info',         'html' => 'Re-fetches the page using each platform\'s real crawler User-Agent string to confirm the page is not blocked by a WAF, Cloudflare rule, or bot-protection plugin.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -6638,19 +6736,6 @@ class CloudScale_DevTools {
                     </div>
                 </div>
 
-                <!-- Crawler UA Test -->
-                <div style="margin-top:18px;padding-top:16px;border-top:1px solid #e0e0e0">
-                    <h3 style="font-size:14px;color:#333;margin-top:0"><?php esc_html_e( 'Test Crawler Access', 'cloudscale-devtools' ); ?></h3>
-                    <p class="cs-hint"><?php esc_html_e( 'Fetches a page using each social crawler\'s user agent from the server. If all return HTTP 200 with OG tags present, your WAF rule is working.', 'cloudscale-devtools' ); ?></p>
-                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-                        <input type="url" id="cs-thumb-cf-test-url" class="cs-input" style="max-width:480px;flex:1"
-                               placeholder="<?php echo esc_attr( home_url( '/' ) ); ?>"
-                               value="<?php echo esc_attr( home_url( '/' ) ); ?>">
-                        <button type="button" class="cs-btn-primary" id="cs-thumb-cf-test-btn">🤖 <?php esc_html_e( 'Test Crawler Access', 'cloudscale-devtools' ); ?></button>
-                    </div>
-                    <div id="cs-thumb-cf-test-results" style="display:none"></div>
-                </div>
-
                 <!-- CF Cache Purge -->
                 <div style="margin-top:18px;padding-top:16px;border-top:1px solid #e0e0e0">
                     <h3 style="font-size:14px;color:#333;margin-top:0"><?php esc_html_e( 'Cloudflare Cache Purge', 'cloudscale-devtools' ); ?></h3>
@@ -6687,16 +6772,16 @@ class CloudScale_DevTools {
                 <span>📋 POST SOCIAL PREVIEW SCAN</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Check the last 50 posts — will their images work on each social platform?', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'post-social-scan', 'Post Social Preview Scan', [
-                    [ 'name' => 'Facebook',      'rec' => 'Min 200×200',    'desc' => 'Checks the WordPress featured image file directly — no live HTTP fetch. Recommended 1200×630px, max 8 MB. Optimised versions are auto-generated to /wp-content/uploads/social-formats/ when you publish or update a post.' ],
-                    [ 'name' => 'X / Twitter',   'rec' => 'Min 280×150',    'desc' => 'summary_large_image card format. Recommended 1200×628px, max 5 MB. Auto-generated at the correct crop on every post save with a new featured image.' ],
-                    [ 'name' => 'WhatsApp',      'rec' => 'Max 300 KB',     'desc' => 'Strict 300 KB hard limit — images over this are silently hidden with no error message. The plugin automatically compresses the image at lower JPEG quality until it fits, so your WhatsApp preview will always appear.' ],
-                    [ 'name' => 'LinkedIn',      'rec' => 'Min 200×110',    'desc' => 'Recommended 1200×627px, max 5 MB. Auto-generated with the correct crop. Portrait-oriented or very small images often display poorly in LinkedIn feed cards.' ],
-                    [ 'name' => 'Instagram',     'rec' => '1080×1080 sq',   'desc' => 'Square 1:1 format for direct feed post uploads. Min 320×320, recommended 1080×1080, max 8 MB. Note: Instagram does not scrape OG tags for link previews — this format is for direct uploads only.' ],
-                    [ 'name' => 'Auto-generate', 'rec' => 'Automatic',      'desc' => 'Every time you publish or update a post with a new featured image, the plugin automatically generates correctly sized and compressed images for each enabled platform. Nothing changes if the featured image hasn\'t changed.' ],
-                    [ 'name' => 'Fix',           'rec' => 'Manual action',  'desc' => 'Manually triggers generation for a single post. Use this to regenerate after changing platform settings, or for posts that existed before auto-generation was enabled.' ],
-                    [ 'name' => 'Fix all',            'rec' => 'Manual action',  'desc' => 'Runs Fix for every post in the current scan results (up to 50). Useful for quickly fixing the posts you just scanned.' ],
-                    [ 'name' => 'Fix All Posts on Site', 'rec' => 'Bulk action', 'desc' => 'Processes every published post on the entire site in batches of 10, generating platform formats for each. Shows live progress (e.g. "Fixing 45 / 320"). Posts without a featured image are skipped automatically.' ],
-                    [ 'name' => 'Re-check',      'rec' => 'Diagnostic',     'desc' => 'Runs the full live URL diagnostic (OG tags, robots.txt, crawler UA test) on this specific post URL and scrolls to the URL checker results above.' ],
+                    [ 'name' => 'Facebook',      'rec' => 'Min 200×200',    'html' => 'Checks the WordPress featured image file directly — no live HTTP fetch. Recommended <code>1200×630 px</code>, max <code>8 MB</code>. Optimised versions are auto-generated to <code>/wp-content/uploads/social-formats/</code> when you publish or update a post.' ],
+                    [ 'name' => 'X / Twitter',   'rec' => 'Min 280×150',    'html' => '<code>summary_large_image</code> card format. Recommended <code>1200×628 px</code>, max <code>5 MB</code>. Auto-generated at the correct crop on every post save with a new featured image.' ],
+                    [ 'name' => 'WhatsApp',      'rec' => 'Max 300 KB',     'html' => 'Strict <code>300 KB</code> hard limit — images over this are <strong>silently hidden</strong> with no error message. The plugin automatically compresses the image at lower JPEG quality until it fits, so your WhatsApp preview will always appear.' ],
+                    [ 'name' => 'LinkedIn',      'rec' => 'Min 200×110',    'html' => 'Recommended <code>1200×627 px</code>, max <code>5 MB</code>. Auto-generated with the correct crop. Portrait-oriented or very small images often display poorly in LinkedIn feed cards.' ],
+                    [ 'name' => 'Instagram',     'rec' => '1080×1080 sq',   'html' => 'Square <code>1:1</code> format for direct feed post uploads. Min <code>320×320</code>, recommended <code>1080×1080</code>, max <code>8 MB</code>.<br><br><strong>Note:</strong> Instagram does not scrape OG tags for link previews — this format is for direct uploads only.' ],
+                    [ 'name' => 'Auto-generate', 'rec' => 'Automatic',      'html' => 'Every time you publish or update a post with a new featured image, the plugin automatically generates correctly sized and compressed images for each enabled platform. Nothing changes if the featured image hasn\'t changed.' ],
+                    [ 'name' => 'Fix',           'rec' => 'Manual action',  'html' => 'Manually triggers generation for a single post. Use this to regenerate after changing platform settings, or for posts that existed before auto-generation was enabled.' ],
+                    [ 'name' => 'Fix all',            'rec' => 'Manual action',  'html' => 'Runs <strong>Fix</strong> for every post in the current scan results (up to 50). Useful for quickly fixing the posts you just scanned.' ],
+                    [ 'name' => 'Fix All Posts on Site', 'rec' => 'Bulk action', 'html' => 'Processes every published post on the entire site in batches of <code>10</code>, generating platform formats for each. Shows live progress (e.g. <code>Fixing 45 / 320</code>). Posts without a featured image are skipped automatically.' ],
+                    [ 'name' => 'Re-check',      'rec' => 'Diagnostic',     'html' => 'Runs the full live URL diagnostic (OG tags, robots.txt, crawler UA test) on this specific post URL and scrolls to the URL checker results above.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -6720,13 +6805,13 @@ class CloudScale_DevTools {
                 <span>🎨 SOCIAL FORMAT SETTINGS</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Auto-generates on every post save — select which platforms to prepare images for', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'social-formats', 'Social Format Settings', [
-                    [ 'name' => 'Facebook 1200×630',    'rec' => 'Optimum ~900 KB',  'desc' => 'Optimum: 1200×630 px at under 900 KB JPEG. Hard limit: 8 MB. Minimum accepted: 200×200 px. Landscape 1.91:1 ratio — the plugin auto-crops to this exact frame so Facebook always shows your image, not a random one from the page.' ],
-                    [ 'name' => 'X / Twitter 1200×628', 'rec' => 'Optimum ~900 KB',  'desc' => 'Optimum: 1200×628 px at under 900 KB JPEG. Hard limit: 5 MB. Minimum for large card: 280×150 px. Slightly shorter than Facebook — a separate dedicated crop prevents the subject being letterboxed or clipped.' ],
-                    [ 'name' => 'WhatsApp 1200×630',    'rec' => 'Optimum ~200 KB',  'desc' => 'Optimum: 1200×630 px at under 200 KB JPEG. Hard limit: 300 KB — images over this are silently dropped with no error message. The plugin targets 200 KB for a safe margin, retrying at lower quality until the file fits.' ],
-                    [ 'name' => 'LinkedIn 1200×627',    'rec' => 'Optimum ~900 KB',  'desc' => 'Optimum: 1200×627 px at under 900 KB JPEG. Hard limit: 5 MB. Minimum: 200×110 px. Landscape cards perform best — portrait images are cropped awkwardly or shown very small in the LinkedIn feed.' ],
-                    [ 'name' => 'Instagram 1080×1080',  'rec' => 'Optimum ~900 KB',  'desc' => 'Optimum: 1080×1080 px square at under 900 KB JPEG. Hard limit: 8 MB. Minimum: 320×320 px. Square 1:1 crop for direct feed uploads — Instagram does not scrape OG tags for link preview cards.' ],
-                    [ 'name' => 'Auto-generation',      'rec' => 'How it works',     'desc' => 'Every time you publish or update a post with a new featured image, the plugin automatically generates all enabled platform formats at the optimum size and quality — not just within the hard limit. Unchanged images are skipped. Originals are never modified.' ],
-                    [ 'name' => 'Save Settings',        'rec' => 'Required once',    'desc' => 'Saves which platforms are enabled. Only checked platforms are generated on post save. Changes take effect on the next publish or update.' ],
+                    [ 'name' => 'Facebook 1200×630',    'rec' => 'Optimum ~400 KB',  'html' => 'Optimum: <code>1200×630 px</code> at under <code>400 KB</code> JPEG. Hard limit: <code>8 MB</code>. Minimum: <code>200×200 px</code>. Landscape <code>1.91:1</code> ratio — the plugin auto-crops to this exact frame so Facebook always shows your image, not a random one from the page.' ],
+                    [ 'name' => 'X / Twitter 1200×628', 'rec' => 'Optimum ~400 KB',  'html' => 'Optimum: <code>1200×628 px</code> at under <code>400 KB</code> JPEG. Hard limit: <code>5 MB</code>. Minimum for large card: <code>280×150 px</code>. Slightly shorter than Facebook — a separate dedicated crop prevents the subject being letterboxed or clipped.' ],
+                    [ 'name' => 'WhatsApp 1200×630',    'rec' => 'Optimum ~200 KB',  'html' => 'Optimum: <code>1200×630 px</code> at under <code>200 KB</code> JPEG. Hard limit: <strong><code>300 KB</code></strong> — images over this are <strong>silently dropped</strong> with no error message. The plugin targets <code>200 KB</code> for a safe margin, retrying at lower quality until the file fits.' ],
+                    [ 'name' => 'LinkedIn 1200×627',    'rec' => 'Optimum ~400 KB',  'html' => 'Optimum: <code>1200×627 px</code> at under <code>400 KB</code> JPEG. Hard limit: <code>5 MB</code>. Minimum: <code>200×110 px</code>. Landscape cards perform best — portrait images are cropped awkwardly or shown very small in the LinkedIn feed.' ],
+                    [ 'name' => 'Instagram 1080×1080',  'rec' => 'Optimum ~400 KB',  'html' => 'Optimum: <code>1080×1080 px</code> square at under <code>400 KB</code> JPEG. Hard limit: <code>8 MB</code>. Minimum: <code>320×320 px</code>. Square <code>1:1</code> crop for direct feed uploads — Instagram does not scrape OG tags for link preview cards.' ],
+                    [ 'name' => 'Auto-generation',      'rec' => 'How it works',     'html' => 'Every time you publish or update a post with a new featured image, the plugin automatically generates all enabled platform formats at the optimum size and quality — not just within the hard limit. Unchanged images are skipped. <strong>Originals are never modified.</strong>' ],
+                    [ 'name' => 'Save Settings',        'rec' => 'Required once',    'html' => 'Saves which platforms are enabled. Only checked platforms are generated on post save. Changes take effect on the next publish or update.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -6858,7 +6943,7 @@ class CloudScale_DevTools {
     private static function check_platform_compat( int $width, int $height, float $kb, bool $https ): array {
         $r = [];
 
-        // Facebook — optimum ~900 KB, hard limit 8 MB, min 200×200, ideal 1200×630
+        // Facebook — optimum ~400 KB, hard limit 8 MB, min 200×200, ideal 1200×630
         if ( ! $https ) {
             $r['facebook'] = [ 'status' => 'fail', 'msg' => 'Image must be HTTPS' ];
         } elseif ( $width < 200 || $height < 200 ) {
@@ -6867,13 +6952,13 @@ class CloudScale_DevTools {
             $r['facebook'] = [ 'status' => 'fail', 'msg' => 'Too large — hard limit 8 MB' ];
         } elseif ( $width < 1200 || $height < 630 ) {
             $r['facebook'] = [ 'status' => 'warn', 'msg' => 'Below optimum 1200×630 — Fix will crop and resize to the ideal size' ];
-        } elseif ( $kb > 900 ) {
-            $r['facebook'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~900 KB. Fix will compress to the ideal size" ];
+        } elseif ( $kb > 400 ) {
+            $r['facebook'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~400 KB. Fix will compress to the ideal size" ];
         } else {
             $r['facebook'] = [ 'status' => 'pass', 'msg' => 'Ready — optimum size and quality' ];
         }
 
-        // X / Twitter — optimum ~900 KB, hard limit 5 MB, min 280×150, ideal 1200×628
+        // X / Twitter — optimum ~400 KB, hard limit 5 MB, min 280×150, ideal 1200×628
         if ( ! $https ) {
             $r['twitter'] = [ 'status' => 'fail', 'msg' => 'Image must be HTTPS' ];
         } elseif ( $width < 280 || $height < 150 ) {
@@ -6882,8 +6967,8 @@ class CloudScale_DevTools {
             $r['twitter'] = [ 'status' => 'fail', 'msg' => 'Too large — hard limit 5 MB' ];
         } elseif ( $width < 1200 || $height < 628 ) {
             $r['twitter'] = [ 'status' => 'warn', 'msg' => 'Below optimum 1200×628 — Fix will crop and resize to the ideal size' ];
-        } elseif ( $kb > 900 ) {
-            $r['twitter'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~900 KB. Fix will compress to the ideal size" ];
+        } elseif ( $kb > 400 ) {
+            $r['twitter'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~400 KB. Fix will compress to the ideal size" ];
         } else {
             $r['twitter'] = [ 'status' => 'pass', 'msg' => 'Ready — optimum size and quality' ];
         }
@@ -6901,7 +6986,7 @@ class CloudScale_DevTools {
             $r['whatsapp'] = [ 'status' => 'pass', 'msg' => 'Ready — within optimum 200 KB target' ];
         }
 
-        // LinkedIn — optimum ~900 KB, hard limit 5 MB, min 200×110, ideal 1200×627
+        // LinkedIn — optimum ~400 KB, hard limit 5 MB, min 200×110, ideal 1200×627
         if ( ! $https ) {
             $r['linkedin'] = [ 'status' => 'fail', 'msg' => 'Image must be HTTPS' ];
         } elseif ( $width < 200 || $height < 110 ) {
@@ -6910,21 +6995,21 @@ class CloudScale_DevTools {
             $r['linkedin'] = [ 'status' => 'fail', 'msg' => 'Too large — hard limit 5 MB' ];
         } elseif ( $width < 1200 || $height < 627 ) {
             $r['linkedin'] = [ 'status' => 'warn', 'msg' => 'Below optimum 1200×627 — Fix will crop and resize to the ideal size' ];
-        } elseif ( $kb > 900 ) {
-            $r['linkedin'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~900 KB. Fix will compress to the ideal size" ];
+        } elseif ( $kb > 400 ) {
+            $r['linkedin'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~400 KB. Fix will compress to the ideal size" ];
         } else {
             $r['linkedin'] = [ 'status' => 'pass', 'msg' => 'Ready — optimum size and quality' ];
         }
 
-        // Instagram — optimum ~900 KB, hard limit 8 MB, min 320×320, ideal 1080×1080 square
+        // Instagram — optimum ~400 KB, hard limit 8 MB, min 320×320, ideal 1080×1080 square
         if ( $width < 320 || $height < 320 ) {
             $r['instagram'] = [ 'status' => 'fail', 'msg' => 'Too small — minimum 320×320 px' ];
         } elseif ( $kb > 8000 ) {
             $r['instagram'] = [ 'status' => 'fail', 'msg' => 'Too large — hard limit 8 MB' ];
         } elseif ( $width < 1080 || $height < 1080 ) {
             $r['instagram'] = [ 'status' => 'warn', 'msg' => 'Below optimum 1080×1080 square — Fix will crop to a square and resize to the ideal size' ];
-        } elseif ( $kb > 900 ) {
-            $r['instagram'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~900 KB. Fix will compress to the ideal size" ];
+        } elseif ( $kb > 400 ) {
+            $r['instagram'] = [ 'status' => 'warn', 'msg' => "{$kb} KB — above optimum ~400 KB. Fix will compress to the ideal size" ];
         } else {
             $r['instagram'] = [ 'status' => 'pass', 'msg' => 'Ready — optimum size and quality' ];
         }
@@ -7257,6 +7342,138 @@ class CloudScale_DevTools {
         wp_send_json_success( $results );
     }
 
+    // ─── AJAX: diagnose social formats for a post ────────────────────────
+    // Checks: (1) what's stored in meta, (2) whether image files exist on disk,
+    // (3) whether image URLs are reachable by each crawler UA.
+
+    public static function ajax_social_diagnose_formats(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'upload_files' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $post_id = absint( $_POST['post_id'] ?? 0 );
+        if ( ! $post_id ) {
+            wp_send_json_error( [ 'message' => 'No post ID.' ] );
+        }
+
+        $result = [];
+
+        // ── 1. Meta state ────────────────────────────────────────────────
+        $formats   = get_post_meta( $post_id, '_csdt_social_formats', true );
+        $old_formats = get_post_meta( $post_id, '_cs_social_formats', true );
+        $thumb_id  = (int) get_post_meta( $post_id, '_csdt_social_formats_thumb_id', true );
+        $current_thumb = (int) get_post_thumbnail_id( $post_id );
+
+        $result['meta'] = [
+            'has_new_key'    => ! empty( $formats ),
+            'has_old_key'    => ! empty( $old_formats ),
+            'thumb_id_saved' => $thumb_id,
+            'thumb_id_now'   => $current_thumb,
+            'thumb_stale'    => $thumb_id !== $current_thumb,
+            'no_thumbnail'   => ! $current_thumb,
+        ];
+
+        if ( empty( $formats ) && ! empty( $old_formats ) ) {
+            $formats = $old_formats;
+            $result['meta']['using_old_key'] = true;
+        }
+
+        // ── 2. Per-platform: file existence + URL reachability ───────────
+        $upload   = wp_upload_dir();
+        $dest_dir = trailingslashit( $upload['basedir'] ) . 'social-formats/' . $post_id;
+
+        $test_uas = [
+            'LinkedInBot' => 'LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)',
+            'Facebook'    => 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+            'Twitterbot'  => 'Twitterbot/1.0',
+        ];
+
+        $platforms_out = [];
+        foreach ( self::SOCIAL_PLATFORMS as $key => $p ) {
+            $meta_entry = $formats[ $key ] ?? null;
+            $entry = [
+                'label'       => $p['label'],
+                'meta_status' => 'missing',
+                'url'         => null,
+                'file_exists' => false,
+                'ua_results'  => [],
+            ];
+
+            if ( $meta_entry !== null ) {
+                if ( ! empty( $meta_entry['success'] ) ) {
+                    $entry['meta_status'] = 'ok';
+                    $entry['url']         = $meta_entry['url'] ?? null;
+                    $entry['kb']          = $meta_entry['kb'] ?? null;
+                    $entry['w']           = $meta_entry['w'] ?? null;
+                    $entry['h']           = $meta_entry['h'] ?? null;
+                } else {
+                    $entry['meta_status'] = 'failed';
+                    $entry['error']       = $meta_entry['error'] ?? 'Unknown error';
+                }
+            }
+
+            // Check file on disk (try .jpg and .png).
+            foreach ( [ 'jpg', 'png', 'webp' ] as $ext ) {
+                $path = "{$dest_dir}/{$key}.{$ext}";
+                if ( file_exists( $path ) ) {
+                    $entry['file_exists'] = true;
+                    $entry['file_path']   = $path;
+                    $entry['file_kb']     = round( filesize( $path ) / 1024, 1 );
+                    break;
+                }
+            }
+
+            // Test URL reachability with crawler UAs (only if a URL is stored).
+            if ( ! empty( $entry['url'] ) ) {
+                foreach ( $test_uas as $ua_label => $ua_string ) {
+                    $resp = wp_remote_head( $entry['url'], [
+                        'user-agent'  => $ua_string,
+                        'timeout'     => 8,
+                        'redirection' => 3,
+                    ] );
+                    if ( is_wp_error( $resp ) ) {
+                        $entry['ua_results'][ $ua_label ] = [ 'code' => 0, 'ok' => false, 'error' => $resp->get_error_message() ];
+                    } else {
+                        $code = (int) wp_remote_retrieve_response_code( $resp );
+                        $entry['ua_results'][ $ua_label ] = [ 'code' => $code, 'ok' => $code === 200 ];
+                    }
+                }
+            }
+
+            $platforms_out[ $key ] = $entry;
+        }
+
+        $result['platforms'] = $platforms_out;
+
+        // ── 3. What og:image would each crawler see ──────────────────────
+        $post_url = get_permalink( $post_id );
+        $og_seen = [];
+        foreach ( $test_uas as $ua_label => $ua_string ) {
+            $resp = wp_remote_get( $post_url, [
+                'user-agent'  => $ua_string,
+                'timeout'     => 10,
+                'redirection' => 5,
+            ] );
+            if ( is_wp_error( $resp ) ) {
+                $og_seen[ $ua_label ] = [ 'ok' => false, 'error' => $resp->get_error_message() ];
+                continue;
+            }
+            $code = (int) wp_remote_retrieve_response_code( $resp );
+            $body = wp_remote_retrieve_body( $resp );
+            preg_match( '/<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']|<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']/', $body, $m );
+            $og_url = $m[1] ?? $m[2] ?? null;
+            $og_seen[ $ua_label ] = [
+                'ok'     => $code === 200,
+                'code'   => $code,
+                'og_url' => $og_url,
+                'has_og' => ! empty( $og_url ),
+            ];
+        }
+        $result['og_seen'] = $og_seen;
+
+        wp_send_json_success( $result );
+    }
+
     // ─── AJAX: batch fix all posts ────────────────────────────────────────
 
     public static function ajax_social_fix_all_batch(): void {
@@ -7331,6 +7548,10 @@ class CloudScale_DevTools {
         if ( ! $post_id ) return;
 
         $formats = get_post_meta( $post_id, '_csdt_social_formats', true );
+        // Backward compat: fall back to old meta key from before the cs_ → csdt_ rename.
+        if ( empty( $formats ) ) {
+            $formats = get_post_meta( $post_id, '_cs_social_formats', true );
+        }
         if ( empty( $formats[ $platform ]['url'] ) ) return;
 
         $img_url = esc_url( $formats[ $platform ]['url'] );
@@ -7577,7 +7798,7 @@ class CloudScale_DevTools {
         if ( $cf_ray ) {
             $cf_cache = wp_remote_retrieve_header( is_wp_error( $head ) ? [] : $head, 'cf-cache-status' );
             $cf_results[] = [ 'type' => 'pass', 'msg' => "Cloudflare active: cf-ray $cf_ray" . ( $cf_cache ? " | Cache: $cf_cache" : '' ) ];
-            $cf_results[] = [ 'type' => 'info', 'msg' => 'If any crawler UA test above failed, set up a WAF Skip rule in Cloudflare for social crawler user agents (see Cloudflare Setup panel below).' ];
+            $cf_results[] = [ 'type' => 'info', 'msg' => 'If any crawler UA test failed, set up a WAF Skip rule in Cloudflare for social crawler user agents — see the Cloudflare Setup panel.' ];
         } else {
             $cf_results[] = [ 'type' => 'pass', 'msg' => 'No Cloudflare detected — WAF skip rule not required' ];
         }

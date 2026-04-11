@@ -208,16 +208,56 @@
                 return text;
             }
 
+            // Aliases so common fence tags (sh, py, js…) map to known language values.
+            var langAliases = {
+                'sh': 'bash', 'shell': 'bash', 'zsh': 'bash',
+                'py': 'python', 'py3': 'python',
+                'js': 'javascript', 'mjs': 'javascript',
+                'ts': 'typescript',
+                'rb': 'ruby',
+                'rs': 'rust',
+                'yml': 'yaml',
+                'md': 'markdown',
+                'tf': 'hcl'
+            };
+
+            // Detect a markdown/GitLab/GitHub fenced code block and return
+            // { lang, code } if found, otherwise null.
+            function detectMarkdownFence( text ) {
+                var m = text.match( /^[ \t]*(?:`{3,}|~{3,})([a-zA-Z0-9_+#.-]*)[^\n]*\r?\n([\s\S]*?)(?:\r?\n[ \t]*(?:`{3,}|~{3,})[ \t]*)?$/ );
+                if ( ! m ) return null;
+                var lang = ( m[1] || '' ).trim().toLowerCase();
+                lang = langAliases[ lang ] || lang;
+                var code = m[2].replace( /\r\n/g, '\n' ).replace( /\n$/, '' );
+                return { lang: lang, code: code };
+            }
+
+            function applyPastedCode( text ) {
+                var fence = detectMarkdownFence( text );
+                if ( fence ) {
+                    var updates = { content: fence.code };
+                    // Auto-set language only when none is explicitly chosen yet
+                    if ( fence.lang && ! attributes.language ) {
+                        var known = languageOptions.some( function( opt ) {
+                            return opt.value === fence.lang;
+                        } );
+                        if ( known ) updates.language = fence.lang;
+                    }
+                    props.setAttributes( updates );
+                } else {
+                    props.setAttributes( { content: text } );
+                }
+            }
+
             function onPasteCode( event ) {
                 // Called both from the toolbar Paste button (no event) and the
                 // textarea's onPaste handler (event.clipboardData available).
                 if ( event && event.clipboardData ) {
                     event.preventDefault();
-                    var text = event.clipboardData.getData( 'text' );
-                    props.setAttributes( { content: decodeClipboardText( text ) } );
+                    applyPastedCode( decodeClipboardText( event.clipboardData.getData( 'text' ) ) );
                 } else if ( navigator.clipboard && navigator.clipboard.readText ) {
                     navigator.clipboard.readText().then( function( text ) {
-                        props.setAttributes( { content: decodeClipboardText( text ) } );
+                        applyPastedCode( decodeClipboardText( text ) );
                     } ).catch( function() {} );
                 }
             }

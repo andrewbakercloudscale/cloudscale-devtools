@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.8.119] - 2026-04-11
+
+### Added
+- Thumbnails: Diagnose button on each flagged post row — checks meta state (both old `_cs_social_formats` and new `_csdt_social_formats` keys), file existence on disk for each platform, URL reachability per crawler UA, and og:image seen by each crawler
+- Thumbnails: URL checker results — Copy Results to Clipboard button
+- Thumbnails: Crawler Access Test merged into URL checker results; removed from separate Cloudflare Setup panel
+
+### Fixed
+- Thumbnails: `output_crawler_og_image()` now falls back to legacy `_cs_social_formats` meta key so posts published before the cs_ → csdt_ rename still serve the correct og:image
+- Thumbnails: optimum image size targets reduced from 900 KB → 400 KB for Facebook, Twitter, LinkedIn, and Instagram
+- Admin CSS: section header layout — title and hint text no longer run together; hint is right-aligned via `flex: 1; margin-left: auto`
+
+### Changed
+- Code Block editor: Paste button (and Ctrl+V into the textarea) now detects markdown fenced code blocks — extracts language from the fence header (handles aliases: `sh`/`shell`/`zsh` → bash, `py` → python, `js` → javascript, etc.) and strips fence markers so only the code content is stored
+
+## [1.8.114] - 2026-04-10
+
+### Fixed
+- Explain modals: description content now renders formatted HTML — inline `<code>` tokens styled with dark background and amber text, `<strong>` / `<em>` emphasis, and `<ul>/<li>` bullet lists
+- Explain modals: all plain-text `desc` items converted to `html` format with `<code>` markup for commands, file paths, query types, and technical values
+- Expand `$explain_kses` allowlist: added `ul`, `ol`, `li`, `p`, `h4` so structured content can be used in item descriptions
+
 ## [1.8.111] - 2026-04-11
 
 ### Added

@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.8.113
+Stable tag: 1.8.119
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.8.118 =
+* Fixed: Explain modals now render formatted HTML — inline code tokens styled with dark background, bold/italic emphasis, and bullet lists; all describe items converted from plain text to rich HTML markup
 
 = 1.8.113 =
 * Added: "Fix All Posts on Site" button — batch-processes every published post on the site in groups of 10, generating platform-specific social format images with live progress counter (e.g. "Fixing 45 / 320")

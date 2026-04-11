@@ -54,7 +54,7 @@
                     checkResults.innerHTML = `<p style="color:#8c2020">${esc( res.data?.message || 'Error' )}</p>`;
                     return;
                 }
-                checkResults.innerHTML = renderReport( res.data );
+                checkResults.innerHTML = renderReport( res.data, url );
             } ).catch( () => {
                 checkBtn.disabled = false;
                 checkBtn.textContent = '🔍 Run Diagnostic';
@@ -63,7 +63,7 @@
         } );
     }
 
-    function renderReport( data ) {
+    function renderReport( data, checkedUrl ) {
         const t = data.totals;
         const cls = t.fail > 0 ? 'fail' : t.warn > 0 ? 'warn' : 'pass';
         const msg = t.fail > 0
@@ -78,6 +78,7 @@
                     <span style="color:#276227">✔ ${t.pass}</span>
                     <span style="color:#7a5a00">⚠ ${t.warn}</span>
                     <span style="color:#8c2020">✘ ${t.fail}</span>
+                    <button class="button button-small cs-copy-results-btn" style="font-size:11px;margin-left:10px" title="Copy results to clipboard">📋 Copy</button>
                 </span>
             </div>`;
 
@@ -97,8 +98,81 @@
             }
             html += '</ul></div>';
         }
+
+        // Merged: Test All Crawlers button at the bottom of results.
+        const urlForTest = checkedUrl || ( checkUrlEl?.value || '' ).trim();
+        if ( urlForTest ) {
+            html += `<div class="cs-thumb-section">
+                <div class="cs-thumb-section-title">Crawler Access Test</div>
+                <p style="font-size:12px;color:#555;margin:6px 0 8px">Fetches the page with each social crawler user agent to confirm none are blocked by a WAF or Bot Fight Mode rule.</p>
+                <button class="button cs-btn-primary cs-inline-crawler-test-btn" data-url="${esc( urlForTest )}" style="font-size:12px">🤖 Test All Crawlers</button>
+                <div class="cs-inline-crawler-results" style="margin-top:8px"></div>
+            </div>`;
+        }
+
         return html;
     }
+
+    // Build plain-text summary for clipboard copy.
+    function reportToText( container ) {
+        const lines = [];
+        const hdr = container.querySelector( '.cs-thumb-report-hdr strong' );
+        if ( hdr ) lines.push( hdr.textContent, '' );
+        container.querySelectorAll( '.cs-thumb-section' ).forEach( sec => {
+            const title = sec.querySelector( '.cs-thumb-section-title' );
+            if ( title ) lines.push( '── ' + title.textContent + ' ──' );
+            sec.querySelectorAll( '.cs-thumb-result' ).forEach( li => {
+                const spans = li.querySelectorAll( 'span' );
+                const icon = spans[0]?.textContent.trim() || '';
+                const msg  = spans[1]?.textContent.trim() || '';
+                lines.push( `  ${icon} ${msg}` );
+            } );
+            lines.push( '' );
+        } );
+        return lines.join( '\n' );
+    }
+
+    // Copy results to clipboard.
+    document.addEventListener( 'click', ( e ) => {
+        const btn = e.target.closest( '.cs-copy-results-btn' );
+        if ( ! btn ) return;
+        const container = btn.closest( '#cs-thumb-check-results' );
+        if ( ! container ) return;
+        const text = reportToText( container );
+        navigator.clipboard.writeText( text ).then( () => {
+            const orig = btn.textContent;
+            btn.textContent = '✔ Copied';
+            setTimeout( () => { btn.textContent = orig; }, 2000 );
+        } ).catch( () => {
+            btn.textContent = '✘ Failed';
+            setTimeout( () => { btn.textContent = '📋 Copy'; }, 2000 );
+        } );
+    } );
+
+    // Inline crawler access test (merged from CF panel).
+    document.addEventListener( 'click', ( e ) => {
+        const btn = e.target.closest( '.cs-inline-crawler-test-btn' );
+        if ( ! btn ) return;
+        const url        = btn.dataset.url;
+        const resultsDiv = btn.closest( '.cs-thumb-section' ).querySelector( '.cs-inline-crawler-results' );
+        btn.disabled = true;
+        btn.textContent = 'Testing…';
+        if ( resultsDiv ) resultsDiv.innerHTML = '<span style="color:#555;font-size:12px">⏳ Fetching page with each crawler user agent…</span>';
+
+        post( 'csdt_devtools_social_cf_test', { url } ).then( res => {
+            btn.disabled = false;
+            btn.textContent = '🤖 Test All Crawlers';
+            if ( ! res.success ) {
+                if ( resultsDiv ) resultsDiv.innerHTML = `<p style="color:#8c2020;font-size:12px">${esc( res.data?.message || 'Error' )}</p>`;
+                return;
+            }
+            if ( resultsDiv ) resultsDiv.innerHTML = renderCfTestResults( res.data, url );
+        } ).catch( () => {
+            btn.disabled = false;
+            btn.textContent = '🤖 Test All Crawlers';
+            if ( resultsDiv ) resultsDiv.innerHTML = '<span style="color:#8c2020;font-size:12px">✘ Request failed</span>';
+        } );
+    } );
 
     // ── Post Social Preview Scan ──────────────────────────────────────────
 
@@ -353,6 +427,8 @@
                 ? `<button class="button button-small cs-scan-fix-btn" data-post-id="${esc( String( p.post_id ) )}" style="font-size:11px">🔧 Fix</button>`
                 : '';
 
+            const diagBtn = `<button class="button button-small cs-scan-diag-btn" data-post-id="${esc( String( p.post_id ) )}" style="font-size:11px">🔍 Diagnose</button>`;
+
             html += `<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f0f0f0">
                 ${imgPreview}
                 <div style="flex:1;min-width:0">
@@ -366,8 +442,10 @@
                         <button class="button button-small cs-thumb-recheck-btn" data-url="${esc( p.post_url )}" style="font-size:11px">Re-check</button>
                         <a href="${esc( p.post_url )}" target="_blank" rel="noopener" class="button button-small" style="font-size:11px">View Post</a>
                         ${fixBtn}
+                        ${diagBtn}
                     </div>
                     <div id="cs-scan-fix-row-${esc( String( p.post_id ) )}" style="margin-top:4px"></div>
+                    <div id="cs-scan-diag-row-${esc( String( p.post_id ) )}" style="margin-top:4px"></div>
                 </div>
             </div>`;
         }
@@ -397,7 +475,7 @@
                 checkResults.innerHTML = `<p style="color:#8c2020">${esc( res.data?.message || 'Error' )}</p>`;
                 return;
             }
-            checkResults.innerHTML = renderReport( res.data );
+            checkResults.innerHTML = renderReport( res.data, url );
             checkResults.scrollIntoView( { behavior: 'smooth', block: 'start' } );
         } ).catch( () => {
             checkResults.innerHTML = '<p style="color:#8c2020">Request failed.</p>';
@@ -453,6 +531,113 @@
                 </a>
             </div>`;
         }
+        html += '</div>';
+        return html;
+    }
+
+    // ── Diagnose button — checks meta, disk, and crawler URL reachability ──
+    document.addEventListener( 'click', ( e ) => {
+        const btn = e.target.closest( '.cs-scan-diag-btn' );
+        if ( ! btn ) return;
+        const postId  = btn.dataset.postId;
+        const diagRow = document.getElementById( `cs-scan-diag-row-${postId}` );
+        btn.disabled  = true;
+        btn.textContent = 'Diagnosing…';
+        if ( diagRow ) diagRow.innerHTML = '<span style="color:#555;font-size:11px">⏳ Running diagnostics — fetching page and image URLs with crawler user agents…</span>';
+
+        post( 'csdt_devtools_social_diagnose_formats', { post_id: postId } ).then( res => {
+            btn.disabled    = false;
+            btn.textContent = '🔍 Diagnose';
+            if ( ! res.success ) {
+                if ( diagRow ) diagRow.innerHTML = `<span style="color:#8c2020;font-size:11px">✘ ${esc( res.data?.message || 'Failed' )}</span>`;
+                return;
+            }
+            if ( diagRow ) diagRow.innerHTML = renderDiagResult( res.data );
+        } ).catch( () => {
+            btn.disabled    = false;
+            btn.textContent = '🔍 Diagnose';
+            if ( diagRow ) diagRow.innerHTML = '<span style="color:#8c2020;font-size:11px">✘ Request failed</span>';
+        } );
+    } );
+
+    function renderDiagResult( d ) {
+        const { meta, platforms, og_seen } = d;
+
+        // ── Section helper ──
+        const section = ( title, body ) =>
+            `<div style="margin-top:8px"><div style="font-size:11px;font-weight:700;color:#333;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">${title}</div>${body}</div>`;
+
+        const row = ( label, content, col ) =>
+            `<div style="display:flex;gap:6px;align-items:baseline;font-size:11px;padding:2px 0">
+                <span style="min-width:120px;color:#555;flex-shrink:0">${esc( label )}</span>
+                <span style="color:${col || '#333'}">${content}</span>
+            </div>`;
+
+        let html = `<div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:4px;padding:10px 14px;margin-top:6px;font-size:12px">`;
+
+        // ── 1. Meta state ──
+        let metaRows = '';
+        if ( meta.no_thumbnail ) {
+            metaRows += row( 'Featured image', '✘ Not set — no formats can be generated', '#8c2020' );
+        } else {
+            metaRows += row( 'Featured image', meta.thumb_id_now ? `ID ${meta.thumb_id_now}` : '✘ Missing', meta.thumb_id_now ? '#276227' : '#8c2020' );
+            if ( meta.has_new_key ) {
+                metaRows += row( 'Format meta (_csdt_)', '✔ Present', '#276227' );
+            } else if ( meta.has_old_key ) {
+                metaRows += row( 'Format meta (_csdt_)', '⚠ Only old key (_cs_) — run migration', '#7a5a00' );
+            } else {
+                metaRows += row( 'Format meta (_csdt_)', '✘ Missing — formats were never generated or failed silently', '#8c2020' );
+            }
+            if ( meta.thumb_stale ) {
+                metaRows += row( 'Thumb ID mismatch', `⚠ Saved: ${meta.thumb_id_saved} / Current: ${meta.thumb_id_now} — Fix will regenerate`, '#7a5a00' );
+            }
+        }
+        html += section( '1. Post meta', metaRows );
+
+        // ── 2. Per-platform formats ──
+        let platRows = '';
+        for ( const [ key, p ] of Object.entries( platforms ) ) {
+            let statusHtml = '';
+            if ( p.meta_status === 'missing' ) {
+                statusHtml = '<span style="color:#8c2020">✘ Not in meta</span>';
+            } else if ( p.meta_status === 'failed' ) {
+                statusHtml = `<span style="color:#8c2020">✘ Generation failed — ${esc( p.error || '' )}</span>`;
+            } else {
+                const fileIcon = p.file_exists ? '✔' : '✘ File missing on disk';
+                const fileCol  = p.file_exists ? '#276227' : '#8c2020';
+                const dims     = p.w && p.h ? ` ${p.w}×${p.h}` : '';
+                const kb       = p.file_kb != null ? ` · ${p.file_kb} KB on disk` : ( p.kb ? ` · ${p.kb} KB (meta)` : '' );
+                statusHtml = `<span style="color:${fileCol}">${fileIcon}${dims}${kb}</span>`;
+
+                // UA reachability badges
+                if ( p.ua_results && Object.keys( p.ua_results ).length ) {
+                    statusHtml += ' &nbsp;';
+                    for ( const [ ua, r ] of Object.entries( p.ua_results ) ) {
+                        const bg  = r.ok ? '#edfaed' : '#fdf0f0';
+                        const col = r.ok ? '#276227' : '#8c2020';
+                        const txt = r.ok ? `✔ ${esc( ua )} ${r.code}` : `✘ ${esc( ua )} ${r.error || r.code}`;
+                        statusHtml += `<span style="background:${bg};color:${col};padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-right:3px">${txt}</span>`;
+                    }
+                }
+            }
+            platRows += row( p.label, statusHtml );
+        }
+        html += section( '2. Generated format files', platRows );
+
+        // ── 3. What crawlers actually see ──
+        let ogRows = '';
+        for ( const [ ua, r ] of Object.entries( og_seen ) ) {
+            if ( ! r.ok ) {
+                ogRows += row( ua, `✘ Could not fetch page — ${esc( r.error || r.code )}`, '#8c2020' );
+            } else if ( r.has_og ) {
+                const urlShort = r.og_url.length > 60 ? r.og_url.slice( 0, 57 ) + '…' : r.og_url;
+                ogRows += row( ua, `✔ og:image found — <a href="${esc( r.og_url )}" target="_blank" rel="noopener" style="color:#1a3a8f">${esc( urlShort )}</a>` );
+            } else {
+                ogRows += row( ua, '✘ No og:image tag found in page HTML', '#8c2020' );
+            }
+        }
+        html += section( '3. og:image seen by each crawler UA', ogRows );
+
         html += '</div>';
         return html;
     }

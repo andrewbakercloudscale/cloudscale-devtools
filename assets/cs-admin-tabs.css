@@ -115,8 +115,8 @@
     letter-spacing: .06em;
     padding: 10px 16px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
 }
 .cs-section-header-green  { background: linear-gradient(135deg, #1a7a3a, #1db954); }
 .cs-section-header-orange { background: linear-gradient(135deg, #c45c00, #f47c20); }
@@ -133,11 +133,14 @@
 .cs-header-hint {
     font-size: 11px;
     font-weight: 400;
-    opacity: .85;
+    opacity: .8;
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    margin-left: auto;
+    text-align: right;
 }
 @media (max-width: 480px) {
     .cs-header-hint { display: none; }
