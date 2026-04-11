@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.111
+ * Version: 1.8.112
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.111';
+    const VERSION      = '1.8.112';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2892,7 +2892,7 @@ class CloudScale_DevTools {
      * calls wp_print_footer_scripts() at priority 20. This ensures
      * window.csDevtoolsPerfData is set before cs-perf-monitor.js IIFE runs.
      *
-     * @since  1.8.111
+     * @since  1.8.112
      * @return void
      */
     public static function perf_inject_data(): void {
@@ -3013,7 +3013,7 @@ class CloudScale_DevTools {
      * Injected via wp_add_inline_style() on the cs-admin-tabs handle when the
      * thumbnails tab is active, keeping the render method free of <style> tags.
      *
-     * @since  1.8.111
+     * @since  1.8.112
      * @return string
      */
     private static function get_thumbnails_admin_css(): string {
