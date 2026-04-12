@@ -13,11 +13,20 @@
 const { test, expect } = require('@playwright/test');
 
 const SITE      = process.env.WP_SITE || 'https://andrewbaker.ninja';
+const SITE_HOST = new URL(SITE).hostname;
+// Bypass Cloudflare cache — proxy all requests through Pi nginx directly.
+const PI_DIRECT = process.env.PI_DIRECT || 'http://192.168.0.48:8082';
 const PAGE_404  = `${SITE}/this-page-does-not-exist-cs404test`;
 
 test.describe('Custom 404 page', () => {
 
     test.beforeEach(async ({ page }) => {
+        // Bypass Cloudflare — proxy all site requests directly to Pi nginx.
+        await page.route(`${SITE}/**`, async route => {
+            const piUrl = route.request().url().replace(SITE, PI_DIRECT);
+            const resp = await route.fetch({ url: piUrl, headers: { ...route.request().headers(), host: SITE_HOST, 'x-forwarded-proto': 'https' } });
+            await route.fulfill({ response: resp });
+        });
         await page.goto(PAGE_404, { waitUntil: 'networkidle' });
     });
 
@@ -27,64 +36,22 @@ test.describe('Custom 404 page', () => {
         await expect(canvas).toBeVisible();
     });
 
-    test('shows correct game tabs — no Mr. Do, yes Gamut Shift + Racer 3D', async ({ page }) => {
+    test('shows correct game tabs — no Mr. Do, yes Space Invaders', async ({ page }) => {
         const tabs = page.locator('.cs404-tab');
-        await expect(tabs).toHaveCount(8); // runner, jetpack, racer, miner, asteroids, snake, gamutshift, racer3d
+        await expect(tabs).toHaveCount(7); // runner, jetpack, racer, miner, asteroids, snake, spaceinvaders
 
         const labels = await tabs.allInnerTexts();
-        expect(labels.some(t => /Gamut Shift/i.test(t))).toBe(true);
-        expect(labels.some(t => /Racer 3D/i.test(t))).toBe(true);
+        expect(labels.some(t => /Invaders/i.test(t))).toBe(true);
         expect(labels.some(t => /Mr\.?\s*Do/i.test(t))).toBe(false);
+        expect(labels.some(t => /Gamut/i.test(t))).toBe(false);
+        expect(labels.some(t => /Racer 3D/i.test(t))).toBe(false);
     });
 
-    test('Runner tab — canvas visible, iframe hidden', async ({ page }) => {
-        await page.locator('.cs404-tab[data-game="runner"]').click();
-        await expect(page.locator('#cs404-game')).toBeVisible();
-        const iframe = page.locator('#cs404-iframe');
-        await expect(iframe).toBeHidden();
-    });
-
-    test('Gamut Shift tab — iframe visible, canvas hidden, src set', async ({ page }) => {
-        await page.locator('.cs404-tab[data-game="gamutshift"]').click();
-
-        const iframe = page.locator('#cs404-iframe');
-        await expect(iframe).toBeVisible();
-
-        const src = await iframe.getAttribute('src');
-        expect(src).toContain('js13kgames.com');
-        expect(src).toContain('gamut-shift');
-
-        await expect(page.locator('#cs404-game')).toBeHidden();
-    });
-
-    test('Racer 3D tab — iframe visible, canvas hidden, src set', async ({ page }) => {
-        await page.locator('.cs404-tab[data-game="racer3d"]').click();
-
-        const iframe = page.locator('#cs404-iframe');
-        await expect(iframe).toBeVisible();
-
-        const src = await iframe.getAttribute('src');
-        expect(src).toContain('js13kgames.com');
-        expect(src).toContain('racer');
-
-        await expect(page.locator('#cs404-game')).toBeHidden();
-    });
-
-    test('switching back from iframe to canvas game restores canvas', async ({ page }) => {
-        // Go to iframe game
-        await page.locator('.cs404-tab[data-game="gamutshift"]').click();
-        await expect(page.locator('#cs404-iframe')).toBeVisible();
-        await expect(page.locator('#cs404-game')).toBeHidden();
-
-        // Switch back to canvas game
-        await page.locator('.cs404-tab[data-game="snake"]').click();
-        await expect(page.locator('#cs404-game')).toBeVisible();
-
-        const iframe = page.locator('#cs404-iframe');
-        await expect(iframe).toBeHidden();
-        // iframe src should be cleared to stop the game loading
-        const src = await iframe.getAttribute('src');
-        expect(src === '' || src === null).toBe(true);
+    test('canvas always visible (no iframe games)', async ({ page }) => {
+        for (const game of ['runner', 'racer', 'snake', 'spaceinvaders']) {
+            await page.locator(`.cs404-tab[data-game="${game}"]`).click();
+            await expect(page.locator('#cs404-game')).toBeVisible();
+        }
     });
 
     test('leaderboard panel updates on tab switch', async ({ page }) => {
@@ -98,6 +65,11 @@ test.describe('Custom 404 page', () => {
 test.describe('Gameplay — canvas games start and respond to input', () => {
 
     async function goTo404(page) {
+        await page.route(`${SITE}/**`, async route => {
+            const piUrl = route.request().url().replace(SITE, PI_DIRECT);
+            const resp = await route.fetch({ url: piUrl, headers: { ...route.request().headers(), host: SITE_HOST, 'x-forwarded-proto': 'https' } });
+            await route.fulfill({ response: resp });
+        });
         await page.goto(PAGE_404, { waitUntil: 'networkidle' });
     }
 
@@ -188,58 +160,30 @@ test.describe('Gameplay — canvas games start and respond to input', () => {
         expect(colour).not.toBe('255,255,255');
     });
 
-});
-
-test.describe('Gameplay — iframe games load content', () => {
-
-    async function goTo404(page) {
-        await page.goto(PAGE_404, { waitUntil: 'networkidle' });
-    }
-
-    test('Gamut Shift iframe loads and contains a document', async ({ page }) => {
+    test('Space Invaders — space starts game, arrows move ship, space fires', async ({ page }) => {
         await goTo404(page);
-        await page.locator('.cs404-tab[data-game="gamutshift"]').click();
+        await page.locator('.cs404-tab[data-game="spaceinvaders"]').click();
 
-        const iframeEl = page.locator('#cs404-iframe');
-        await expect(iframeEl).toBeVisible();
+        // Start the game
+        await page.keyboard.press('Space');
+        await page.waitForTimeout(200);
 
-        // Wait for the iframe to navigate (up to 15s for external resource)
-        const frame = await iframeEl.contentFrame();
-        if (frame) {
-            // If same-origin access is possible, verify something loaded
-            try {
-                await frame.waitForLoadState('load', { timeout: 15000 });
-                const body = await frame.locator('body').innerHTML({ timeout: 5000 });
-                expect(body.length).toBeGreaterThan(10);
-            } catch {
-                // Cross-origin frames are inaccessible — just verify the iframe is present & src is set
-            }
-        }
+        // Canvas should be dark (space background, not blank)
+        const colAfterStart = await canvasCentreColour(page);
+        expect(colAfterStart).not.toBe('255,255,255');
 
-        const src = await iframeEl.getAttribute('src');
-        expect(src).toContain('gamut-shift');
-    });
+        // Move ship right
+        await page.keyboard.down('ArrowRight');
+        await page.waitForTimeout(300);
+        await page.keyboard.up('ArrowRight');
 
-    test('Racer 3D iframe loads and contains a document', async ({ page }) => {
-        await goTo404(page);
-        await page.locator('.cs404-tab[data-game="racer3d"]').click();
+        // Fire a shot
+        await page.keyboard.press('Space');
+        await page.waitForTimeout(200);
 
-        const iframeEl = page.locator('#cs404-iframe');
-        await expect(iframeEl).toBeVisible();
-
-        const frame = await iframeEl.contentFrame();
-        if (frame) {
-            try {
-                await frame.waitForLoadState('load', { timeout: 15000 });
-                const body = await frame.locator('body').innerHTML({ timeout: 5000 });
-                expect(body.length).toBeGreaterThan(10);
-            } catch {
-                // Cross-origin — verify src attribute only
-            }
-        }
-
-        const src = await iframeEl.getAttribute('src');
-        expect(src).toContain('racer');
+        // Canvas still rendering
+        const colAfterMove = await canvasCentreColour(page);
+        expect(colAfterMove).not.toBe('255,255,255');
     });
 
 });

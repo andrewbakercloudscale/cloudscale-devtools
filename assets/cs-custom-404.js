@@ -15,7 +15,7 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 var ctx=c.getContext('2d'),W=c.width,H=c.height;
 
 /* ── Per-game leaderboards (top 10) ─────────────── */
-var GNAMES=['runner','jetpack','racer','miner','asteroids','snake','gamutshift','racer3d'];
+var GNAMES=['runner','jetpack','racer','miner','asteroids','snake','spaceinvaders'];
 var lbData={};
 GNAMES.forEach(function(g){
     var raw=localStorage.getItem('cs404_lb_'+g);
@@ -39,7 +39,7 @@ function renderLeaderboard(game){
     var panel=document.getElementById('cs404-lb-body');
     var title=document.getElementById('cs404-lb-title');
     if(!panel)return;
-    var gname={runner:'Runner',jetpack:'Jetpack',racer:'Racer',miner:'Miner',asteroids:'Asteroids',snake:'Snake',gamutshift:'Gamut Shift',racer3d:'Racer 3D'};
+    var gname={runner:'Runner',jetpack:'Jetpack',racer:'Racer',miner:'Miner',asteroids:'Asteroids',snake:'Snake',spaceinvaders:'Space Invaders'};
     if(title)title.textContent='\uD83C\uDFC6 '+(gname[game]||game)+' \u2014 Top 10';
     var lb=lbData[game];
     if(!lb||lb.length===0){panel.innerHTML='<p class="cs404-lb-empty">No scores yet \u2014 be the first!</p>';return;}
@@ -219,11 +219,6 @@ function drawWelcome(title,sub){
 
 /* ── Current game ───────────────────────────────── */
 var currentGame='runner';
-var IFRAME_GAMES={
-    gamutshift:'https://js13kgames.com/games/gamut-shift/index.html',
-    racer3d:'https://js13kgames.com/games/racer/index.html'
-};
-var iframeEl=document.getElementById('cs404-iframe');
 
 /* ═══════════════════════════════════════════════
    GAME 1 — RUNNER
@@ -1191,6 +1186,142 @@ function mdDraw(){
 }
 
 
+/* ═══════════════════════════════════════════════
+   GAME 7 — SPACE INVADERS
+   ═══════════════════════════════════════════════ */
+var SI_COLS=10,SI_ROWS=4,SI_IW=26,SI_IH=16,SI_IX=10,SI_IY=8;
+var SI_PW=30,SI_PH=12,SI_PY=H-20;
+var SI_CS=(W-SI_COLS*(SI_IW+SI_IX)+SI_IX)/2;
+var SI={run:false,over:false,score:0,newHi:false,lives:3,
+    px:0,bullet:null,iBullets:[],invaders:[],dir:1,
+    spd:0.8,fr:0,shootTimer:0,wave:0};
+
+function siReset(){
+    SI.run=true;SI.over=false;SI.newHi=false;
+    if(!SI.wave){SI.lives=3;SI.score=0;}
+    SI.px=W/2-SI_PW/2;SI.bullet=null;SI.iBullets=[];
+    SI.fr=0;SI.shootTimer=0;SI.dir=1;
+    SI.spd=0.8+SI.wave*0.25;
+    SI.invaders=[];
+    for(var r=0;r<SI_ROWS;r++){
+        for(var cc=0;cc<SI_COLS;cc++){
+            SI.invaders.push({x:SI_CS+cc*(SI_IW+SI_IX),y:28+r*(SI_IH+SI_IY),alive:true,row:r,col:cc});
+        }
+    }
+}
+function siShoot(){
+    if(!SI.run||SI.bullet)return;
+    SI.bullet={x:SI.px+SI_PW/2,y:SI_PY-4};
+}
+function siUpdate(){
+    if(!SI.run)return;
+    SI.fr++;
+    var alive=SI.invaders.filter(function(i){return i.alive;});
+    if(!alive.length){SI.wave++;siReset();return;}
+    // Move invaders
+    var step=SI.spd*(1+0.015*(SI_COLS*SI_ROWS-alive.length));
+    alive.forEach(function(i){i.x+=step*SI.dir;});
+    var minX=Math.min.apply(null,alive.map(function(i){return i.x;}));
+    var maxX=Math.max.apply(null,alive.map(function(i){return i.x+SI_IW;}));
+    if(maxX>W-2||minX<2){
+        SI.dir*=-1;alive.forEach(function(i){i.y+=10;});
+        SI.spd=Math.min(SI.spd+0.1,5);
+    }
+    if(alive.some(function(i){return i.y+SI_IH>=SI_PY;})){
+        SI.lives=0;SI.over=true;SI.run=false;SI.wave=0;
+        SI.newHi=checkNewHi('spaceinvaders',SI.score);return;
+    }
+    // Player bullet
+    if(SI.bullet){
+        SI.bullet.y-=7;
+        if(SI.bullet.y<0){SI.bullet=null;}
+        else{
+            for(var i=0;i<SI.invaders.length;i++){
+                var inv=SI.invaders[i];if(!inv.alive)continue;
+                if(SI.bullet.x>=inv.x&&SI.bullet.x<=inv.x+SI_IW&&SI.bullet.y>=inv.y&&SI.bullet.y<=inv.y+SI_IH){
+                    inv.alive=false;
+                    var pts=[30,20,15,10];SI.score+=(pts[inv.row]||10);SI.bullet=null;
+                    var ic=['#c084fc','#60a5fa','#34d399','#fbbf24'];
+                    for(var p=0;p<7;p++){var pa=Math.random()*Math.PI*2,ps=1.5+Math.random()*2.5;
+                        particles.push({x:inv.x+SI_IW/2,y:inv.y+SI_IH/2,vx:Math.cos(pa)*ps,vy:Math.sin(pa)*ps,life:1,dec:0.04+Math.random()*0.04,r:2+Math.random()*2,col:ic[inv.row]||'#fff'});}
+                    break;
+                }
+            }
+        }
+    }
+    // Invader shooting
+    SI.shootTimer++;
+    var rate=Math.max(16,72-alive.length*1.5);
+    if(SI.shootTimer>=rate){
+        SI.shootTimer=0;
+        var front={};
+        alive.forEach(function(i){if(!front[i.col]||i.y>front[i.col].y)front[i.col]=i;});
+        var shooters=Object.values(front);
+        var s=shooters[Math.floor(Math.random()*shooters.length)];
+        SI.iBullets.push({x:s.x+SI_IW/2,y:s.y+SI_IH});
+    }
+    // Invader bullets
+    SI.iBullets=SI.iBullets.filter(function(b){
+        b.y+=3.5;
+        if(b.y>H)return false;
+        if(b.x>SI.px&&b.x<SI.px+SI_PW&&b.y>SI_PY){
+            SI.lives--;
+            for(var p=0;p<6;p++){var pa=Math.random()*Math.PI*2,ps=1+Math.random()*2;
+                particles.push({x:b.x,y:SI_PY+SI_PH/2,vx:Math.cos(pa)*ps,vy:Math.sin(pa)*ps,life:1,dec:0.06,r:2+Math.random()*2,col:'#f87171'});}
+            if(SI.lives<=0){SI.over=true;SI.run=false;SI.wave=0;SI.newHi=checkNewHi('spaceinvaders',SI.score);}
+            return false;
+        }
+        return true;
+    });
+    // Player movement
+    if(keysDown['ArrowLeft']||keysDown['KeyA'])SI.px=Math.max(0,SI.px-3.5);
+    if(keysDown['ArrowRight']||keysDown['KeyD'])SI.px=Math.min(W-SI_PW,SI.px+3.5);
+}
+function siDraw(){
+    ctx.clearRect(0,0,W,H);
+    var bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#020617');bg.addColorStop(1,'#0f172a');
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(255,255,255,0.55)';
+    for(var s=0;s<40;s++){ctx.fillRect((s*83+SI.fr*0.04)%W,(s*47)%H,1,1);}
+    if(!SI.run&&!SI.over){drawWelcome('Space Invaders','\u2190\u2192 move  \u2022  Space to fire');return;}
+    // Invaders
+    var ic=['#c084fc','#60a5fa','#34d399','#fbbf24'];
+    SI.invaders.forEach(function(inv){
+        if(!inv.alive)return;
+        var col=ic[inv.row]||'#fff';var anim=Math.floor(SI.fr/14)%2;
+        ctx.fillStyle=col;
+        ctx.beginPath();ctx.roundRect(inv.x+2,inv.y+1,SI_IW-4,SI_IH-3,3);ctx.fill();
+        ctx.fillStyle='rgba(0,0,0,0.7)';
+        ctx.fillRect(inv.x+5,inv.y+4,4,4);ctx.fillRect(inv.x+SI_IW-9,inv.y+4,4,4);
+        ctx.fillStyle=col;
+        if(anim===0){ctx.fillRect(inv.x+3,inv.y+SI_IH-2,3,3);ctx.fillRect(inv.x+SI_IW-6,inv.y+SI_IH-2,3,3);}
+        else{ctx.fillRect(inv.x+6,inv.y+SI_IH-1,3,4);ctx.fillRect(inv.x+SI_IW-9,inv.y+SI_IH-1,3,4);}
+    });
+    // Ground line
+    ctx.fillStyle='rgba(34,211,238,0.25)';ctx.fillRect(0,SI_PY+SI_PH+3,W,1);
+    // Player ship
+    ctx.fillStyle='#22d3ee';
+    ctx.beginPath();ctx.roundRect(SI.px,SI_PY,SI_PW,SI_PH,4);ctx.fill();
+    ctx.fillRect(SI.px+SI_PW/2-2,SI_PY-6,4,7);
+    ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.beginPath();ctx.roundRect(SI.px+SI_PW/2-5,SI_PY+2,10,4,2);ctx.fill();
+    // Player bullet
+    if(SI.bullet){
+        ctx.shadowBlur=6;ctx.shadowColor='#fbbf24';
+        ctx.fillStyle='#fbbf24';ctx.fillRect(SI.bullet.x-1,SI.bullet.y,3,10);
+        ctx.shadowBlur=0;
+    }
+    // Invader bullets
+    ctx.fillStyle='#f87171';
+    SI.iBullets.forEach(function(b){ctx.fillRect(b.x-1,b.y,3,8);});
+    // Lives
+    ctx.font='bold 11px monospace';ctx.textAlign='left';ctx.fillStyle='#22d3ee';
+    var ls='';for(var l=0;l<SI.lives;l++)ls+='\u2665 ';
+    ctx.fillText(ls.trim(),8,H-5);
+    drawHiPanel('spaceinvaders');drawScore(SI.score);drawParticles();
+    if(SI.over)drawGameOver(SI.score,SI.newHi);
+}
+
 /* ── Input ──────────────────────────────────────── */
 var keysDown={};
 document.addEventListener('keydown',function(e){
@@ -1227,6 +1358,14 @@ document.addEventListener('keydown',function(e){
         if(e.code==='Space'){if(!SN.run&&!SN.over)snReset();else if(SN.over)snReset();}
         return;
     }
+    if(currentGame==='spaceinvaders'){
+        if(e.code==='Space'||e.key===' '){
+            var el=document.getElementById('cs404-game');
+            if(el){var r=el.getBoundingClientRect();if(r.top<window.innerHeight&&r.bottom>0)e.preventDefault();}
+            if(!SI.run&&!SI.over){siReset();}else if(SI.over){SI.wave=0;siReset();}else{siShoot();}
+            return;
+        }
+    }
     if(e.code==='Space'||e.key===' '){
         var el=document.getElementById('cs404-game');
         if(el){var r=el.getBoundingClientRect();if(r.top<window.innerHeight&&r.bottom>0){e.preventDefault();onAction();}}
@@ -1251,6 +1390,8 @@ c.addEventListener('click',function(e){
         if(!MM.run&&!MM.over)mmReset();else if(MM.over)mmReset();
     } else if(currentGame==='asteroids'){
         if(!AS.run&&!AS.over)asReset();else if(AS.over)asReset();
+    } else if(currentGame==='spaceinvaders'){
+        if(!SI.run&&!SI.over)siReset();else if(SI.over){SI.wave=0;siReset();}else siShoot();
     } else onAction();
 });
 document.addEventListener('touchstart',function(e){
@@ -1262,6 +1403,13 @@ document.addEventListener('touchstart',function(e){
         e.preventDefault();if(cx<W/2)rcMove('l');else rcMove('r');
     } else if(currentGame==='miner'){
         /* handled by miner buttons above */
+    } else if(currentGame==='spaceinvaders'){
+        var r=c.getBoundingClientRect(),cx=e.touches[0].clientX-r.left;
+        e.preventDefault();
+        if(!SI.run&&!SI.over){siReset();}else if(SI.over){SI.wave=0;siReset();}
+        else if(cx<W*0.33)SI.px=Math.max(0,SI.px-30);
+        else if(cx>W*0.67)SI.px=Math.min(W-SI_PW,SI.px+30);
+        else siShoot();
     } else {
         e.preventDefault();onAction();
     }
@@ -1273,6 +1421,7 @@ function onAction(){
     else if(currentGame==='miner'){if(!MM.run&&!MM.over)mmReset();else if(MM.over)mmReset();}
     else if(currentGame==='asteroids'){if(!AS.run&&!AS.over)asReset();else if(AS.over)asReset();}
     else if(currentGame==='snake'){if(!SN.run&&!SN.over)snReset();else if(SN.over)snReset();}
+    else if(currentGame==='spaceinvaders'){if(!SI.run&&!SI.over)siReset();else if(SI.over){SI.wave=0;siReset();}else siShoot();}
 }
 
 /* ── Tab switching ──────────────────────────────── */
@@ -1291,28 +1440,20 @@ document.querySelectorAll('.cs404-tab').forEach(function(tab){
         if(mcCtrl)mcCtrl.style.display=currentGame==='miner'?'flex':'none';
         if(asCtrl)asCtrl.style.display=currentGame==='asteroids'?'flex':'none';
         if(d4Ctrl)d4Ctrl.style.display=currentGame==='snake'?'grid':'none';
-        if(IFRAME_GAMES[currentGame]){
-            if(iframeEl){iframeEl.src=IFRAME_GAMES[currentGame];iframeEl.style.display='block';}
-            c.style.display='none';
-        } else {
-            if(iframeEl){iframeEl.style.display='none';iframeEl.src='';}
-            c.style.display='';
-        }
         renderLeaderboard(currentGame);
     });
 });
 
 /* ── Main loop ──────────────────────────────────── */
 function loop(){
-    if(!IFRAME_GAMES[currentGame]){
-        if(currentGame==='runner'){rnUpdate();rnDraw();}
-        else if(currentGame==='jetpack'){jpUpdate();jpDraw();}
-        else if(currentGame==='racer'){rcUpdate();rcDraw();}
-        else if(currentGame==='miner'){mmUpdate();mmDraw();}
-        else if(currentGame==='asteroids'){asUpdate();asDraw();}
-        else if(currentGame==='snake'){snUpdate();snDraw();}
-        updateParticles();
-    }
+    if(currentGame==='runner'){rnUpdate();rnDraw();}
+    else if(currentGame==='jetpack'){jpUpdate();jpDraw();}
+    else if(currentGame==='racer'){rcUpdate();rcDraw();}
+    else if(currentGame==='miner'){mmUpdate();mmDraw();}
+    else if(currentGame==='asteroids'){asUpdate();asDraw();}
+    else if(currentGame==='snake'){snUpdate();snDraw();}
+    else if(currentGame==='spaceinvaders'){siUpdate();siDraw();}
+    updateParticles();
     requestAnimationFrame(loop);
 }
 renderLeaderboard(currentGame);
