@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.120
+ * Version: 1.8.125
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.120';
+    const VERSION      = '1.8.125';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1054,7 +1054,7 @@ class CloudScale_DevTools {
             wp_localize_script( 'csdt-404-admin', 'csdtDevtools404', [
                 'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
                 'nonce'      => wp_create_nonce( 'csdt_devtools_404_settings' ),
-                'custom_404' => get_option( self::CUSTOM_404_OPTION, 0 ) ? 1 : 0,
+                'custom_404' => get_option( self::CUSTOM_404_OPTION, 1 ) ? 1 : 0,
                 'scheme'     => get_option( self::SCHEME_404_OPTION, 'ocean' ),
                 'previewUrl' => home_url( '/this-page-does-not-exist' ),
             ] );
@@ -6353,7 +6353,7 @@ class CloudScale_DevTools {
     public static function maybe_custom_404(): void {
         if ( ! is_404() ) { return; }
         $is_preview = isset( $_GET['csdt_devtools_preview_scheme'] ) && current_user_can( 'manage_options' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        if ( ! $is_preview && ! get_option( self::CUSTOM_404_OPTION, 0 ) ) { return; }
+        if ( ! $is_preview && ! get_option( self::CUSTOM_404_OPTION, 1 ) ) { return; }
 
         status_header( 404 );
         nocache_headers();
@@ -6581,7 +6581,7 @@ class CloudScale_DevTools {
     /** Renders the 404 Games settings panel. */
     private static function render_404_panel(): void {
         $current_scheme = get_option( self::SCHEME_404_OPTION, 'ocean' );
-        $enabled        = (bool) get_option( self::CUSTOM_404_OPTION, 0 );
+        $enabled        = (bool) get_option( self::CUSTOM_404_OPTION, 1 );
         ?>
         <div class="cs-panel" id="cs-panel-404">
             <div class="cs-section-header" style="background:linear-gradient(135deg,#f57c00,#e65100);">
