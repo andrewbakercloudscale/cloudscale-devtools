@@ -80,7 +80,7 @@
 .cs-code-editor-textarea {
     display: block;
     width: 100% !important;
-    min-height: 160px;
+    min-height: 60px;
     padding: 16px 18px !important;
     margin: 0 !important;
     border: none !important;

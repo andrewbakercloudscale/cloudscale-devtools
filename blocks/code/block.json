@@ -11,8 +11,7 @@
     "supports": {
         "html": false,
         "multiple": true,
-        "className": true,
-        "align": [ "wide", "full" ]
+        "className": true
     },
     "attributes": {
         "content": {
