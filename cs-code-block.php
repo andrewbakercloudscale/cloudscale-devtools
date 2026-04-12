@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.125
+ * Version: 1.8.130
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.125';
+    const VERSION      = '1.8.130';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -6411,10 +6411,12 @@ class CloudScale_DevTools {
         <button class="cs404-tab" data-game="miner">⛏ Miner</button>
         <button class="cs404-tab" data-game="asteroids">🌌 Asteroids</button>
         <button class="cs404-tab" data-game="snake">🐍 Snake</button>
-        <button class="cs404-tab" data-game="mrdo">🤡 Mr. Do!</button>
+        <button class="cs404-tab" data-game="gamutshift">🎨 Gamut Shift</button>
+        <button class="cs404-tab" data-game="racer3d">🏎 Racer 3D</button>
     </div>
     <div style="position:relative;display:inline-block;max-width:100%;">
         <canvas id="cs404-game" width="620" height="280" aria-label="404 Olympics mini-games"></canvas>
+        <iframe id="cs404-iframe" src="" width="620" height="280" style="display:none;border:none;border-radius:10px;background:#000;vertical-align:top;" allow="accelerometer; autoplay; gamepad; pointer-lock" sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms"></iframe>
         <div id="cs404-name-overlay" style="display:none;position:absolute;inset:0;z-index:10;background:rgba(13,42,74,0.88);border-radius:10px;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-shadow:inset 0 0 0 2px rgba(245,124,0,0.6);">
             <p style="font-size:22px;font-weight:900;color:#f57c00;margin:0;">🏆 New High Score!</p>
             <p style="font-size:14px;color:#cce9fb;margin:0;">Enter your name:</p>

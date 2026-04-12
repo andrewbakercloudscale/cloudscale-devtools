@@ -204,7 +204,13 @@
                         emailPendingMsg.style.display = '';
                         const span = document.createElement( 'span' );
                         span.style.cssText = 'color:#e53e3e;font-size:12px';
-                        span.textContent   = '✗ ' + ( d.message || 'Failed to send.' );
+                        if ( d.smtp_not_configured ) {
+                            const mailUrl = ( window.csdtDevtoolsLogin || {} ).mailTabUrl || '';
+                            span.innerHTML = '✗ Email isn\'t configured on this site. '
+                                + ( mailUrl ? '<a href="' + mailUrl + '" style="color:#c53030;text-decoration:underline">Set up SMTP</a> to enable email delivery.' : 'Set up SMTP to enable email delivery.' );
+                        } else {
+                            span.textContent = '✗ ' + ( d.message || 'Failed to send.' );
+                        }
                         emailPendingMsg.textContent = '';
                         emailPendingMsg.appendChild( span );
                     }
