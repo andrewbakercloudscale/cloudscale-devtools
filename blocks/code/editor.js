@@ -372,7 +372,7 @@
                         onKeyDown: onKeyDown,
                         onPaste: onPasteCode,
                         placeholder: __( 'Paste or type your code here...', 'cloudscale-devtools' ),
-                        rows: Math.max( 8, ( decodeHtmlEntities( attributes.content || '' ).split( '\n' ).length || 1 ) + 2 ),
+                        rows: Math.max( 4, ( decodeHtmlEntities( attributes.content || '' ).split( '\n' ).length || 1 ) + 1 ),
                         spellCheck: false,
                         autoComplete: 'off',
                         autoCorrect: 'off',
