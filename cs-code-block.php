@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.131
+ * Version: 1.8.132
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.131';
+    const VERSION      = '1.8.132';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -6436,6 +6436,11 @@ class CloudScale_DevTools {
         <button id="cs404-asu" class="cs404-miner-btn">▲ Thrust</button>
         <button id="cs404-ass" class="cs404-miner-btn">● Shoot</button>
         <button id="cs404-asr" class="cs404-miner-btn">▶</button>
+    </div>
+    <div id="cs404-si-ctrl" class="cs404-miner-ctrl" style="display:none;">
+        <button id="cs404-sil" class="cs404-miner-btn">◀</button>
+        <button id="cs404-sif" class="cs404-miner-btn">● Fire</button>
+        <button id="cs404-sir" class="cs404-miner-btn">▶</button>
     </div>
     <div id="cs404-4dir-ctrl" style="display:none;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:4px;justify-content:center;margin-top:10px;">
         <span></span>

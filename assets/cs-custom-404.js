@@ -1195,6 +1195,7 @@ var SI_CS=(W-SI_COLS*(SI_IW+SI_IX)+SI_IX)/2;
 var SI={run:false,over:false,score:0,newHi:false,lives:3,
     px:0,bullet:null,iBullets:[],invaders:[],dir:1,
     spd:0.8,fr:0,shootTimer:0,wave:0};
+var siKeys={left:false,right:false};
 
 function siReset(){
     SI.run=true;SI.over=false;SI.newHi=false;
@@ -1273,9 +1274,9 @@ function siUpdate(){
         }
         return true;
     });
-    // Player movement
-    if(keysDown['ArrowLeft']||keysDown['KeyA'])SI.px=Math.max(0,SI.px-3.5);
-    if(keysDown['ArrowRight']||keysDown['KeyD'])SI.px=Math.min(W-SI_PW,SI.px+3.5);
+    // Player movement (keyboard + on-screen buttons)
+    if(keysDown['ArrowLeft']||keysDown['KeyA']||siKeys.left)SI.px=Math.max(0,SI.px-3.5);
+    if(keysDown['ArrowRight']||keysDown['KeyD']||siKeys.right)SI.px=Math.min(W-SI_PW,SI.px+3.5);
 }
 function siDraw(){
     ctx.clearRect(0,0,W,H);
@@ -1404,12 +1405,8 @@ document.addEventListener('touchstart',function(e){
     } else if(currentGame==='miner'){
         /* handled by miner buttons above */
     } else if(currentGame==='spaceinvaders'){
-        var r=c.getBoundingClientRect(),cx=e.touches[0].clientX-r.left;
         e.preventDefault();
-        if(!SI.run&&!SI.over){siReset();}else if(SI.over){SI.wave=0;siReset();}
-        else if(cx<W*0.33)SI.px=Math.max(0,SI.px-30);
-        else if(cx>W*0.67)SI.px=Math.min(W-SI_PW,SI.px+30);
-        else siShoot();
+        if(!SI.run&&!SI.over){siReset();}else if(SI.over){SI.wave=0;siReset();}else siShoot();
     } else {
         e.preventDefault();onAction();
     }
@@ -1424,9 +1421,31 @@ function onAction(){
     else if(currentGame==='spaceinvaders'){if(!SI.run&&!SI.over)siReset();else if(SI.over){SI.wave=0;siReset();}else siShoot();}
 }
 
+/* ── Space Invaders on-screen buttons ───────────── */
+(function(){
+    function press(key,val){return function(e){e.preventDefault();
+        if(!SI.run&&!SI.over){siReset();return;}
+        if(SI.over){SI.wave=0;siReset();return;}
+        if(key==='fire'){siShoot();}else siKeys[key]=val;
+    };}
+    ['sil','sir','sif'].forEach(function(id){
+        var el=document.getElementById('cs404-'+id);if(!el)return;
+        var key=id==='sil'?'left':id==='sir'?'right':'fire';
+        el.addEventListener('mousedown',press(key,true));
+        el.addEventListener('touchstart',press(key,true),{passive:false});
+        if(key!=='fire'){
+            el.addEventListener('mouseup',function(){siKeys[key]=false;});
+            el.addEventListener('mouseleave',function(){siKeys[key]=false;});
+            el.addEventListener('touchend',function(){siKeys[key]=false;});
+            el.addEventListener('touchcancel',function(){siKeys[key]=false;});
+        }
+    });
+})();
+
 /* ── Tab switching ──────────────────────────────── */
 var mcCtrl=document.getElementById('cs404-miner-ctrl');
 var asCtrl=document.getElementById('cs404-asteroids-ctrl');
+var siCtrl=document.getElementById('cs404-si-ctrl');
 var d4Ctrl=document.getElementById('cs404-4dir-ctrl');
 document.querySelectorAll('.cs404-tab').forEach(function(tab){
     tab.addEventListener('click',function(){
@@ -1437,8 +1456,10 @@ document.querySelectorAll('.cs404-tab').forEach(function(tab){
         if(nameOverlay)nameOverlay.style.display='none';
         mmKeys.left=false;mmKeys.right=false;mmKeys.jump=false;
         asKeys.left=false;asKeys.right=false;asKeys.up=false;asKeys.shoot=false;
+        siKeys.left=false;siKeys.right=false;
         if(mcCtrl)mcCtrl.style.display=currentGame==='miner'?'flex':'none';
         if(asCtrl)asCtrl.style.display=currentGame==='asteroids'?'flex':'none';
+        if(siCtrl)siCtrl.style.display=currentGame==='spaceinvaders'?'flex':'none';
         if(d4Ctrl)d4Ctrl.style.display=currentGame==='snake'?'grid':'none';
         renderLeaderboard(currentGame);
     });
