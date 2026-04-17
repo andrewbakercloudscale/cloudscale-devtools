@@ -1,5 +1,5 @@
 /**
- * CloudScale DevTools — Server Logs tab
+ * CloudScale Devtools — Server Logs tab
  *
  * Handles source-selection, AJAX fetching, filtering, colour-coding,
  * and auto-refresh for the Server Logs admin tab.

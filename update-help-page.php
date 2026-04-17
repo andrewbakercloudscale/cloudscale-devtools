@@ -1,6 +1,6 @@
 <?php
 /**
- * One-off script: update CloudScale DevTools help page (ID 5708).
+ * One-off script: update CloudScale Devtools help page (ID 5708).
  * Run via: docker exec -u www-data pi_wordpress php /tmp/update-help-page.php
  */
 $_SERVER['HTTP_HOST']   = 'andrewbaker.ninja';
@@ -45,7 +45,7 @@ $content = <<<'HTML'
 
 <div class="cs-hero">
 <a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
-<h1>CloudScale DevTools</h1>
+<h1>CloudScale Devtools &amp; Cyber</h1>
 <p>A free WordPress developer toolkit: syntax-highlighted code blocks, social preview &amp; thumbnail diagnostics, read-only SQL query tool, bulk code migrator, performance monitor, login security (hide URL, 2FA, passkeys, brute-force protection), AI security audit, SMTP mail, and a custom 404 page with mini-games. Core features run entirely on your server. The optional AI Security Audit uses your choice of AI provider (Anthropic Claude or Google Gemini) — bring your own API key.</p>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;">
 <a class="cs-download-btn" href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">&#11015; Download Latest Version (.zip)</a>
@@ -79,7 +79,7 @@ $content = <<<'HTML'
 <figure class="cs-screenshot"><img decoding="async" src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-code-block-5.jpg" alt="Code Block" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
-<p style="margin:0 0 10px;"><strong>Why CloudScale DevTools?</strong> Popular code highlighting plugins load external CDN scripts that add 100–300ms to your page load. Others charge $30–50/year for features that should come included. CloudScale DevTools bundles everything locally — zero external requests, zero CDN cache impact. Auto language detection, clipboard copy, dark/light toggle, and line numbers all work out of the box.</p>
+<p style="margin:0 0 10px;"><strong>Why CloudScale Devtools?</strong> Popular code highlighting plugins load external CDN scripts that add 100–300ms to your page load. Others charge $30–50/year for features that should come included. CloudScale Devtools bundles everything locally — zero external requests, zero CDN cache impact. Auto language detection, clipboard copy, dark/light toggle, and line numbers all work out of the box.</p>
 <p style="margin:0;"><strong>Completely free.</strong> No premium version, no nag screens, no feature gating. Use it on as many sites as you want.</p>
 </div>
 <p>The <strong>Code Block</strong> is a Gutenberg block (<code>cloudscale/code-block</code>) and shortcode for syntax-highlighted code. Syntax highlighting is powered by <strong>highlight.js 11.11.1</strong>, bundled locally, supporting 190+ languages with auto-detection.</p>
@@ -96,7 +96,7 @@ $content = <<<'HTML'
 <li><strong>Line numbers</strong> — toggle per block. Line numbers are rendered via CSS counter so they are not included when a reader copies the code.</li>
 <li><strong>Paste with fence detection</strong> — paste a Markdown-fenced code block (e.g. <code>```bash … ```</code>) directly into the editor and the language is set automatically.</li>
 </ul>
-<p><strong>Automatic INI/TOML fragment repair:</strong> When you paste Markdown with INI/TOML fenced code into Gutenberg, bare <code>[section]</code> headers are pulled out and turned into <code>core/shortcode</code> blocks, fragmenting your code. CloudScale DevTools detects this and silently merges the fragments back before you see them. A toast confirms when it happens.</p>
+<p><strong>Automatic INI/TOML fragment repair:</strong> When you paste Markdown with INI/TOML fenced code into Gutenberg, bare <code>[section]</code> headers are pulled out and turned into <code>core/shortcode</code> blocks, fragmenting your code. CloudScale Devtools detects this and silently merges the fragments back before you see them. A toast confirms when it happens.</p>
 <p><strong>Requirements:</strong> WordPress 6.0+, PHP 7.4+.</p>
 </div>
 </div>
@@ -107,7 +107,7 @@ $content = <<<'HTML'
 <h3 class="cs-panel-heading" id="migrator">Code Block Migrator</h3>
 <figure class="cs-screenshot"><img decoding="async" src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-migrator-5.jpg" alt="Code Block Migrator" /></figure>
 <div class="cs-panel-body">
-<p>The <strong>Code Block Migrator</strong> (Tools → CloudScale DevTools → Migrate tab) converts legacy code block shortcodes and blocks from other plugins to CloudScale DevTools blocks in a single batch operation.</p>
+<p>The <strong>Code Block Migrator</strong> (Tools → CloudScale Devtools → Migrate tab) converts legacy code block shortcodes and blocks from other plugins to CloudScale Devtools blocks in a single batch operation.</p>
 <p><strong>Supported source formats:</strong></p>
 <ul>
 <li>WordPress core <code>&lt;!-- wp:code --&gt;</code> and <code>&lt;!-- wp:preformatted --&gt;</code> blocks.</li>
@@ -156,7 +156,7 @@ $content = <<<'HTML'
 <li><strong>Transient activity</strong> — set and delete operations on transients.</li>
 <li><strong>Template hierarchy</strong> — the chain of template files WordPress evaluated to render the page.</li>
 </ul>
-<p>The panel is enabled by default. You can disable it under Tools → CloudScale DevTools → Settings. Data is colour-coded by severity and can be exported as JSON for sharing with developers.</p>
+<p>The panel is enabled by default. You can disable it under Tools → CloudScale Devtools → Settings. Data is colour-coded by severity and can be exported as JSON for sharing with developers.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
@@ -168,7 +168,7 @@ $content = <<<'HTML'
 <div class="cs-panel-body">
 <p>The <strong>Hide Login URL</strong> feature moves your WordPress login from the default <code>/wp-login.php</code> to a custom URL slug of your choice. Requests to <code>/wp-login.php</code> return a 404 to automated scanners and bots.</p>
 <p><strong>How it works:</strong> The feature hooks into <code>init</code> and rewrites the login request transparently — no redirect occurs, so there is no latency penalty. It overrides <code>login_url</code>, <code>lostpassword_url</code>, and <code>register_url</code> filters so all WordPress-generated links point to your custom slug automatically. WP-CLI, REST API, XML-RPC, and WP Cron connections are unaffected.</p>
-<p><strong>Setup:</strong> Tools → CloudScale DevTools → Login tab → enter your chosen slug (e.g. <code>my-login</code>) and save. Your login URL becomes <code>https://yoursite.com/my-login</code>. Keep a note of your slug — if you forget it you can recover it by deactivating the plugin.</p>
+<p><strong>Setup:</strong> Tools → CloudScale Devtools → Login tab → enter your chosen slug (e.g. <code>my-login</code>) and save. Your login URL becomes <code>https://yoursite.com/my-login</code>. Keep a note of your slug — if you forget it you can recover it by deactivating the plugin.</p>
 <p><strong>Session Duration:</strong> Also on the Login tab, you can set a custom session duration (in days). When set, login cookies are issued with that lifetime so users stay logged in without re-authenticating on every visit.</p>
 </div>
 </div>
@@ -178,7 +178,7 @@ $content = <<<'HTML'
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="2fa">Two-Factor Authentication</h3>
 <div class="cs-panel-body">
-<p>CloudScale DevTools supports three 2FA methods, all configurable under Tools → CloudScale DevTools → Login tab.</p>
+<p>CloudScale Devtools supports three 2FA methods, all configurable under Tools → CloudScale Devtools → Login tab.</p>
 
 <h4 class="cs-sub-heading">Email Code</h4>
 <p>After a successful password login, a 6-digit code is emailed to the user's registered address. The code expires after 10 minutes. No third-party service is required — the code is generated and verified entirely on your server.</p>
@@ -211,7 +211,7 @@ $content = <<<'HTML'
 <li><strong>Per-device registration</strong> — register multiple devices with individual labels. Remove any device at any time from the Login tab.</li>
 <li><strong>Test without logout</strong> — after registering a passkey you can verify it works from the Login tab without signing out first.</li>
 </ul>
-<p><strong>Registration:</strong> Tools → CloudScale DevTools → Login tab → Passkeys section → click Register and follow your browser/OS prompt. Give the device a recognisable label (e.g. "MacBook Touch ID").</p>
+<p><strong>Registration:</strong> Tools → CloudScale Devtools → Login tab → Passkeys section → click Register and follow your browser/OS prompt. Give the device a recognisable label (e.g. "MacBook Touch ID").</p>
 </div>
 </div>
 <hr class="cs-divider"/>
@@ -221,7 +221,7 @@ $content = <<<'HTML'
 <h3 class="cs-panel-heading" id="brute-force">Brute Force Protection</h3>
 <div class="cs-panel-body">
 <p>The <strong>Brute Force Protection</strong> feature rate-limits repeated failed login attempts on a per-username and per-IP basis, locking out attackers before they can exhaust your password space.</p>
-<p><strong>Configuration</strong> (Tools → CloudScale DevTools → Login tab):</p>
+<p><strong>Configuration</strong> (Tools → CloudScale Devtools → Login tab):</p>
 <ul>
 <li><strong>Max attempts</strong> — number of consecutive failed logins before a lockout is triggered (default: 5).</li>
 <li><strong>Lockout duration</strong> — how long the account/IP is blocked after the threshold is reached (configurable in minutes).</li>
@@ -236,7 +236,7 @@ $content = <<<'HTML'
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="ai-security">AI Security Audit</h3>
 <div class="cs-panel-body">
-<p>The <strong>AI Security Audit</strong> tab (Tools → CloudScale DevTools → Security) uses a large language model to analyse your WordPress configuration and flag security issues with remediation guidance. Two scan types are available:</p>
+<p>The <strong>AI Security Audit</strong> tab (Tools → CloudScale Devtools → Security) uses a large language model to analyse your WordPress configuration and flag security issues with remediation guidance. Two scan types are available:</p>
 
 <h4 class="cs-sub-heading">Internal Config Audit</h4>
 <p>Collects server-side data — active plugins, PHP version, WordPress version, file permissions, exposed debug settings, user roles, and key <code>wp-config.php</code> flags — then sends it to the AI for analysis. Results are scored and grouped into <strong>Critical</strong>, <strong>High</strong>, <strong>Medium</strong>, <strong>Low</strong>, and <strong>Good</strong> findings, each with a plain-English explanation and a step-by-step fix.</p>
@@ -253,7 +253,7 @@ $content = <<<'HTML'
 <p>You can customise the model selection and edit the system prompt directly in the settings panel to tune the analysis for your environment.</p>
 
 <h4 class="cs-sub-heading">How Scans Run (No Timeout Risk)</h4>
-<p>Scans can take 30–120 seconds. To avoid HTTP gateway timeouts, CloudScale DevTools uses <code>fastcgi_finish_request()</code> to close the browser connection immediately after the scan starts, then continues running the analysis in the same PHP-FPM worker in the background. A progress bar updates every 3 seconds via polling until the result is ready. This approach does <strong>not</strong> depend on WP Cron — <code>DISABLE_WP_CRON</code> and cron configuration have no effect on the scan.</p>
+<p>Scans can take 30–120 seconds. To avoid HTTP gateway timeouts, CloudScale Devtools uses <code>fastcgi_finish_request()</code> to close the browser connection immediately after the scan starts, then continues running the analysis in the same PHP-FPM worker in the background. A progress bar updates every 3 seconds via polling until the result is ready. This approach does <strong>not</strong> depend on WP Cron — <code>DISABLE_WP_CRON</code> and cron configuration have no effect on the scan.</p>
 
 <h4 class="cs-sub-heading">External Services Used</h4>
 <p>When a scan runs, the following external requests are made:</p>
@@ -274,7 +274,7 @@ $content = <<<'HTML'
 <h3 class="cs-panel-heading" id="smtp">SMTP / Mail</h3>
 <div class="cs-panel-body">
 <p>The <strong>SMTP</strong> tab replaces WordPress's default <code>wp_mail()</code> (which relies on PHP's <code>mail()</code> function) with authenticated SMTP delivery. This fixes delivery failures on servers where PHP mail is disabled or flagged as spam.</p>
-<p><strong>Configuration</strong> (Tools → CloudScale DevTools → Mail tab):</p>
+<p><strong>Configuration</strong> (Tools → CloudScale Devtools → Mail tab):</p>
 <ul>
 <li><strong>SMTP host</strong> — your mail server hostname (e.g. <code>smtp.gmail.com</code>, <code>smtp.sendgrid.net</code>, or your hosting provider's SMTP server).</li>
 <li><strong>Port</strong> — typically 587 (STARTTLS) or 465 (SSL).</li>
@@ -292,7 +292,7 @@ $content = <<<'HTML'
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="thumbnails">Social Preview &amp; Thumbnails</h3>
 <div class="cs-panel-body">
-<p>The <strong>Thumbnails</strong> tab (Tools → CloudScale DevTools → Thumbnails) is a social preview diagnostics suite for ensuring every post shares correctly on Facebook, Twitter/X, LinkedIn, and WhatsApp.</p>
+<p>The <strong>Thumbnails</strong> tab (Tools → CloudScale Devtools → Thumbnails) is a social preview diagnostics suite for ensuring every post shares correctly on Facebook, Twitter/X, LinkedIn, and WhatsApp.</p>
 
 <h4 class="cs-sub-heading">URL Checker</h4>
 <p>Enter any URL on your site and get a full breakdown of its <code>og:image</code>, <code>og:title</code>, <code>og:description</code>, <code>twitter:card</code>, and related meta tags — exactly as a social crawler would see them. Diagnoses common problems such as missing tags, wrong image dimensions, or images blocked by Cloudflare's crawler challenge.</p>
@@ -345,15 +345,20 @@ $content = <<<'HTML'
 </div>
 <hr class="cs-divider"/>
 
-<p style="text-align:center;color:#94a3b8;font-size:.9em;margin-top:40px;">CloudScale DevTools is free and open source. Found a bug or have a feature request? <a href="https://github.com/andrewbakercloudscale/cloudscale-devtools/issues" target="_blank" rel="noopener">Open an issue on GitHub</a>.</p>
+<p style="text-align:center;color:#94a3b8;font-size:.9em;margin-top:40px;">CloudScale Devtools is free and open source. Found a bug or have a feature request? <a href="https://github.com/andrewbakercloudscale/cloudscale-devtools/issues" target="_blank" rel="noopener">Open an issue on GitHub</a>.</p>
 </div>
 HTML;
 
+// Bypass KSES so <style> tags in the content are preserved.
+// wp_update_post() runs wp_filter_post_kses() which strips <style> for users
+// without unfiltered_html (e.g. www-data running this script via CLI).
+kses_remove_filters();
 $result = wp_update_post( [
     'ID'           => 5708,
     'post_content' => $content,
     'post_status'  => 'publish',
 ] );
+kses_init_filters();
 
 if ( is_wp_error( $result ) ) {
     echo 'ERROR: ' . $result->get_error_message() . "\n";

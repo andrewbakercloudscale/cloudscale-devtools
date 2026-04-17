@@ -1,4 +1,4 @@
-# CloudScale DevTools
+# CloudScale Devtools
 
 ![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue) ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple) ![License](https://img.shields.io/badge/License-GPLv2-green) ![Version](https://img.shields.io/badge/Version-1.8.42-orange)
 
@@ -49,7 +49,7 @@ A free WordPress developer toolkit. Everything runs on your server — no extern
 1. Download the latest release zip from the [Releases](../../releases) page
 2. In WordPress admin go to **Plugins > Add New > Upload Plugin**
 3. Upload the zip, click **Install Now**, then **Activate**
-4. Navigate to **Tools > 🌩️ CloudScale DevTools**
+4. Navigate to **Tools > 🌩️ CloudScale Devtools**
 
 ## License
 

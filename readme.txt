@@ -1,10 +1,10 @@
-=== CloudScale DevTools ===
+=== CloudScale Devtools ===
 Contributors: andrewbaker
 Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.24
+Stable tag: 1.9.28
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Syntax highlighted code block with 14 color themes, auto language detection, cli
 
 == Description ==
 
-CloudScale DevTools is a lightweight, zero dependency Gutenberg block plugin that renders beautifully syntax highlighted code on your WordPress site using highlight.js. It includes a built in code block migrator to convert legacy WordPress code blocks in bulk, and a read only SQL query tool for database diagnostics.
+CloudScale Devtools is a lightweight, zero dependency Gutenberg block plugin that renders beautifully syntax highlighted code on your WordPress site using highlight.js. It includes a built in code block migrator to convert legacy WordPress code blocks in bulk, and a read only SQL query tool for database diagnostics.
 
 = Features =
 
@@ -39,8 +39,8 @@ CloudScale DevTools is a lightweight, zero dependency Gutenberg block plugin tha
 
 1. Upload the cs-code-block folder to /wp-content/plugins/
 2. Activate the plugin through the Plugins menu in WordPress
-3. Add a CloudScale DevTools block from the Gutenberg block inserter, or use the [cs_code] shortcode
-4. Configure your preferred color theme and dark/light default under Tools > CloudScale DevTools
+3. Add a CloudScale Devtools block from the Gutenberg block inserter, or use the [cs_code] shortcode
+4. Configure your preferred color theme and dark/light default under Tools > CloudScale Devtools
 
 If you were previously using the standalone CloudScale SQL Command plugin, you can deactivate and delete it after activating this version. All SQL functionality is now built in.
 
@@ -145,7 +145,7 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 = 1.8.56 =
 * Changed: Admin page slug renamed from cloudscale-code-sql to cloudscale-devtools (URL is now tools.php?page=cloudscale-devtools); legacy URL redirects automatically
-* Fixed: Help page slug and title updated to cloudscale-devtools-help / CloudScale DevTools: Online Help
+* Fixed: Help page slug and title updated to cloudscale-devtools-help / CloudScale Devtools: Online Help
 
 = 1.7.57 =
 * Added: Code Block Settings now includes a checkbox to show/hide the CS Monitor performance panel
@@ -252,7 +252,7 @@ This plugin loads syntax highlighting scripts and stylesheets from the cdnjs CDN
 **Website:** https://anthropic.com
 **Endpoint:** https://api.anthropic.com/v1/messages
 **Data sent:** WordPress configuration data (plugin list, PHP version, WordPress version, file permission flags, exposed debug settings, user role counts, key wp-config.php flags) and, for the Cyber Deep Dive, HTTP security header responses from your own site's public URLs. No post content or visitor data is transmitted.
-**When data is sent:** Only when you click "Run AI Security Scan" or "Run Cyber Deep Dive" on the Security tab in Tools > CloudScale DevTools and Anthropic is selected as your AI provider.
+**When data is sent:** Only when you click "Run AI Security Scan" or "Run Cyber Deep Dive" on the Security tab in Tools > CloudScale Devtools and Anthropic is selected as your AI provider.
 **API key:** You must supply your own Anthropic API key. The key is stored in your WordPress database (wp_options) and is never transmitted anywhere except directly to api.anthropic.com.
 
 Anthropic Privacy Policy: https://www.anthropic.com/privacy
@@ -265,7 +265,7 @@ Anthropic API documentation: https://docs.anthropic.com
 **Website:** https://ai.google.dev
 **Endpoint:** https://generativelanguage.googleapis.com/v1beta/models/
 **Data sent:** WordPress configuration data (plugin list, PHP version, WordPress version, file permission flags, exposed debug settings, user role counts, key wp-config.php flags) and, for the Cyber Deep Dive, HTTP security header responses from your own site's public URLs. No post content or visitor data is transmitted.
-**When data is sent:** Only when you click "Run AI Security Scan" or "Run Cyber Deep Dive" on the Security tab in Tools > CloudScale DevTools and Google Gemini is selected as your AI provider.
+**When data is sent:** Only when you click "Run AI Security Scan" or "Run Cyber Deep Dive" on the Security tab in Tools > CloudScale Devtools and Google Gemini is selected as your AI provider.
 **API key:** You must supply your own Google AI API key. The key is stored in your WordPress database (wp_options) and is never transmitted anywhere except directly to Google.
 
 Google Privacy Policy: https://policies.google.com/privacy
