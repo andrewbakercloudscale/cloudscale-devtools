@@ -5,7 +5,7 @@
  * Pure PHP, no Composer. Requires the OpenSSL extension (standard in all PHP builds).
  * Implements FIDO2 / WebAuthn credential registration and authentication.
  *
- * @since 1.9.0
+ * @since 1.9.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }

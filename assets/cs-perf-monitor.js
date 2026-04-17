@@ -1014,9 +1014,15 @@
 
         // "admin" username exists — prime brute-force target
         if (health.admin_user_exists) {
-            issuesList.push({ sev: 'critical', tab: 'summary',
+            var bfOn  = health.brute_force_enabled;
+            var bfSev = bfOn ? 'warning' : 'critical';
+            var bfDetail = 'Rename in Users → Profile. Transfer content first, then delete the old account.'
+                + (bfOn
+                    ? ' Brute-force protection is ON (mitigating risk), but renaming is still strongly recommended.'
+                    : ' ⚠ Brute-force protection is OFF — enable it in DevTools → Login Security to limit attack exposure.');
+            issuesList.push({ sev: bfSev, tab: 'summary',
                 title: 'Username "admin" exists — prime brute-force target',
-                detail: 'Rename in Users → Profile. Transfer content first, then delete the old account.', plugin: '' });
+                detail: bfDetail, plugin: '' });
         }
 
         // Default wp_ table prefix
@@ -1093,6 +1099,22 @@
                 issuesList.push({ sev: 'warning', tab: 'summary',
                     title: dbName + ' ' + meta.mysql_version + ' — ' + dbEolLabel,
                     detail: 'Plan upgrade to ' + dbTarget + ' before end-of-life.', plugin: '' });
+            }
+        }
+
+        // Nginx version EOL check
+        if (health.nginx_version) {
+            var ngParts = health.nginx_version.split('.').map(Number);
+            var ngMaj = ngParts[0] || 0, ngMin = ngParts[1] || 0;
+            // Stable branch history: 1.26 (Apr 2024), 1.24 (Apr 2023 EOL), 1.22 EOL, ≤1.20 very old
+            if (ngMaj < 1 || (ngMaj === 1 && ngMin < 20)) {
+                issuesList.push({ sev: 'critical', tab: 'summary',
+                    title: 'Nginx ' + health.nginx_version + ' is very old and unmaintained',
+                    detail: 'Update to Nginx 1.26 (stable) or 1.27 (mainline). Old versions have known unpatched CVEs.', plugin: '' });
+            } else if (ngMaj === 1 && ngMin < 26) {
+                issuesList.push({ sev: 'warning', tab: 'summary',
+                    title: 'Nginx ' + health.nginx_version + ' is outdated — stable is 1.26',
+                    detail: 'Update to Nginx 1.26 (stable). Older stable branches no longer receive security patches.', plugin: '' });
             }
         }
 
@@ -1625,6 +1647,27 @@
                 'Or limit to only genuine errors (not notices/warnings): <code>error_reporting( E_ERROR | E_PARSE );</code>'
             ]
         },
+        nginx_eol: {
+            why: 'Nginx follows a stable-branch model: older stable branches reach end-of-life when the next stable is released and stop receiving security backports. Running an outdated version leaves known CVEs unpatched.',
+            steps: [
+                'Check current version: <code>nginx -v</code>',
+                'On Debian/Ubuntu: <code>apt-get update && apt-get install nginx</code> — or add the official Nginx APT repo for the latest stable.',
+                'On Alpine (Docker): update your base image tag, e.g. <code>FROM nginx:1.26-alpine</code> in your Dockerfile.',
+                'After updating, reload config: <code>nginx -t && systemctl reload nginx</code> (or <code>nginx -s reload</code>).',
+                'In Docker Compose: update the image tag in docker-compose.yml and run <code>docker compose pull nginx && docker compose up -d nginx</code>.'
+            ]
+        },
+        redis_eol: {
+            why: 'Redis follows a versioned release model with defined end-of-life dates. EOL versions receive no CVE fixes — and WordPress object cache uses Redis on every single page load.',
+            steps: [
+                'Check current version: <code>redis-server --version</code>',
+                'On Debian/Ubuntu: <code>apt-get update && apt-get install redis-server</code> — or use the official Redis APT repo for latest stable.',
+                'On Alpine (Docker): update the image tag, e.g. <code>FROM redis:7.4-alpine</code> in docker-compose.yml.',
+                'In Docker Compose: update the image tag and run <code>docker compose pull redis && docker compose up -d redis</code>.',
+                'Redis is backwards compatible within major versions — no data migration is required for a minor version update.',
+                'After upgrading, verify WP Object Cache still works: <code>wp cache flush && wp post get 1 --field=post_title</code>'
+            ]
+        },
         php_limits: {
             why: 'WordPress media uploads and import operations fail silently when PHP\'s upload_max_filesize or post_max_size are too small. The browser reports success but no file lands on the server.',
             steps: [
@@ -1654,6 +1697,8 @@
         if (t.indexOf('debug.log') !== -1)                                               return ISSUE_FIXES.debug_log;
         if (t.indexOf('wordpress update available') !== -1)                              return ISSUE_FIXES.wp_outdated;
         if ((t.indexOf('mysql') !== -1 || t.indexOf('mariadb') !== -1) && (t.indexOf('end-of-life') !== -1 || t.indexOf('eol') !== -1 || t.indexOf('approaching eol') !== -1)) return ISSUE_FIXES.mysql_eol;
+        if (t.indexOf('nginx') !== -1 && (t.indexOf('outdated') !== -1 || t.indexOf('old') !== -1 || t.indexOf('end-of-life') !== -1)) return ISSUE_FIXES.nginx_eol;
+        if (t.indexOf('redis') !== -1 && (t.indexOf('end-of-life') !== -1 || t.indexOf('eol') !== -1))  return ISSUE_FIXES.redis_eol;
         if (t.indexOf('opcache') !== -1)                                                 return ISSUE_FIXES.opcache;
         if (t.indexOf('uploads directory') !== -1)                                       return ISSUE_FIXES.uploads_writable;
         if (t.indexOf('upload_max_filesize') !== -1 || t.indexOf('post_max_size') !== -1 || t.indexOf('max_execution_time') !== -1) return ISSUE_FIXES.php_limits;
@@ -1758,7 +1803,6 @@
 
         var html = '<div class="cs-issues-toolbar">'
             + '<span class="cs-issues-summary">' + summary.join(' · ') + '</span>'
-            + '<button class="cs-issues-copy-btn" title="Copy all issues and remediation steps to clipboard">&#128203; Copy All</button>'
             + '</div>';
 
         var lastSev = null;
@@ -1771,12 +1815,11 @@
             }
             var fix = getIssueFix(issue);
             var fixId = 'cs-fix-' + idx;
-            html += '<div class="cs-issue-row cs-issue-' + esc(issue.sev) + '" data-tab="' + esc(issue.tab) + '">'
+            html += '<div class="cs-issue-row cs-issue-' + esc(issue.sev) + '">'
                 + '<div class="cs-issue-top">'
                     + '<span class="cs-issue-title">' + esc(issue.title) + '</span>'
                     + (issue.plugin ? pluginChip(issue.plugin) : '')
-                    + (fix ? '<button class="cs-fix-btn" data-fix="' + fixId + '">Explain</button>' : '')
-                    + '<span class="cs-issue-arrow">&#8594;</span>'
+                    + (fix ? '<span class="cs-issue-arrow cs-issue-arrow-expand">&#9658;</span>' : '')
                 + '</div>'
                 + (issue.detail ? '<div class="cs-issue-detail">' + esc(issue.detail) + '</div>' : '')
                 + (fix ? '<div class="cs-fix-wrap" id="' + fixId + '">' + buildFixHtml(fix) + '</div>' : '')
@@ -1786,37 +1829,15 @@
 
         issuesWrap.innerHTML = html;
 
-        // Copy All button
-        var copyBtn = issuesWrap.querySelector('.cs-issues-copy-btn');
-        if (copyBtn) {
-            copyBtn.addEventListener('click', function () {
-                var text = buildIssuesCopyText();
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text).then(function () {
-                        copyBtn.textContent = 'Copied!';
-                        setTimeout(function () { copyBtn.innerHTML = '&#128203; Copy All'; }, 2000);
-                    }).catch(function () { csFallbackCopy(text, copyBtn); });
-                } else {
-                    csFallbackCopy(text, copyBtn);
-                }
-            });
-        }
-
-        // Tab-switch on row click (not on Explain button)
-        Array.prototype.forEach.call(issuesWrap.querySelectorAll('.cs-issue-row[data-tab]'), function (row) {
-            row.addEventListener('click', function () { switchTab(row.getAttribute('data-tab')); });
-        });
-
-        // Explain button — toggle fix panel, stop propagation so row click doesn't fire
-        Array.prototype.forEach.call(issuesWrap.querySelectorAll('.cs-fix-btn'), function (btn) {
-            btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                var wrap = document.getElementById(btn.getAttribute('data-fix'));
-                if (!wrap) return;
-                var open = wrap.classList.contains('cs-fix-open');
-                wrap.classList.toggle('cs-fix-open', !open);
-                btn.classList.toggle('cs-fix-btn-active', !open);
-                btn.textContent = open ? 'Explain' : 'Close';
+        // Row click — expand/collapse the fix panel
+        Array.prototype.forEach.call(issuesWrap.querySelectorAll('.cs-issue-row'), function (row) {
+            var fixWrap = row.querySelector('.cs-fix-wrap');
+            var arrow   = row.querySelector('.cs-issue-arrow-expand');
+            if (!fixWrap) return;
+            row.addEventListener('click', function () {
+                var open = fixWrap.classList.contains('cs-fix-open');
+                fixWrap.classList.toggle('cs-fix-open', !open);
+                if (arrow) arrow.innerHTML = open ? '&#9658;' : '&#9660;';
             });
         });
     }
@@ -1977,6 +1998,7 @@
     // ── Summary ───────────────────────────────────────────────────────────────
     function renderSummary() {
         if (!summaryWrap) return;
+        var health  = data.health || {};
         var queries = data.queries, http = data.http, logs = data.logs || [];
 
         var slowQ  = queries.filter(function (q) { return q.time_ms >= T_SLOW; }).length;
@@ -2057,7 +2079,8 @@
                 + '<div class="cs-sum-card-sub">'
                 + '<span>PHP&nbsp;' + esc(meta.php_version) + '</span>'
                 + '<span>WP&nbsp;'  + esc(meta.wp_version  || '?') + '</span>'
-                + (meta.mysql_version ? '<span>MySQL&nbsp;' + esc(meta.mysql_version) + '</span>' : '')
+                + (meta.mysql_version ? '<span>' + (health.is_mariadb ? 'MariaDB' : 'MySQL') + '&nbsp;' + esc(meta.mysql_version) + '</span>' : '')
+                + (health.nginx_version  ? '<span>Nginx&nbsp;' + esc(health.nginx_version)  + '</span>' : '')
                 + (meta.memory_peak_mb ? '<span class="' + memCls + '">Mem peak:&nbsp;' + meta.memory_peak_mb + 'MB&nbsp;/&nbsp;' + esc(meta.memory_limit || '?') + '</span>' : '')
                 + (meta.active_theme   ? '<span>Theme:&nbsp;' + esc(meta.active_theme) + '</span>' : '')
                 + (meta.is_multisite   ? '<span style="color:#9cdcfe">Multisite</span>' : '')
@@ -2228,7 +2251,6 @@
         }
 
         // ── Site Health ────────────────────────────────────────────────────────
-        var health = data.health || {};
         if (Object.keys(health).length > 0) {
             html += '<div><div class="cs-sum-section-title">Site Health</div>';
 
@@ -2337,6 +2359,18 @@
                 html += hBadge(dbEolOk2, dbEolWarn2,
                     (dbIsMariaDB2 ? 'MariaDB' : 'MySQL'),
                     meta.mysql_version + (dbEolOk2 ? ' — supported' : dbEolWarn2 ? ' — approaching EOL' : ' — end-of-life'));
+            }
+
+            // Nginx version
+            if (health.nginx_version) {
+                var ngParts2 = health.nginx_version.split('.').map(Number);
+                var ngMaj2 = ngParts2[0] || 0, ngMin2 = ngParts2[1] || 0;
+                var ngOk2   = ngMaj2 > 1 || (ngMaj2 === 1 && ngMin2 >= 26);
+                var ngWarn2 = !ngOk2 && (ngMaj2 === 1 && ngMin2 >= 20);
+                html += hBadge(ngOk2, ngWarn2, 'Nginx',
+                    health.nginx_version + (ngOk2 ? ' — current' : ngWarn2 ? ' — outdated (stable: 1.26)' : ' — very old'));
+            } else if (health.apache_version) {
+                html += hBadge(true, false, 'Apache', health.apache_version);
             }
 
             // Plugin updates

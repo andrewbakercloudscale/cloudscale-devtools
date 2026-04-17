@@ -54,3 +54,46 @@
             } );
     } );
 } )();
+
+( function () {
+    'use strict';
+
+    var copyAllBtn = document.getElementById( 'cs-copy-all-btn' );
+    if ( ! copyAllBtn ) { return; }
+
+    function fallbackCopy( text ) {
+        var ta = document.createElement( 'textarea' );
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild( ta );
+        ta.select();
+        try { document.execCommand( 'copy' ); } catch ( e ) {}
+        document.body.removeChild( ta );
+    }
+
+    function resetBtn() {
+        copyAllBtn.innerHTML = '&#128203; Copy All';
+        copyAllBtn.classList.remove( 'copied' );
+    }
+
+    function markCopied() {
+        copyAllBtn.textContent = 'Copied!';
+        copyAllBtn.classList.add( 'copied' );
+        setTimeout( resetBtn, 2000 );
+    }
+
+    copyAllBtn.addEventListener( 'click', function () {
+        var active = document.querySelector( '.cs-tab-content.active' );
+        var text   = active ? ( active.innerText || active.textContent || '' ) : '';
+        text = text.replace( /\n{3,}/g, '\n\n' ).trim();
+
+        if ( navigator.clipboard && navigator.clipboard.writeText ) {
+            navigator.clipboard.writeText( text )
+                .then( markCopied )
+                .catch( function () { fallbackCopy( text ); markCopied(); } );
+        } else {
+            fallbackCopy( text );
+            markCopied();
+        }
+    } );
+} )();
