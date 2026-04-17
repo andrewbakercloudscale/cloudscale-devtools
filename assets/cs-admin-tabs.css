@@ -101,6 +101,36 @@
 .cs-tab:focus { outline: none; box-shadow: none; }
 .cs-tab.active { color: #fff; border-bottom-color: #f47c20; }
 
+/* ── Copy All action bar ─────────────────────────── */
+#cs-tab-actions {
+    background: #f8f9fb;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px 20px;
+}
+.cs-copy-all-btn {
+    background: #1a2d6b;
+    border: 1px solid #1a2d6b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background .15s, border-color .15s;
+    white-space: nowrap;
+}
+.cs-copy-all-btn:hover { background: #243d8f; border-color: #243d8f; }
+.cs-copy-all-btn:focus { outline: none; box-shadow: none; }
+.cs-copy-all-btn.copied {
+    background: #15803d;
+    border-color: #15803d;
+}
+
 /* ── Tab content ─────────────────────────────────── */
 .cs-tab-content { display: none; padding: 20px 0 0; }
 .cs-tab-content.active { display: block; }
@@ -806,3 +836,608 @@
 .cs-modal-msg    { font-size: 14px; color: #555; margin: 0 0 28px; line-height: 1.6; }
 .cs-modal-btn    { min-width: 140px; }
 .cs-modal-auto   { font-size: 12px; color: #aaa; margin: 12px 0 0; }
+
+/* ── Server Logs tab ─────────────────────────────── */
+.cs-logs-sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 0 4px;
+}
+.cs-log-src-btn {
+    background: #f0f4ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 20px;
+    color: #334155;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    transition: background .15s, border-color .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.cs-log-src-btn::after {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    flex-shrink: 0;
+}
+.cs-log-src-btn.status-ok::after          { background: #22c55e; }
+.cs-log-src-btn.status-not-found          { opacity: .55; }
+.cs-log-src-btn.status-not-found::after   { background: #94a3b8; }
+.cs-log-src-btn.status-permission-denied::after { background: #f59e0b; }
+.cs-log-src-btn.status-empty::after       { background: #60a5fa; }
+.cs-log-src-btn:hover  { background: #e0e7ff; border-color: #818cf8; }
+.cs-log-src-btn:focus  { outline: none; box-shadow: none; }
+.cs-log-src-btn.active { background: #1a3a8f; border-color: #1a3a8f; color: #fff; }
+.cs-log-src-btn.active::after { background: rgba(255,255,255,.7); }
+
+.cs-logs-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+.cs-logs-search {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 5px 10px;
+    width: 220px;
+    min-width: 120px;
+}
+.cs-logs-level-sel {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 5px 8px;
+}
+.cs-logs-status-msg { font-size: 12px; color: #64748b; }
+.cs-logs-auto-label { font-size: 12px; color: #64748b; margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+.cs-logs-viewer {
+    background: #0f1117;
+    border-radius: 6px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    margin-top: 12px;
+    max-height: 620px;
+    min-height: 200px;
+    overflow-y: auto;
+    padding: 12px 16px;
+    color: #d4d4d8;
+}
+.cs-logs-placeholder { color: #4b5563; padding: 40px 0; text-align: center; font-family: inherit; }
+.cs-log-line { border-bottom: 1px solid rgba(255,255,255,.04); padding: 2px 0; word-break: break-all; white-space: pre-wrap; }
+.cs-log-line.level-emerg  { color: #ff4d4f; font-weight: 700; }
+.cs-log-line.level-alert  { color: #ff7875; font-weight: 600; }
+.cs-log-line.level-crit   { color: #f87171; }
+.cs-log-line.level-error  { color: #fca5a5; }
+.cs-log-line.level-warn   { color: #fbbf24; }
+.cs-log-line.level-notice { color: #60a5fa; }
+.cs-log-line.level-info   { color: #a3e635; }
+.cs-log-line.level-debug  { color: #6b7280; }
+.cs-log-line.level-default { color: #d4d4d8; }
+
+/* ── Generic notice boxes (used across multiple tabs) ──────────── */
+.cs-notice {
+    border-radius: 6px;
+    font-size: 13px;
+    padding: 10px 14px;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+.cs-notice-warn  { background: #fef3c7; border: 1px solid #f59e0b; color: #78350f; }
+.cs-notice-error { background: #fee2e2; border: 1px solid #f87171; color: #7f1d1d; }
+.cs-notice-info  { background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af; }
+
+.cs-form-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+}
+.cs-text-input {
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 13px;
+    padding: 6px 10px;
+    color: #111827;
+    background: #fff;
+}
+.cs-text-input:focus {
+    outline: none;
+    border-color: #2271b1;
+    box-shadow: 0 0 0 2px rgba(34,113,177,.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Redis Cache Stats tab
+   ═══════════════════════════════════════════════════════════════════ */
+
+.cs-redis-loading {
+    color: #64748b;
+    font-size: 13px;
+    padding: 20px 0;
+}
+.cs-redis-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+.cs-redis-card-wide { grid-column: span 2; }
+@media (max-width: 640px) { .cs-redis-card-wide { grid-column: span 1; } }
+
+.cs-redis-stat-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+.cs-redis-stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 6px;
+}
+.cs-redis-stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.1;
+}
+.cs-redis-stat-value.cs-redis-sm { font-size: 15px; padding-top: 4px; }
+.cs-redis-stat-sub {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+/* Hit rate colours */
+.cs-redis-hit-rate.cs-redis-good { color: #15803d; }
+.cs-redis-hit-rate.cs-redis-warn { color: #b45309; }
+.cs-redis-hit-rate.cs-redis-bad  { color: #dc2626; }
+
+/* Memory progress bar */
+.cs-redis-progress-wrap {
+    background: #e2e8f0;
+    border-radius: 4px;
+    height: 6px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+.cs-redis-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .4s ease;
+}
+.cs-bar-green { background: #22c55e; }
+.cs-bar-amber { background: #f59e0b; }
+.cs-bar-red   { background: #ef4444; }
+
+/* Actions row */
+.cs-redis-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+}
+.cs-btn-danger {
+    background: linear-gradient(135deg, #991b1b, #dc2626);
+    border: none;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: opacity .15s;
+}
+.cs-btn-danger:hover { opacity: .88; }
+.cs-redis-flush-msg {
+    font-size: 12px;
+    color: #64748b;
+    margin-left: 4px;
+}
+.cs-redis-flush-msg.cs-flush-ok  { color: #15803d; font-weight: 600; }
+.cs-redis-flush-msg.cs-flush-err { color: #dc2626; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Plugin Vulnerability Scan tab
+   ═══════════════════════════════════════════════════════════════════ */
+
+.cs-security-key-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.cs-security-scan-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.cs-vuln-inline-msg {
+    display: block;
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 5px;
+}
+.cs-vuln-inline-msg.cs-vuln-msg-ok  { color: #15803d; font-weight: 600; }
+.cs-vuln-inline-msg.cs-vuln-msg-err { color: #dc2626; font-weight: 600; }
+
+/* ── Scan progress bar ───────────────────────────────────────────── */
+.cs-scan-progress {
+    display: none;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+.cs-scan-progress.is-active { display: block; }
+.cs-scan-progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #3b82f6, #6366f1);
+    transition: width 2.8s ease;
+}
+.cs-scan-progress-fill.deep { background: linear-gradient(90deg, #7c3aed, #9333ea); }
+
+/* Summary bar */
+.cs-vuln-summary-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    margin-bottom: 14px;
+}
+.cs-vuln-sum-bad  { color: #dc2626; }
+.cs-vuln-sum-good { color: #15803d; }
+.cs-vuln-sum-warn { color: #b45309; }
+
+/* Clean state */
+.cs-vuln-clean {
+    text-align: center;
+    padding: 40px 20px;
+    font-size: 15px;
+    color: #15803d;
+    font-weight: 600;
+}
+.cs-vuln-clean-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+/* Plugin cards */
+.cs-vuln-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+.cs-vuln-card-alert { border-color: #fca5a5; }
+.cs-vuln-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    flex-wrap: wrap;
+}
+.cs-vuln-card-alert .cs-vuln-card-header { background: #fff5f5; }
+
+.cs-vuln-name    { font-weight: 700; font-size: 13px; color: #1e293b; flex: 1; min-width: 120px; }
+.cs-vuln-version { font-size: 12px; color: #64748b; font-family: monospace; }
+.cs-vuln-outdated-tag { color: #b45309; font-weight: 600; font-family: sans-serif; }
+
+.cs-vuln-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.cs-vuln-badge-danger { background: #fee2e2; color: #dc2626; }
+.cs-vuln-badge-warn   { background: #fef3c7; color: #b45309; }
+.cs-vuln-badge-ok     { background: #dcfce7; color: #15803d; }
+
+/* Vulnerability list inside a card */
+.cs-vuln-list { padding: 8px 14px 12px; }
+.cs-vuln-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+.cs-vuln-item:last-child { border-bottom: none; }
+
+.cs-vuln-sev {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.cs-vuln-sev-critical { background: #7f1d1d; color: #fff; }
+.cs-vuln-sev-high     { background: #dc2626; color: #fff; }
+.cs-vuln-sev-medium   { background: #f59e0b; color: #fff; }
+.cs-vuln-sev-low      { background: #22c55e; color: #fff; }
+.cs-vuln-sev-unknown  { background: #94a3b8; color: #fff; }
+
+.cs-vuln-title { flex: 1; color: #1e293b; min-width: 100px; }
+.cs-vuln-fix   { font-size: 11px; color: #15803d; white-space: nowrap; margin-left: auto; }
+.cs-vuln-no-fix { color: #dc2626 !important; }
+.cs-vuln-ref    {
+    font-size: 11px;
+    color: #2271b1;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.cs-vuln-ref:hover { text-decoration: underline; }
+.cs-vuln-results { margin-top: 4px; }
+
+/* ── Brute-force failed login log ─────────────────────────────────────── */
+.cs-bf-log-wrap {
+    margin-top: 28px;
+    border-top: 1px solid #e8edf5;
+    padding-top: 20px;
+}
+.cs-bf-log-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.cs-bf-log-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a2332;
+}
+.cs-bf-log-total {
+    font-size: 11px;
+    color: #666;
+    background: #f0f4f8;
+    border-radius: 10px;
+    padding: 1px 8px;
+}
+.cs-bf-chart {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    margin-bottom: 16px;
+}
+.cs-bf-day {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.cs-bf-bar-track {
+    width: 100%;
+    height: 70px;
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 1px solid #e8edf5;
+}
+.cs-bf-bar {
+    width: 100%;
+    min-height: 2px;
+    background: #dce3ef;
+    border-radius: 2px 2px 0 0;
+    transition: height .3s;
+    cursor: default;
+}
+.cs-bf-bar-mid  { background: #f0a500; }
+.cs-bf-bar-high { background: #e53e3e; }
+.cs-bf-day-label {
+    font-size: 8px;
+    color: #aaa;
+    margin-top: 4px;
+    text-align: center;
+    white-space: nowrap;
+}
+.cs-bf-table-wrap {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #e8edf5;
+    border-radius: 4px;
+}
+.cs-bf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.cs-bf-th {
+    position: sticky;
+    top: 0;
+    background: #f5f7fb;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: #444;
+    border-bottom: 1px solid #e8edf5;
+}
+.cs-bf-td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #f0f4f8;
+    color: #333;
+    vertical-align: middle;
+}
+.cs-bf-td-time { color: #888; width: 80px; }
+.cs-bf-td-user { font-family: 'Consolas', monospace; font-size: 11px; }
+.cs-bf-td-ip   { color: #555; font-family: 'Consolas', monospace; font-size: 11px; }
+.cs-bf-empty,
+.cs-bf-loading { padding: 16px; color: #aaa; font-size: 12px; text-align: center; }
+
+/* ── Security AI settings panel ───────────────────────────────────────── */
+.cs-sec-settings { display: flex; flex-direction: column; gap: 16px; }
+.cs-sec-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 8px 14px;
+    align-items: start;
+}
+.cs-sec-row-prompt { align-items: start; }
+.cs-sec-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    padding-top: 7px;
+    white-space: nowrap;
+}
+.cs-sec-control { display: flex; flex-direction: column; gap: 4px; }
+.cs-sec-key-input { width: 280px; max-width: 100%; font-family: monospace; font-size: 12px; }
+.cs-sec-select { width: 320px; max-width: 100%; font-size: 12px; }
+.cs-sec-prompt-area {
+    width: 100%;
+    max-width: 680px;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    line-height: 1.55;
+    resize: vertical;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: #1e293b;
+    background: #f8fafc;
+}
+.cs-sec-prompt-area:focus { outline: none; border-color: #6366f1; background: #fff; }
+.cs-sec-key-status { font-size: 12px; font-weight: 600; }
+.cs-sec-key-status.ok  { color: #15803d; }
+.cs-sec-key-status.err { color: #dc2626; }
+.cs-sec-divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
+.cs-hint { font-size: 11px; color: #94a3b8; }
+.cs-hint a { color: #6366f1; text-decoration: none; }
+.cs-hint a:hover { text-decoration: underline; }
+
+/* ── AI Security Audit report ─────────────────────────────────────────── */
+.cs-audit-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 0 20px;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+.cs-audit-score-circle {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 3px solid currentColor;
+}
+.cs-audit-score-num  { font-size: 24px; font-weight: 800; line-height: 1; }
+.cs-audit-score-lbl  { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-top: 1px; }
+.cs-audit-score-excellent { color: #15803d; }
+.cs-audit-score-good      { color: #16a34a; }
+.cs-audit-score-fair      { color: #b45309; }
+.cs-audit-score-poor      { color: #ea580c; }
+.cs-audit-score-critical  { color: #dc2626; }
+
+.cs-audit-meta { flex: 1; }
+.cs-audit-summary-text { font-size: 13px; color: #334155; line-height: 1.6; margin: 0 0 6px; }
+.cs-audit-meta-line { font-size: 11px; color: #94a3b8; }
+
+.cs-audit-section { margin-bottom: 20px; }
+.cs-audit-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 5px 10px;
+    border-radius: 4px 4px 0 0;
+    margin: 0;
+}
+.cs-audit-sec-critical .cs-audit-section-title { background: #7f1d1d; color: #fff; }
+.cs-audit-sec-high     .cs-audit-section-title { background: #dc2626; color: #fff; }
+.cs-audit-sec-medium   .cs-audit-section-title { background: #f59e0b; color: #fff; }
+.cs-audit-sec-low      .cs-audit-section-title { background: #22c55e; color: #fff; }
+.cs-audit-sec-good     .cs-audit-section-title { background: #dcfce7; color: #15803d; }
+
+.cs-audit-issue {
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    padding: 12px 14px;
+    background: #fff;
+}
+.cs-audit-issue + .cs-audit-issue { border-top: 1px solid #f1f5f9; }
+.cs-audit-sec-critical .cs-audit-issue { border-color: #fca5a5; }
+.cs-audit-sec-high     .cs-audit-issue { border-color: #fca5a5; }
+.cs-audit-issue-title  { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+.cs-audit-issue-detail { font-size: 12px; color: #475569; margin-bottom: 6px; line-height: 1.5; }
+.cs-audit-issue-fix {
+    font-size: 12px;
+    color: #15803d;
+    background: #f0fdf4;
+    border-left: 3px solid #4ade80;
+    padding: 6px 10px;
+    border-radius: 0 4px 4px 0;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+.cs-audit-good-item {
+    display: flex;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid #d1fae5;
+    border-top: none;
+    background: #f0fdf4;
+    font-size: 12px;
+    color: #15803d;
+}
+.cs-audit-good-item:first-of-type { border-top: 1px solid #d1fae5; margin-top: 0; }
+.cs-audit-good-check { flex-shrink: 0; }
+.cs-audit-empty { font-size: 12px; color: #94a3b8; padding: 10px 14px; border: 1px solid #e2e8f0; border-top: none; }
+
+/* ── Scan two-column layout ──────────────────────────────────────── */
+.cs-scan-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.cs-scan-col {
+    flex: 1 1 320px;
+    min-width: 280px;
+}
+.cs-scan-col-deep {
+    border-left: 1px solid #e2e8f0;
+    padding-left: 20px;
+}
+@media (max-width: 700px) {
+    .cs-scan-col-deep { border-left: none; padding-left: 0; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+}
+.cs-scan-col-header { margin-bottom: 10px; }
+.cs-scan-col-title  { display: block; font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+.cs-scan-col-hint   { display: block; font-size: 11px; color: #64748b; }
+.cs-btn-deep { background: #6d28d9 !important; border-color: #5b21b6 !important; }
+.cs-btn-deep:hover:not(:disabled) { background: #5b21b6 !important; }

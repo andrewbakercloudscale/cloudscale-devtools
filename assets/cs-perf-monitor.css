@@ -269,16 +269,14 @@
 }
 .cs-perf-btn:hover { background: #3c3c3c; color: #fff; border-color: #777; }
 
-/* Copy + Help buttons — electric pink accent */
-#cs-perf-copy,
+/* Help button */
 .cs-perf-help-btn {
-    background: #ff1493;
-    border-color: #ff1493;
+    background: #2a4a9f;
+    border-color: #2a4a9f;
     color: #fff;
     font-weight: 700;
 }
-#cs-perf-copy:hover,
-.cs-perf-help-btn:hover { background: #ff45a8; border-color: #ff45a8; color: #fff; }
+.cs-perf-help-btn:hover { background: #3558b8; border-color: #3558b8; color: #fff; }
 
 /* ── Panel body ──────────────────────────────────────────────────────────── */
 #cs-perf-body {
@@ -295,8 +293,15 @@
     background: #2d2d30;
     border-bottom: 1px solid #3c3c3c;
     flex-shrink: 0;
-    overflow-x: auto;
+    overflow: hidden;  /* outer never scrolls */
 }
+#cs-ptab-scroll {
+    display: flex;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+#cs-ptab-scroll::-webkit-scrollbar { display: none; }
 .cs-ptab {
     background: none;
     border: none;
@@ -323,6 +328,26 @@
     font-weight: 700;
 }
 .cs-ptab.active span { background: #007acc; color: #fff; }
+
+/* Copy button — always pinned to the right, never scrolls away */
+.cs-ptab-copy {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-left: 1px solid #3c3c3c;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 4px 12px;
+    white-space: nowrap;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: background .15s, color .15s;
+}
+.cs-ptab-copy:hover { background: #3c3c3c; color: #fff; }
 
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
 #cs-perf-filters {
@@ -1312,7 +1337,8 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.cs-issue-arrow { color: #444; font-size: 11px; flex-shrink: 0; }
+.cs-issue-arrow { color: #666; font-size: 11px; flex-shrink: 0; transition: color .1s; }
+.cs-issue-row:hover .cs-issue-arrow { color: #aaa; }
 .cs-issue-detail {
     font-size: 10px;
     color: #777;
@@ -1324,22 +1350,6 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
 }
 
 /* ── Explain / fix panel ─────────────────────────────────────────────────── */
-.cs-fix-btn {
-    flex-shrink: 0;
-    padding: 1px 7px;
-    font-size: 10px;
-    font-weight: 600;
-    background: #2a2d2e;
-    color: #9cdcfe;
-    border: 1px solid #3a3d3e;
-    border-radius: 3px;
-    cursor: pointer;
-    letter-spacing: .02em;
-    line-height: 16px;
-    transition: background .1s, color .1s;
-}
-.cs-fix-btn:hover     { background: #3a3d3e; color: #fff; }
-.cs-fix-btn-active    { background: #1e3a4a; color: #4ec9b0; border-color: #4ec9b0; }
 
 .cs-fix-wrap {
     display: none;

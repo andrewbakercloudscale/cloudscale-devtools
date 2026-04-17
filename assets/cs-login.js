@@ -1,5 +1,5 @@
 /* ===========================================================
-   CloudScale Code Block — Login Security admin JS  v1.9.5
+   CloudScale Code Block — Login Security admin JS  v1.9.10
    Handles: Hide Login save, 2FA site settings save,
             session duration, brute-force protection,
             TOTP setup wizard, email 2FA enable/disable.
@@ -384,6 +384,89 @@
         totpMsg.style.display   = 'block';
         totpMsg.style.color     = ok ? '#1db954' : '#e53e3e';
         totpMsg.style.fontWeight = '600';
+    }
+
+    // ── Failed login log ──────────────────────────────────────────────────
+
+    const bfLogWrap   = document.getElementById( 'cs-bf-log-wrap' );
+    const bfChart     = document.getElementById( 'cs-bf-chart' );
+    const bfTableWrap = document.getElementById( 'cs-bf-table-wrap' );
+    const bfLogTotal  = document.getElementById( 'cs-bf-log-total' );
+
+    function escHtml( s ) {
+        return String( s ).replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' );
+    }
+
+    function fmtAgo( secs ) {
+        if ( secs < 60 )    return 'just now';
+        if ( secs < 3600 )  return Math.floor( secs / 60 ) + 'm ago';
+        if ( secs < 86400 ) return Math.floor( secs / 3600 ) + 'h ago';
+        return Math.floor( secs / 86400 ) + 'd ago';
+    }
+
+    function renderBfChart( log, now ) {
+        if ( ! bfChart ) return;
+        const DAY = 86400;
+        const days = [];
+        for ( let i = 13; i >= 0; i-- ) {
+            const dayStart = ( Math.floor( ( now - i * DAY ) / DAY ) ) * DAY;
+            const dayEnd   = dayStart + DAY;
+            const count    = log.filter( e => e[0] >= dayStart && e[0] < dayEnd ).length;
+            const d        = new Date( dayStart * 1000 );
+            days.push( {
+                label: d.toLocaleDateString( 'en', { month: 'short', day: 'numeric' } ),
+                count,
+            } );
+        }
+        const max = Math.max( 1, ...days.map( d => d.count ) );
+        bfChart.innerHTML = days.map( d => {
+            const pct = Math.round( ( d.count / max ) * 100 );
+            const cls = d.count === 0 ? '' : d.count >= max * 0.75 ? ' cs-bf-bar-high' : d.count >= max * 0.4 ? ' cs-bf-bar-mid' : '';
+            return `<div class="cs-bf-day">
+                <div class="cs-bf-bar-track">
+                    <div class="cs-bf-bar${cls}" style="height:${pct}%" title="${d.count} failed attempt${d.count !== 1 ? 's' : ''}"></div>
+                </div>
+                <div class="cs-bf-day-label">${d.label}</div>
+            </div>`;
+        } ).join( '' );
+    }
+
+    function renderBfTable( log, now ) {
+        if ( ! bfTableWrap ) return;
+        if ( log.length === 0 ) {
+            bfTableWrap.innerHTML = '<div class="cs-bf-empty">No failed login attempts in the last 14 days.</div>';
+            return;
+        }
+        const rows = log.slice().reverse().slice( 0, 200 ).map( e => {
+            const d    = new Date( e[0] * 1000 );
+            const time = d.toLocaleDateString( 'en', { month: 'short', day: 'numeric' } )
+                       + ' ' + d.toLocaleTimeString( 'en', { hour: '2-digit', minute: '2-digit' } );
+            return `<tr>
+                <td class="cs-bf-td cs-bf-td-time" title="${time}">${fmtAgo( now - e[0] )}</td>
+                <td class="cs-bf-td cs-bf-td-user">${escHtml( e[1] || '—' )}</td>
+                <td class="cs-bf-td cs-bf-td-ip">${escHtml( e[2] || '—' )}</td>
+            </tr>`;
+        } ).join( '' );
+        bfTableWrap.innerHTML = `<table class="cs-bf-table">
+            <thead><tr>
+                <th class="cs-bf-th">When</th>
+                <th class="cs-bf-th">Username tried</th>
+                <th class="cs-bf-th">IP address</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    if ( bfLogWrap ) {
+        post( 'csdt_devtools_bf_log_fetch', {} ).then( res => {
+            if ( ! res.success ) return;
+            const { log, now } = res.data;
+            if ( bfLogTotal ) bfLogTotal.textContent = log.length + ' event' + ( log.length !== 1 ? 's' : '' );
+            renderBfChart( log, now );
+            renderBfTable( log, now );
+        } ).catch( () => {
+            if ( bfTableWrap ) bfTableWrap.innerHTML = '<div class="cs-bf-empty">Could not load log.</div>';
+        } );
     }
 
     // ── Slug live preview ─────────────────────────────────────────────────

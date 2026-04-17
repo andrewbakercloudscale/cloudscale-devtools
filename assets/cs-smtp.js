@@ -1,5 +1,5 @@
 /* ===========================================================
-   CloudScale DevTools — Mail / SMTP admin JS  v1.9.0
+   CloudScale DevTools — Mail / SMTP admin JS  v1.9.4
    Handles: SMTP settings save, from-address save, test email.
    =========================================================== */
 ( function () {

@@ -1,5 +1,5 @@
 /* ===========================================================
-   CloudScale DevTools — Thumbnails / Social Preview  v1.9.6
+   CloudScale DevTools — Thumbnails / Social Preview  v1.9.10
    Handles: URL checker, post social scan, Cloudflare
             crawler test, CF cache purge, platform formats.
    =========================================================== */
