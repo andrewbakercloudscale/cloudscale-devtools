@@ -150,6 +150,7 @@
         var age = data.from_cache ? ' · cached ' + timeSince(data.scanned_at) + ' ago' : '';
         var html = '';
 
+        html += '<div style="margin:0 0 14px"><button class="cs-audit-pdf-btn button button-secondary" data-scan-type="' + escHtml(scanType || 'standard') + '">&#8595; Download PDF Report</button></div>';
         html += '<div class="cs-audit-header">';
         html += '<div class="cs-audit-score-circle ' + cls + '">';
         html += '<span class="cs-audit-score-num">' + escHtml(r.score) + '</span>';
@@ -160,7 +161,6 @@
         html += '<span class="cs-audit-meta-line">Model: ' + escHtml(data.model_used || '') + age + '</span>';
         html += '</div>';
         html += '</div>';
-        html += '<div style="margin:10px 0 16px"><button class="cs-audit-pdf-btn button button-secondary" data-scan-type="' + escHtml(scanType || 'standard') + '">&#8595; Download PDF Report</button></div>';
 
         var secs = [
             { key: 'critical', label: 'Critical',       cls: 'cs-audit-sec-critical' },
