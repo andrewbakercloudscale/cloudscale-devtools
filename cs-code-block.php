@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: CloudScale DevTools
+ * Plugin Name: CloudScale Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.26
+ * Version: 1.9.28
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.26';
+    const VERSION      = '1.9.28';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -935,8 +935,8 @@ class CloudScale_DevTools {
 
     public static function add_tools_page() {
         add_management_page(
-            'CloudScale DevTools',
-            '🌩️ CloudScale DevTools',
+            'CloudScale Devtools & Cyber',
+            '🌩️ Devtools & Cyber',
             'manage_options',
             self::TOOLS_SLUG,
             [ __CLASS__, 'render_tools_page' ]
@@ -1160,7 +1160,7 @@ class CloudScale_DevTools {
             <!-- Banner -->
             <div id="cs-banner">
                 <div>
-                    <div id="cs-banner-title">⚡ CloudScale DevTools</div>
+                    <div id="cs-banner-title">⚡ CloudScale Devtools &amp; Cyber</div>
                     <div id="cs-banner-sub"><?php esc_html_e( 'Code blocks, SQL tools, code migrator, site monitor &amp; login security', 'cloudscale-devtools' ); ?> &middot; v<?php echo esc_html( self::VERSION ); ?></div>
                 </div>
                 <div id="cs-banner-right">
@@ -6111,8 +6111,8 @@ class CloudScale_DevTools {
             $mail->addAddress( $to );
             $mail->isHTML( true );
             $mail->CharSet = 'UTF-8';
-            $mail->Subject  = sprintf( '[%s] CloudScale DevTools — SMTP Test', $site );
-            $mail->Body     = '<p>This is a test email from <strong>CloudScale DevTools</strong>.</p>'
+            $mail->Subject  = sprintf( '[%s] CloudScale Devtools — SMTP Test', $site );
+            $mail->Body     = '<p>This is a test email from <strong>CloudScale Devtools</strong>.</p>'
                             . '<p>Your SMTP configuration is working correctly.</p>';
 
             $mail->send();

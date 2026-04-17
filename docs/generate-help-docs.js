@@ -8,9 +8,9 @@ helpLib.run({
     restPass:   process.env.WP_REST_PASS,
     docsDir:    process.env.WP_DOCS_DIR,
 
-    pluginName: 'CloudScale DevTools',
+    pluginName: 'CloudScale Devtools',
     pluginDesc: 'A free WordPress developer toolkit: syntax-highlighted code blocks, read-only SQL query tool, bulk code migrator, hide login URL, two-factor authentication (TOTP, email, passkeys), and a site performance monitor. Everything runs on your server — no external APIs, no subscriptions.',
-    pageTitle:  'CloudScale DevTools',
+    pageTitle:  'CloudScale Devtools',
     pageSlug:   'cloudscale-devtools-help',
     downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
     repoUrl:     'https://github.com/andrewbakercloudscale/cloudscale-devtools',
@@ -30,9 +30,9 @@ helpLib.run({
     docs: {
         'code-block': `
 <div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
-<h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Why CloudScale DevTools?</h2>
+<h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Why CloudScale Devtools?</h2>
 <p style="margin:0 0 10px;">Popular code highlighting plugins like Enlighter and SyntaxHighlighter load external CDN scripts that add 100–300ms to your page load time. Others charge $30–$50/year for features that should come included. Some require you to write custom CSS just to make the output look presentable.</p>
-<p style="margin:0 0 10px;">CloudScale DevTools bundles everything locally — zero external requests, zero impact on your CDN cache hit rate. Auto language detection, clipboard copy button, dark and light theme toggle, and line numbers all work out of the box. It also includes a one-click migrator to import code blocks from other popular plugins.</p>
+<p style="margin:0 0 10px;">CloudScale Devtools bundles everything locally — zero external requests, zero impact on your CDN cache hit rate. Auto language detection, clipboard copy button, dark and light theme toggle, and line numbers all work out of the box. It also includes a one-click migrator to import code blocks from other popular plugins.</p>
 <p style="margin:0;"><strong>Completely free.</strong> No premium version, no nag screens, no feature gating. Use it on as many sites as you want.</p>
 </div>
 <p>The <strong>Code Block</strong> feature is a registered Gutenberg block (<code>cloudscale/code</code>) and a <code>[cs_code]</code> shortcode for displaying syntax-highlighted code in WordPress posts and pages. Syntax highlighting is powered by <strong>highlight.js 11.11.1</strong> loaded from the cdnjs CDN, supporting over 190 languages with auto-detection.</p>
@@ -48,7 +48,7 @@ helpLib.run({
 <li><strong>Copy to clipboard</strong> — uses the Clipboard API (<code>navigator.clipboard.writeText()</code>) with a fallback to <code>document.execCommand('copy')</code> for older browsers.</li>
 <li><strong>Line numbers</strong> — toggle per block. Line numbers are rendered via CSS counter to avoid polluting the copied text when a reader clicks Copy.</li>
 </ul>
-<p><strong>Automatic INI/TOML fragment repair:</strong> When you paste Markdown containing a fenced code block with INI or TOML content, Gutenberg intercepts bare <code>[section]</code> headers on their own line and converts them into <code>core/shortcode</code> blocks, splitting your code block into fragments. CloudScale DevTools detects this automatically and silently merges those fragments back into the preceding code block before you even see the broken state. A brief toast notification confirms when this happens:</p>
+<p><strong>Automatic INI/TOML fragment repair:</strong> When you paste Markdown containing a fenced code block with INI or TOML content, Gutenberg intercepts bare <code>[section]</code> headers on their own line and converts them into <code>core/shortcode</code> blocks, splitting your code block into fragments. CloudScale Devtools detects this automatically and silently merges those fragments back into the preceding code block before you even see the broken state. A brief toast notification confirms when this happens:</p>
 <div style="margin:12px 0 16px;"><span style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#1e3a5f 0%,#0d9488 100%);color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,0.25);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">⚡ Merged 2 split code block fragments back into code block</span></div>
 <p>The merge is conservative — only blocks whose entire content matches a plain section header like <code>[mysql]</code> or <code>[global-settings]</code> are absorbed; real shortcodes like <code>[gallery ids="1,2"]</code> are never touched.</p>
 <p><strong>Requirements:</strong> WordPress 6.0+, PHP 7.4+. The block editor script uses <code>@wordpress/blocks</code> API version available in WordPress 5.8+, but full sidebar panel support requires 6.0.</p>`,
@@ -122,7 +122,7 @@ helpLib.run({
 <p><strong>Testing:</strong> Use the <em>Test</em> button next to each registered passkey to verify it is working correctly without logging out. The test performs a full WebAuthn assertion round-trip and reports success or failure.</p>`,
 
         'migrator': `
-<p>The <strong>Code Block Migrator</strong> converts legacy code block shortcodes and HTML from other WordPress syntax highlighting plugins to CloudScale DevTools blocks in a single batch operation — without manual copy-paste or post-by-post editing.</p>
+<p>The <strong>Code Block Migrator</strong> converts legacy code block shortcodes and HTML from other WordPress syntax highlighting plugins to CloudScale Devtools blocks in a single batch operation — without manual copy-paste or post-by-post editing.</p>
 <p><strong>Supported source formats:</strong></p>
 <ul>
 <li>WordPress core <code>&lt;!-- wp:code --&gt;</code> blocks — preserves language class attributes where present.</li>

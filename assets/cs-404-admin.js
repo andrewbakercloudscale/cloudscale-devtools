@@ -1,5 +1,5 @@
 /**
- * CloudScale DevTools — 404 Games admin panel JS.
+ * CloudScale Devtools — 404 Games admin panel JS.
  *
  * Handles the enable toggle and colour scheme picker.
  * Depends on csdtDevtools404 (ajaxUrl, nonce, custom_404, scheme, previewUrl) localised by PHP.
