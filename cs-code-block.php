@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.22
+ * Version: 1.9.23
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.22';
+    const VERSION      = '1.9.23';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -8418,6 +8418,28 @@ class CloudScale_DevTools {
         }
     }
 
+    // ── Background execution helper ──────────────────────────────────
+
+    private static function send_json_and_continue( array $data ): void {
+        if ( function_exists( 'set_time_limit' ) ) {
+            set_time_limit( 0 );
+        }
+        // Discard any output buffers so headers can be sent cleanly
+        while ( ob_get_level() ) {
+            ob_end_clean();
+        }
+        header( 'Content-Type: application/json; charset=utf-8' );
+        header( 'Connection: close' );
+        $body = wp_json_encode( [ 'success' => true, 'data' => $data ] );
+        header( 'Content-Length: ' . strlen( $body ) );
+        echo $body;
+        flush();
+        // On PHP-FPM: close the HTTP connection but keep the process running
+        if ( function_exists( 'fastcgi_finish_request' ) ) {
+            fastcgi_finish_request();
+        }
+    }
+
     // ── AI dispatcher — Anthropic or Gemini ──────────────────────────
 
     private static function dispatch_ai_call( string $system, string $user_message, string $model, int $max_tokens ): string {
@@ -8498,8 +8520,12 @@ class CloudScale_DevTools {
             return;
         }
 
-        if ( ! get_option( 'csdt_devtools_anthropic_key', '' ) ) {
-            wp_send_json_error( [ 'message' => 'No Anthropic API key configured.', 'need_key' => true ] );
+        $provider = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
+        $has_key  = $provider === 'gemini'
+            ? ! empty( get_option( 'csdt_devtools_gemini_key', '' ) )
+            : ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) );
+        if ( ! $has_key ) {
+            wp_send_json_error( [ 'message' => 'No API key configured.', 'need_key' => true ] );
             return;
         }
 
@@ -8507,11 +8533,10 @@ class CloudScale_DevTools {
         delete_transient( 'csdt_security_scan_v2' );
         set_transient( 'csdt_vuln_scan_status', [ 'status' => 'running', 'started_at' => time() ], 600 );
 
-        // Schedule cron and spawn immediately
-        wp_schedule_single_event( time(), 'csdt_devtools_run_vuln_scan' );
-        spawn_cron();
-
-        wp_send_json_success( [ 'queued' => true ] );
+        // Send response immediately, then run scan after connection closes
+        self::send_json_and_continue( [ 'queued' => true ] );
+        self::cron_vuln_scan();
+        exit;
     }
 
     public static function cron_vuln_scan(): void {
@@ -8850,8 +8875,12 @@ PROMPT;
             return;
         }
 
-        if ( ! get_option( 'csdt_devtools_anthropic_key', '' ) ) {
-            wp_send_json_error( [ 'message' => 'No Anthropic API key configured.', 'need_key' => true ] );
+        $provider = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
+        $has_key  = $provider === 'gemini'
+            ? ! empty( get_option( 'csdt_devtools_gemini_key', '' ) )
+            : ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) );
+        if ( ! $has_key ) {
+            wp_send_json_error( [ 'message' => 'No API key configured.', 'need_key' => true ] );
             return;
         }
 
@@ -8859,11 +8888,10 @@ PROMPT;
         delete_transient( 'csdt_deep_scan_v1' );
         set_transient( 'csdt_deep_scan_status', [ 'status' => 'running', 'started_at' => time() ], 900 );
 
-        // Schedule cron and spawn immediately
-        wp_schedule_single_event( time(), 'csdt_devtools_run_deep_scan' );
-        spawn_cron();
-
-        wp_send_json_success( [ 'queued' => true ] );
+        // Send response immediately, then run scan after connection closes
+        self::send_json_and_continue( [ 'queued' => true ] );
+        self::cron_deep_scan();
+        exit;
     }
 
     public static function cron_deep_scan(): void {
