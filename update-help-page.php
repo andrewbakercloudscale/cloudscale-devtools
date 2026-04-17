@@ -46,7 +46,7 @@ $content = <<<'HTML'
 <div class="cs-hero">
 <a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
 <h1>CloudScale DevTools</h1>
-<p>A free WordPress developer toolkit: syntax-highlighted code blocks, social preview &amp; thumbnail diagnostics, read-only SQL query tool, bulk code migrator, performance monitor, login security (hide URL, 2FA, passkeys, brute-force protection), SMTP mail, and a custom 404 page with mini-games. Everything runs on your server — no external APIs, no subscriptions.</p>
+<p>A free WordPress developer toolkit: syntax-highlighted code blocks, social preview &amp; thumbnail diagnostics, read-only SQL query tool, bulk code migrator, performance monitor, login security (hide URL, 2FA, passkeys, brute-force protection), AI security audit, SMTP mail, and a custom 404 page with mini-games. Core features run entirely on your server. The optional AI Security Audit uses your choice of AI provider (Anthropic Claude or Google Gemini) — bring your own API key.</p>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;">
 <a class="cs-download-btn" href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">&#11015; Download Latest Version (.zip)</a>
 <a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a>
@@ -64,6 +64,7 @@ $content = <<<'HTML'
 <li><a href="#2fa">Two-Factor Auth</a></li>
 <li><a href="#passkeys">Passkeys (WebAuthn)</a></li>
 <li><a href="#brute-force">Brute Force Protection</a></li>
+<li><a href="#ai-security">AI Security Audit</a></li>
 <li><a href="#smtp">SMTP / Mail</a></li>
 <li><a href="#thumbnails">Social Preview &amp; Thumbnails</a></li>
 <li><a href="#custom-404">Custom 404 Page</a></li>
@@ -227,6 +228,43 @@ $content = <<<'HTML'
 </ul>
 <p>Failed attempts and lockout state are stored as WordPress transients — no extra database tables. Lockouts clear automatically when the transient expires. Successful logins reset the counter.</p>
 <p><strong>Works alongside 2FA:</strong> Brute force protection fires at the password stage, before any 2FA challenge. An attacker cannot reach the 2FA prompt if they have already been locked out.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ AI SECURITY AUDIT ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="ai-security">AI Security Audit</h3>
+<div class="cs-panel-body">
+<p>The <strong>AI Security Audit</strong> tab (Tools → CloudScale DevTools → Security) uses a large language model to analyse your WordPress configuration and flag security issues with remediation guidance. Two scan types are available:</p>
+
+<h4 class="cs-sub-heading">Internal Config Audit</h4>
+<p>Collects server-side data — active plugins, PHP version, WordPress version, file permissions, exposed debug settings, user roles, and key <code>wp-config.php</code> flags — then sends it to the AI for analysis. Results are scored and grouped into <strong>Critical</strong>, <strong>High</strong>, <strong>Medium</strong>, <strong>Low</strong>, and <strong>Good</strong> findings, each with a plain-English explanation and a step-by-step fix.</p>
+
+<h4 class="cs-sub-heading">Cyber Deep Dive</h4>
+<p>Extends the internal audit with external checks: HTTP security headers (CSP, HSTS, X-Frame-Options, etc.), public endpoint exposure (<code>/wp-json/</code>, XML-RPC, <code>/wp-cron.php</code>), active plugin code review for known vulnerability patterns, and admin-area reconnaissance. Results follow the same scored format as the Internal Config Audit.</p>
+
+<h4 class="cs-sub-heading">AI Providers</h4>
+<p>The audit supports two AI providers. Select your preferred provider and enter your API key on the Security tab settings panel:</p>
+<ul>
+<li><strong>Anthropic Claude</strong> — uses the Claude API (<code>api.anthropic.com</code>). Get an API key at <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>. Default models: Claude Sonnet 4.6 (standard scan), Claude Opus 4.7 (deep dive).</li>
+<li><strong>Google Gemini</strong> — uses the Gemini API (<code>generativelanguage.googleapis.com</code>). Get an API key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Default models: Gemini 2.0 Flash (standard scan), Gemini 2.5 Pro (deep dive). A free tier is available.</li>
+</ul>
+<p>You can customise the model selection and edit the system prompt directly in the settings panel to tune the analysis for your environment.</p>
+
+<h4 class="cs-sub-heading">How Scans Run (No Timeout Risk)</h4>
+<p>Scans can take 30–120 seconds. To avoid HTTP gateway timeouts, CloudScale DevTools uses <code>fastcgi_finish_request()</code> to close the browser connection immediately after the scan starts, then continues running the analysis in the same PHP-FPM worker in the background. A progress bar updates every 3 seconds via polling until the result is ready. This approach does <strong>not</strong> depend on WP Cron — <code>DISABLE_WP_CRON</code> and cron configuration have no effect on the scan.</p>
+
+<h4 class="cs-sub-heading">External Services Used</h4>
+<p>When a scan runs, the following external requests are made:</p>
+<ul>
+<li><strong>AI provider API</strong> — scan data (plugin list, PHP config, headers, etc.) is sent to the Anthropic or Gemini API for analysis. No personally identifiable user data is included. Review each provider's privacy policy: <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google</a>.</li>
+<li><strong>Your own site (deep dive only)</strong> — the plugin makes HTTP requests to your own site's public URLs to check security headers and endpoint exposure. No data leaves your server other than the final summary sent to the AI.</li>
+</ul>
+<p>API keys are stored in <code>wp_options</code> and never exposed to the browser. The Security tab displays a masked version of the stored key.</p>
+
+<h4 class="cs-sub-heading">Access Control</h4>
+<p>The Security tab requires the <code>manage_options</code> capability (administrators only). The AJAX endpoints are protected by nonce verification and capability checks.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
