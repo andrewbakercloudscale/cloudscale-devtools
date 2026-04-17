@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.24
+ * Version: 1.9.25
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.24';
+    const VERSION      = '1.9.25';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -229,6 +229,7 @@ class CloudScale_DevTools {
         self::maybe_migrate_prefix();
         self::maybe_migrate_smtp_prefix();
         self::maybe_migrate_usermeta_prefix();
+        add_filter( 'xmlrpc_enabled', '__return_false' );
         add_action( 'init', [ __CLASS__, 'load_textdomain' ] );
         add_action( 'init', [ __CLASS__, 'register_block' ] );
         add_action( 'init', [ __CLASS__, 'register_shortcode' ] );
@@ -8178,7 +8179,7 @@ class CloudScale_DevTools {
                 'url'              => home_url( '/' ),
                 'is_https'         => is_ssl(),
                 'login_url_hidden' => get_option( 'csdt_devtools_login_hide_enabled', '0' ) === '1',
-                'xmlrpc_exists'    => file_exists( ABSPATH . 'xmlrpc.php' ),
+                'xmlrpc_exists'    => file_exists( ABSPATH . 'xmlrpc.php' ) && (bool) apply_filters( 'xmlrpc_enabled', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
             ],
             'security_features' => [
                 'brute_force_enabled'  => get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1',
