@@ -46,7 +46,7 @@ $content = <<<'HTML'
 <div class="cs-hero">
 <a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
 <h1>CloudScale Devtools &amp; Cyber</h1>
-<p>A free WordPress developer toolkit: syntax-highlighted code blocks, social preview &amp; thumbnail diagnostics, read-only SQL query tool, bulk code migrator, performance monitor, login security (hide URL, 2FA, passkeys, brute-force protection), AI security audit, SMTP mail, and a custom 404 page with mini-games. Core features run entirely on your server. The optional AI Security Audit uses your choice of AI provider (Anthropic Claude or Google Gemini) — bring your own API key.</p>
+<p>A free WordPress developer toolkit with <strong>enterprise-grade AI security scanning built in</strong>. The <strong>AI Cyber Audit</strong> uses frontier AI models (Anthropic Claude or Google Gemini) to perform deep security analysis of your WordPress installation — hardening checks, live HTTP header inspection, endpoint exposure, plugin code vulnerability review, user account risks, and more — delivering scored findings with step-by-step remediation. Bring your own API key and run the kind of security analysis that would normally cost hundreds of dollars, in under 60 seconds. Also includes: syntax-highlighted code blocks, social preview diagnostics, read-only SQL tool, bulk code migrator, login security (passkeys, TOTP, 2FA, hide URL, brute-force protection), SMTP mail, performance monitor, and a custom 404 page with mini-games.</p>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;">
 <a class="cs-download-btn" href="https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">&#11015; Download Latest Version (.zip)</a>
 <a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a>
@@ -58,16 +58,16 @@ $content = <<<'HTML'
 <ol>
 <li><a href="#code-block">Code Block</a></li>
 <li><a href="#migrator">Code Block Migrator</a></li>
-<li><a href="#sql-tool">SQL Query Tool</a></li>
-<li><a href="#perf-monitor">Performance Monitor</a></li>
 <li><a href="#hide-login">Hide Login URL</a></li>
 <li><a href="#2fa">Two-Factor Auth</a></li>
 <li><a href="#passkeys">Passkeys (WebAuthn)</a></li>
 <li><a href="#brute-force">Brute Force Protection</a></li>
-<li><a href="#ai-security">AI Security Audit</a></li>
+<li><a href="#ai-security">AI Cyber Audit</a></li>
 <li><a href="#smtp">SMTP / Mail</a></li>
 <li><a href="#thumbnails">Social Preview &amp; Thumbnails</a></li>
+<li><a href="#sql-tool">SQL Query Tool</a></li>
 <li><a href="#custom-404">Custom 404 Page</a></li>
+<li><a href="#perf-monitor">Performance Monitor</a></li>
 </ol>
 </div>
 
@@ -122,41 +122,6 @@ $content = <<<'HTML'
 <li><strong>Migrate all</strong> — processes every remaining post in a single AJAX request. For large sites (&gt;500 posts), run during low-traffic periods.</li>
 </ol>
 <p><strong>Always take a backup before running the migrator.</strong> The conversion modifies <code>post_content</code> directly in the database and there is no undo.</p>
-</div>
-</div>
-<hr class="cs-divider"/>
-
-<!-- ═══ SQL TOOL ═══ -->
-<div class="cs-panel-section">
-<h3 class="cs-panel-heading" id="sql-tool">SQL Query Tool</h3>
-<figure class="cs-screenshot"><img decoding="async" src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-sql-tool-5.jpg" alt="SQL Query Tool" /></figure>
-<div class="cs-panel-body">
-<p>The <strong>SQL Query Tool</strong> lets administrators run read-only SELECT queries against the live database from within wp-admin — no phpMyAdmin or SSH required. Results display in a paginated table with column headers and query execution time.</p>
-<p><strong>Security model:</strong> Access requires <code>manage_options</code>. Every query is validated before execution: block/line comments are stripped, semicolons are rejected, <code>INTO OUTFILE</code>/<code>LOAD_FILE</code> are blocked, and only <code>SELECT</code>, <code>SHOW</code>, <code>DESCRIBE</code>, <code>DESC</code>, and <code>EXPLAIN</code> are permitted.</p>
-<p><strong>14 built-in quick queries</strong> in four groups: Health &amp; Diagnostics, Content Summary, Bloat &amp; Cleanup, and URL &amp; Migration Helpers.</p>
-<p><strong>Keyboard shortcuts:</strong> <kbd>Enter</kbd> or <kbd>Ctrl+Enter</kbd> runs the query. <kbd>Shift+Enter</kbd> inserts a newline.</p>
-</div>
-</div>
-<hr class="cs-divider"/>
-
-<!-- ═══ PERFORMANCE MONITOR ═══ -->
-<div class="cs-panel-section">
-<h3 class="cs-panel-heading" id="perf-monitor">Performance Monitor</h3>
-<div class="cs-panel-body">
-<p>The <strong>Performance Monitor</strong> is a non-intrusive profiling panel that overlays on every wp-admin screen and frontend page (for logged-in administrators). It collects data in real time without storing anything to the database.</p>
-<p><strong>What it tracks:</strong></p>
-<ul>
-<li><strong>Database queries</strong> — every query with timing, call-chain trace, and the originating plugin/theme file.</li>
-<li><strong>N+1 detection</strong> — highlights patterns where similar queries fire repeatedly in a loop.</li>
-<li><strong>EXPLAIN analysis</strong> — click any SELECT query to run <code>EXPLAIN</code> inline and see whether it's using indexes.</li>
-<li><strong>HTTP requests</strong> — tracks <code>wp_remote_get/post</code> calls with URL and response time.</li>
-<li><strong>PHP errors</strong> — captures notices, warnings, and fatal errors with file and line number.</li>
-<li><strong>Hook profiler</strong> — lists all fired actions and filters with timing.</li>
-<li><strong>Asset inventory</strong> — scripts and stylesheets enqueued for the current page load.</li>
-<li><strong>Transient activity</strong> — set and delete operations on transients.</li>
-<li><strong>Template hierarchy</strong> — the chain of template files WordPress evaluated to render the page.</li>
-</ul>
-<p>The panel is enabled by default. You can disable it under Tools → CloudScale Devtools → Settings. Data is colour-coded by severity and can be exported as JSON for sharing with developers.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
@@ -232,17 +197,21 @@ $content = <<<'HTML'
 </div>
 <hr class="cs-divider"/>
 
-<!-- ═══ AI SECURITY AUDIT ═══ -->
+<!-- ═══ AI CYBER AUDIT ═══ -->
 <div class="cs-panel-section">
-<h3 class="cs-panel-heading" id="ai-security">AI Security Audit</h3>
+<h3 class="cs-panel-heading" id="ai-security">AI Cyber Audit</h3>
 <div class="cs-panel-body">
-<p>The <strong>AI Security Audit</strong> tab (Tools → CloudScale Devtools → Security) uses a large language model to analyse your WordPress configuration and flag security issues with remediation guidance. Two scan types are available:</p>
+<div style="background:#fdf4ff;border-left:4px solid #7c3aed;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<p style="margin:0 0 8px;"><strong>🛡️ Enterprise-grade security analysis — free, in under 60 seconds.</strong> The AI Cyber Audit submits your WordPress environment to a frontier AI model (Claude or Gemini) which analyses it like an expert penetration tester: cross-referencing configuration decisions, live HTTP responses, exposed endpoints, and plugin code to find real vulnerabilities — not just checklist items.</p>
+<p style="margin:0;">Results are scored <strong>Critical / High / Medium / Low / Good</strong>, each with a plain-English explanation and a concrete step-by-step remediation — the same quality you'd expect from a paid security consultant.</p>
+</div>
+<p>Access the audit at <strong>Tools → CloudScale Devtools → Security tab</strong>. Two scan modes are available:</p>
 
-<h4 class="cs-sub-heading">Internal Config Audit</h4>
-<p>Collects server-side data — active plugins, PHP version, WordPress version, file permissions, exposed debug settings, user roles, and key <code>wp-config.php</code> flags — then sends it to the AI for analysis. Results are scored and grouped into <strong>Critical</strong>, <strong>High</strong>, <strong>Medium</strong>, <strong>Low</strong>, and <strong>Good</strong> findings, each with a plain-English explanation and a step-by-step fix.</p>
+<h4 class="cs-sub-heading">Run AI Cyber Audit</h4>
+<p>The fast scan. Collects server-side configuration — active plugins, PHP/WordPress/MySQL versions, file permissions, exposed debug flags, user accounts and roles, 2FA coverage, brute-force settings, and key <code>wp-config.php</code> hardening constants — and runs AI analysis in ~15–30 seconds.</p>
 
-<h4 class="cs-sub-heading">Cyber Deep Dive</h4>
-<p>Extends the internal audit with external checks: HTTP security headers (CSP, HSTS, X-Frame-Options, etc.), public endpoint exposure (<code>/wp-json/</code>, XML-RPC, <code>/wp-cron.php</code>), active plugin code review for known vulnerability patterns, and admin-area reconnaissance. Results follow the same scored format as the Internal Config Audit.</p>
+<h4 class="cs-sub-heading">Run AI Deep Dive Cyber Audit</h4>
+<p>The comprehensive scan. Extends the fast scan with live external checks run concurrently via parallel AI calls: HTTP security headers (CSP, HSTS, X-Frame-Options, Permissions-Policy), public endpoint exposure (<code>/wp-json/</code> user enumeration, XML-RPC, <code>/wp-cron.php</code>, directory listing), SSL/TLS certificate validity, login URL obfuscation, and static analysis of active plugin PHP code for known vulnerability patterns. Results are merged and weighted (internal config 45%, external exposure 55%) into a single scored report. Typically completes in 30–60 seconds.</p>
 
 <h4 class="cs-sub-heading">AI Providers</h4>
 <p>The audit supports two AI providers. Select your preferred provider and enter your API key on the Security tab settings panel:</p>
@@ -341,6 +310,41 @@ $content = <<<'HTML'
 
 <h4 class="cs-sub-heading">Leaderboard</h4>
 <p>Each game maintains a per-browser high score via <code>localStorage</code>. A site-wide leaderboard syncs scores to the server so visitors can compete across sessions and devices.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ SQL TOOL ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="sql-tool">SQL Query Tool</h3>
+<figure class="cs-screenshot"><img decoding="async" src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-sql-tool-5.jpg" alt="SQL Query Tool" /></figure>
+<div class="cs-panel-body">
+<p>The <strong>SQL Query Tool</strong> lets administrators run read-only SELECT queries against the live database from within wp-admin — no phpMyAdmin or SSH required. Results display in a paginated table with column headers and query execution time.</p>
+<p><strong>Security model:</strong> Access requires <code>manage_options</code>. Every query is validated before execution: block/line comments are stripped, semicolons are rejected, <code>INTO OUTFILE</code>/<code>LOAD_FILE</code> are blocked, and only <code>SELECT</code>, <code>SHOW</code>, <code>DESCRIBE</code>, <code>DESC</code>, and <code>EXPLAIN</code> are permitted.</p>
+<p><strong>14 built-in quick queries</strong> in four groups: Health &amp; Diagnostics, Content Summary, Bloat &amp; Cleanup, and URL &amp; Migration Helpers.</p>
+<p><strong>Keyboard shortcuts:</strong> <kbd>Enter</kbd> or <kbd>Ctrl+Enter</kbd> runs the query. <kbd>Shift+Enter</kbd> inserts a newline.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ PERFORMANCE MONITOR ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="perf-monitor">Performance Monitor</h3>
+<div class="cs-panel-body">
+<p>The <strong>Performance Monitor</strong> is a non-intrusive profiling panel that overlays on every wp-admin screen and frontend page (for logged-in administrators). It collects data in real time without storing anything to the database.</p>
+<p><strong>What it tracks:</strong></p>
+<ul>
+<li><strong>Database queries</strong> — every query with timing, call-chain trace, and the originating plugin/theme file.</li>
+<li><strong>N+1 detection</strong> — highlights patterns where similar queries fire repeatedly in a loop.</li>
+<li><strong>EXPLAIN analysis</strong> — click any SELECT query to run <code>EXPLAIN</code> inline and see whether it's using indexes.</li>
+<li><strong>HTTP requests</strong> — tracks <code>wp_remote_get/post</code> calls with URL and response time.</li>
+<li><strong>PHP errors</strong> — captures notices, warnings, and fatal errors with file and line number.</li>
+<li><strong>Hook profiler</strong> — lists all fired actions and filters with timing.</li>
+<li><strong>Asset inventory</strong> — scripts and stylesheets enqueued for the current page load.</li>
+<li><strong>Transient activity</strong> — set and delete operations on transients.</li>
+<li><strong>Template hierarchy</strong> — the chain of template files WordPress evaluated to render the page.</li>
+</ul>
+<p>The panel is enabled by default. You can disable it under Tools → CloudScale Devtools → Settings. Data is colour-coded by severity and can be exported as JSON for sharing with developers.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
