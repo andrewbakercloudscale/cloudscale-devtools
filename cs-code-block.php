@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.85
+ * Version: 1.9.86
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.85';
+    const VERSION      = '1.9.86';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -257,6 +257,7 @@ class CloudScale_DevTools {
         add_action( 'init', [ __CLASS__, 'register_shortcode' ] );
         add_action( 'enqueue_block_editor_assets', [ __CLASS__, 'enqueue_convert_script' ] );
         add_action( 'admin_menu', [ __CLASS__, 'add_tools_page' ] );
+        add_action( 'wp_dashboard_setup', [ __CLASS__, 'register_dashboard_widget' ] );
         add_action( 'admin_init', [ __CLASS__, 'register_settings' ] );
         add_action( 'admin_init',       [ __CLASS__, 'redirect_legacy_slug' ] );
         add_action( 'init', [ __CLASS__, 'redirect_legacy_help_url' ], 1 );
@@ -8850,6 +8851,90 @@ class CloudScale_DevTools {
                 'fix_label' => 'Move Outside Web Root',
             ],
         ];
+    }
+
+    public static function register_dashboard_widget(): void {
+        if ( ! current_user_can( 'manage_options' ) ) { return; }
+        wp_add_dashboard_widget(
+            'csdt_security_summary',
+            '🤖 CloudScale Cyber and Devtools',
+            [ __CLASS__, 'render_dashboard_widget' ]
+        );
+    }
+
+    public static function render_dashboard_widget(): void {
+        $ai_provider   = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
+        $anthropic_key = get_option( 'csdt_devtools_anthropic_key', '' );
+        $gemini_key    = get_option( 'csdt_devtools_gemini_key', '' );
+        $has_key       = $ai_provider === 'gemini' ? ! empty( $gemini_key ) : ! empty( $anthropic_key );
+        $provider_lbl  = $ai_provider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude';
+
+        $history   = get_option( 'csdt_scan_history', [] );
+        $last_scan = ! empty( $history ) ? $history[0] : null;
+        $score_cls = '#888';
+        if ( $last_scan ) {
+            $s = (int) ( $last_scan['score'] ?? 0 );
+            $score_cls = $s >= 75 ? '#16a34a' : ( $s >= 55 ? '#d97706' : '#dc2626' );
+        }
+
+        $fixes      = self::get_quick_fixes();
+        $fixes_tot  = count( $fixes );
+        $fixes_done = count( array_filter( $fixes, function ( $f ) { return ! empty( $f['fixed'] ); } ) );
+
+        $base_url = admin_url( 'tools.php?page=cloudscale-devtools' );
+        ?>
+        <style>
+        #csdt_security_summary .cs-dw-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}
+        #csdt_security_summary .cs-dw-row:last-child{border-bottom:none;}
+        #csdt_security_summary .cs-dw-lbl{color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+        #csdt_security_summary .cs-dw-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;padding:12px 0 6px;border-bottom:2px solid #e5e7eb;margin-bottom:4px;}
+        #csdt_security_summary .cs-dw-actions{margin-top:14px;display:flex;gap:8px;}
+        #csdt_security_summary .cs-dw-actions a{flex:1;text-align:center;padding:7px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;}
+        #csdt_security_summary .cs-dw-btn-pri{background:#0e6b8f;color:#fff!important;}
+        #csdt_security_summary .cs-dw-btn-sec{background:#f1f5f9;color:#1e293b!important;border:1px solid #e2e8f0;}
+        </style>
+
+        <div class="cs-dw-section">🤖 <?php esc_html_e( 'AI Security', 'cloudscale-devtools' ); ?></div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'STATUS', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo $has_key ? '#16a34a' : '#dc2626'; ?>;font-weight:600;">
+                <?php echo $has_key ? '✅ ' . esc_html( $provider_lbl ) : '⚠️ ' . esc_html__( 'API key not set', 'cloudscale-devtools' ); ?>
+            </span>
+        </div>
+
+        <div class="cs-dw-section" style="margin-top:10px;">🛡️ <?php esc_html_e( 'Last Security Scan', 'cloudscale-devtools' ); ?></div>
+        <?php if ( $last_scan ) : ?>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'SCORE', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo esc_attr( $score_cls ); ?>;font-weight:600;"><?php echo esc_html( ( $last_scan['score_label'] ?? '' ) . ' · ' . ( $last_scan['score'] ?? '' ) ); ?></span>
+        </div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'CRITICAL', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo (int) ( $last_scan['critical_count'] ?? 0 ) > 0 ? '#dc2626' : '#16a34a'; ?>;font-weight:600;"><?php echo (int) ( $last_scan['critical_count'] ?? 0 ); ?></span>
+        </div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'HIGH', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo (int) ( $last_scan['high_count'] ?? 0 ) > 0 ? '#d97706' : '#16a34a'; ?>;font-weight:600;"><?php echo (int) ( $last_scan['high_count'] ?? 0 ); ?></span>
+        </div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'SCANNED', 'cloudscale-devtools' ); ?></span>
+            <span style="color:#888;"><?php echo esc_html( human_time_diff( (int) ( $last_scan['scanned_at'] ?? 0 ) ) . ' ' . __( 'ago', 'cloudscale-devtools' ) ); ?></span>
+        </div>
+        <?php else : ?>
+        <div class="cs-dw-row"><span style="color:#94a3b8;"><?php esc_html_e( 'No scans run yet', 'cloudscale-devtools' ); ?></span></div>
+        <?php endif; ?>
+
+        <div class="cs-dw-section" style="margin-top:10px;">⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'RESOLVED', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo $fixes_done === $fixes_tot ? '#16a34a' : '#d97706'; ?>;font-weight:600;"><?php echo esc_html( $fixes_done . ' / ' . $fixes_tot ); ?></span>
+        </div>
+
+        <div class="cs-dw-actions">
+            <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" class="cs-dw-btn-pri"><?php esc_html_e( 'Run Security Scan', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $base_url ); ?>" class="cs-dw-btn-sec"><?php esc_html_e( 'Open Plugin', 'cloudscale-devtools' ); ?></a>
+        </div>
+        <?php
     }
 
     private static function render_home_panel(): void {
