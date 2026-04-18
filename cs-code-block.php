@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.104
+ * Version: 1.9.105
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.104';
+    const VERSION      = '1.9.105';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -8814,15 +8814,20 @@ class CloudScale_DevTools {
                 'fix_label' => 'Disable Registration',
             ],
             [
-                'id'        => 'disable_app_passwords',
-                'title'     => 'Application passwords enabled',
-                'detail'    => get_option( 'csdt_devtools_test_accounts_enabled', '0' ) === '1'
+                'id'           => 'disable_app_passwords',
+                'title'        => 'Application passwords enabled',
+                'detail'       => get_option( 'csdt_devtools_test_accounts_enabled', '0' ) === '1'
                     ? 'App passwords are required for the Test Account Manager feature and are intentionally enabled.'
-                    : 'App passwords allow REST API authentication and can bypass two-factor authentication. Disable unless needed.',
-                'fixed'     => get_option( 'csdt_devtools_disable_app_passwords', '0' ) === '1'
+                    : ( get_option( 'csdt_devtools_app_pw_2fa_ack', '0' ) === '1'
+                        ? 'App passwords are intentionally enabled — 2FA is active and REST API use is authorised.'
+                        : 'App passwords allow REST API authentication and can bypass two-factor authentication. Disable unless needed.' ),
+                'fixed'        => get_option( 'csdt_devtools_disable_app_passwords', '0' ) === '1'
                               || ! $app_pw_available
-                              || get_option( 'csdt_devtools_test_accounts_enabled', '0' ) === '1',
-                'fix_label' => 'Disable App Passwords',
+                              || get_option( 'csdt_devtools_test_accounts_enabled', '0' ) === '1'
+                              || get_option( 'csdt_devtools_app_pw_2fa_ack', '0' ) === '1',
+                'fix_label'    => 'Disable App Passwords',
+                'dismiss_label'=> 'Using with 2FA',
+                'dismiss_id'   => 'app_pw_2fa_ack',
             ],
             [
                 'id'        => 'hide_wp_version',
@@ -8852,11 +8857,16 @@ class CloudScale_DevTools {
                 'fix_label' => 'Set to 0600',
             ],
             [
-                'id'        => 'security_headers',
-                'title'     => 'Security headers not set',
-                'detail'    => 'X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy are missing. These prevent MIME sniffing, clickjacking, and referrer leakage.',
-                'fixed'     => ( function () {
+                'id'           => 'security_headers',
+                'title'        => 'Security headers not set',
+                'detail'       => get_option( 'csdt_devtools_sec_headers_ack', '0' ) === '1'
+                    ? 'Security headers are confirmed set externally (Cloudflare, nginx, or CDN).'
+                    : 'X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy are missing. These prevent MIME sniffing, clickjacking, and referrer leakage.',
+                'fixed'        => ( function () {
                     if ( get_option( 'csdt_devtools_safe_headers_enabled', '0' ) === '1' ) {
+                        return true;
+                    }
+                    if ( get_option( 'csdt_devtools_sec_headers_ack', '0' ) === '1' ) {
                         return true;
                     }
                     $cached = get_transient( 'csdt_sec_headers_check' );
@@ -8873,7 +8883,9 @@ class CloudScale_DevTools {
                     set_transient( 'csdt_sec_headers_check', $all_set ? '1' : '0', 300 );
                     return $all_set;
                 } )(),
-                'fix_label' => 'Enable Headers',
+                'fix_label'    => 'Enable Headers',
+                'dismiss_label'=> 'Set Externally',
+                'dismiss_id'   => 'security_headers_ack',
             ],
             [
                 'id'        => 'block_debug_log',
@@ -10009,6 +10021,14 @@ class CloudScale_DevTools {
         switch ( $fix_id ) {
             case 'security_headers':
                 update_option( 'csdt_devtools_safe_headers_enabled', '1' );
+                delete_transient( 'csdt_sec_headers_check' );
+                break;
+            case 'security_headers_ack':
+                update_option( 'csdt_devtools_sec_headers_ack', '1' );
+                delete_transient( 'csdt_sec_headers_check' );
+                break;
+            case 'app_pw_2fa_ack':
+                update_option( 'csdt_devtools_app_pw_2fa_ack', '1' );
                 break;
             case 'disable_pingbacks':
                 update_option( 'default_ping_status',   'closed' );
