@@ -238,6 +238,41 @@
             html += '</div>';
         });
 
+        // Code triage section (deep scan only)
+        if (scanType === 'deep' && data.code_triage && !data.code_triage.skipped && data.code_triage.results && data.code_triage.results.length) {
+            var triage = data.code_triage;
+            var confirmed  = triage.results.filter(function (x) { return x.verdict === 'confirmed'; });
+            var needsCtx   = triage.results.filter(function (x) { return x.verdict === 'needs_context'; });
+            var falsePos   = triage.results.filter(function (x) { return x.verdict === 'false_positive'; });
+            html += '<div class="cs-audit-section cs-audit-sec-code-triage">';
+            html += '<h4 class="cs-audit-section-title">Code Triage — ' + triage.snippets_triaged + ' snippet' + (triage.snippets_triaged !== 1 ? 's' : '') + ' analysed';
+            if (confirmed.length)  html += ' &nbsp;·&nbsp; <span style="color:#dc2626">' + confirmed.length + ' confirmed</span>';
+            if (needsCtx.length)   html += ' &nbsp;·&nbsp; <span style="color:#d97706">' + needsCtx.length + ' inconclusive</span>';
+            if (falsePos.length)   html += ' &nbsp;·&nbsp; <span style="color:#22c55e">' + falsePos.length + ' false positive' + (falsePos.length !== 1 ? 's' : '') + '</span>';
+            html += '</h4>';
+
+            triage.results.forEach(function (item) {
+                var isFp = item.verdict === 'false_positive';
+                var isConfirmed = item.verdict === 'confirmed';
+                var severityColour = { critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#ca8a04', none: '#888' };
+                var badgeColor = isConfirmed ? (severityColour[item.severity] || '#888') : (isFp ? '#22c55e' : '#d97706');
+                var badgeText  = isConfirmed ? (item.severity || 'confirmed') : (isFp ? 'false positive' : 'needs context');
+                html += '<div class="cs-triage-item" style="margin:8px 0;padding:10px 12px;border-radius:6px;background:' + (isFp ? '#f0fdf4' : isConfirmed ? '#fff5f5' : '#fffbeb') + ';border-left:3px solid ' + badgeColor + '">';
+                html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">';
+                html += '<span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#fff;background:' + badgeColor + ';padding:2px 7px;border-radius:3px">' + escHtml(badgeText) + '</span>';
+                if (item.type && isConfirmed) html += '<span style="font-size:12px;font-weight:600;color:#111">' + escHtml(item.type) + '</span>';
+                html += '<span style="font-size:11px;color:#666;font-family:monospace">' + escHtml(item.plugin) + ' / ' + escHtml(item.file) + ':' + escHtml(String(item.line)) + '</span>';
+                html += '</div>';
+                if (item.explanation) html += '<div style="font-size:13px;color:#333;margin:3px 0">' + escHtml(item.explanation) + '</div>';
+                if (isConfirmed && item.fix) html += '<div class="cs-audit-issue-fix" style="margin-top:4px">' + escHtml(item.fix) + '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        } else if (scanType === 'deep' && data.code_triage && data.code_triage.skipped && data.code_triage.reason === 'no_findings') {
+            html += '<div class="cs-audit-section cs-audit-sec-good"><h4 class="cs-audit-section-title">Code Triage</h4>';
+            html += '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div>No suspicious patterns found in active plugin code — triage not required.</div></div></div>';
+        }
+
         container.innerHTML = html;
 
         var pdfBtn = container.querySelector('.cs-audit-pdf-btn');

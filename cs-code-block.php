@@ -9572,7 +9572,9 @@ You are a penetration tester. Analyse the provided external exposure checks and 
 
 For external checks assess: HTTP security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), exposed endpoints (wp-login.php, xmlrpc.php, wp-cron.php, REST API user enumeration, author enumeration /?author=1, directory listing), SSL certificate validity and days to expiry, HTTP→HTTPS redirect enforcement, exposed sensitive files (debug.log, .env, wp-config.php.bak, .git/config, readme.html, phpinfo.php, error_log, composer.json, backup archives), database admin tools accessible (adminer, phpMyAdmin), server-status/server-info pages, and email DNS security (SPF and DMARC records present).
 
-For plugin code scan: flag all detected patterns (RCE functions like eval/exec/shell_exec/base64_decode, SQL injection risk with raw user input in wpdb queries, XSS risk from unescaped echo of user input, unserialize with user input, remote file inclusion, move_uploaded_file, file_put_contents with user input). Name the plugin, file, and line number.
+For plugin code scan (plugin_code_scan): list detected patterns as context only — raw static analysis that may include false positives.
+
+For code_triage: AI-verified verdicts on the static findings. Each entry has verdict (confirmed|false_positive|needs_context), severity, type, explanation, and fix. Only raise confirmed findings as real issues — do not report false_positive items as vulnerabilities. Use the severity from code_triage for confirmed items. For needs_context items, mention them at low severity. Name plugin, file, and line number in every code finding.
 
 Return ONLY a JSON object (no markdown, no code fences) with this exact schema:
 {"score":0-100,"score_label":"Excellent|Good|Fair|Poor|Critical","summary":"1-2 sentences on external exposure and code scan posture","critical":[{"title":"...","detail":"...","fix":"..."}],"high":[...],"medium":[...],"low":[...],"good":[{"title":"...","detail":"..."}]}
@@ -9817,11 +9819,29 @@ PROMPT;
             }
         }
 
+        // DKIM — probe common selectors used by major ESPs
+        $dkim_found    = false;
+        $dkim_selector = null;
+        foreach ( [ 'google', 'default', 'mail', 'dkim', 'k1', 'selector1', 'selector2', 'mandrill', 'mailjet', 'sendgrid', 'amazonses', 'smtp' ] as $sel ) {
+            $dkim_txt = @dns_get_record( $sel . '._domainkey.' . $host, DNS_TXT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+            if ( is_array( $dkim_txt ) ) {
+                foreach ( $dkim_txt as $r ) {
+                    if ( isset( $r['txt'] ) && stripos( $r['txt'], 'v=DKIM1' ) !== false ) {
+                        $dkim_found    = true;
+                        $dkim_selector = $sel;
+                        break 2;
+                    }
+                }
+            }
+        }
+
         return [
             'spf_present'   => $spf_found,
             'spf_record'    => $spf_record,
             'dmarc_present' => $dmarc_found,
             'dmarc_record'  => $dmarc_record,
+            'dkim_present'  => $dkim_found,
+            'dkim_selector' => $dkim_selector,
         ];
     }
 
@@ -9888,6 +9908,23 @@ PROMPT;
             ( stripos( $uploads_body, 'Index of' ) !== false || stripos( $uploads_body, 'Parent Directory' ) !== false )
         );
 
+        // Plugins and themes directory listing (reveals installed software to targeted attackers)
+        $plugins_r    = wp_remote_get( $base . 'wp-content/plugins/', [ 'timeout' => 4, 'sslverify' => false ] );
+        $plugins_body = is_wp_error( $plugins_r ) ? '' : wp_remote_retrieve_body( $plugins_r );
+        $ext['plugins_listing'] = (
+            ! is_wp_error( $plugins_r ) &&
+            wp_remote_retrieve_response_code( $plugins_r ) === 200 &&
+            ( stripos( $plugins_body, 'Index of' ) !== false || stripos( $plugins_body, 'Parent Directory' ) !== false )
+        );
+
+        $themes_r    = wp_remote_get( $base . 'wp-content/themes/', [ 'timeout' => 4, 'sslverify' => false ] );
+        $themes_body = is_wp_error( $themes_r ) ? '' : wp_remote_retrieve_body( $themes_r );
+        $ext['themes_listing'] = (
+            ! is_wp_error( $themes_r ) &&
+            wp_remote_retrieve_response_code( $themes_r ) === 200 &&
+            ( stripos( $themes_body, 'Index of' ) !== false || stripos( $themes_body, 'Parent Directory' ) !== false )
+        );
+
         // Exposed sensitive files
         $ext['exposed_files'] = [];
         foreach ( [ 'readme.html', 'license.txt', 'phpinfo.php', 'wp-config.php.bak', '.env', '.htaccess', '.git/config', 'error_log', 'composer.json', 'package.json' ] as $f ) {
@@ -9949,6 +9986,34 @@ PROMPT;
             'redirects'   => $http_code !== null && $http_code >= 300 && $http_code < 400 && $http_loc && stripos( $http_loc, 'https://' ) === 0,
             'http_code'   => $http_code,
         ];
+
+        // TLS weak protocol check — test whether TLS 1.0 / 1.1 are still accepted
+        $ext['tls_weak_protocols'] = [ 'checked' => false, 'tls10_accepted' => false, 'tls11_accepted' => false ];
+        if ( function_exists( 'stream_socket_client' ) ) {
+            $tls_tests = [];
+            if ( defined( 'STREAM_CRYPTO_METHOD_TLSv1_0_CLIENT' ) ) {
+                $tls_tests['tls10_accepted'] = STREAM_CRYPTO_METHOD_TLSv1_0_CLIENT;
+            }
+            if ( defined( 'STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT' ) ) {
+                $tls_tests['tls11_accepted'] = STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT;
+            }
+            foreach ( $tls_tests as $field => $crypto_method ) {
+                $ext['tls_weak_protocols']['checked'] = true;
+                $ctx  = stream_context_create( [
+                    'ssl' => [
+                        'crypto_method'    => $crypto_method,
+                        'verify_peer'      => false,
+                        'verify_peer_name' => false,
+                    ],
+                ] );
+                // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+                $sock = @stream_socket_client( 'ssl://' . $host . ':443', $errno, $errstr, 5, STREAM_CLIENT_CONNECT, $ctx );
+                if ( $sock ) {
+                    $ext['tls_weak_protocols'][ $field ] = true;
+                    fclose( $sock );
+                }
+            }
+        }
 
         // Cookie security flags — inspect Set-Cookie headers from wp-login.php
         $cookie_r = wp_remote_get( $base . 'wp-login.php', [ 'timeout' => 5, 'sslverify' => false ] );
@@ -10023,7 +10088,7 @@ PROMPT;
             $h = wp_remote_retrieve_headers( $headers_r );
             foreach ( [ 'x-frame-options', 'x-content-type-options', 'strict-transport-security',
                         'content-security-policy', 'referrer-policy', 'permissions-policy',
-                        'x-powered-by', 'server' ] as $hname ) {
+                        'access-control-allow-origin', 'x-powered-by', 'server' ] as $hname ) {
                 $ext['security_headers_external'][ $hname ] = $h[ $hname ] ?? null;
             }
         }
@@ -10143,6 +10208,130 @@ PROMPT;
         }
 
         return $results;
+    }
+
+    /**
+     * AI-powered triage of static code scan findings.
+     * Reads ±10 lines of context around each flagged line, sends up to 10 snippets
+     * to the cheapest available model, and returns per-snippet verdicts.
+     */
+    private static function triage_code_snippets_with_ai( array $scan_results ): array {
+        if ( empty( $scan_results ) ) {
+            return [ 'skipped' => true, 'reason' => 'no_findings', 'results' => [] ];
+        }
+
+        // Flatten findings and sort by risk priority
+        $priority_order = [
+            'eval()', 'unserialize() with user input (RCE/object injection)',
+            'preg_replace /e modifier', 'create_function()',
+            'SQL query with raw user input (SQLi risk)',
+            'include() with user input (RFI risk)', 'require() with user input (RFI risk)',
+            'exec()', 'shell_exec()', 'system()', 'passthru()', 'popen()', 'proc_open()',
+            'base64_decode()', 'assert()', 'echo user input without escaping (XSS risk)',
+            'print user input without escaping (XSS risk)',
+            'file_put_contents with user input', 'move_uploaded_file()',
+            'outbound request with user input',
+        ];
+
+        $flat = [];
+        foreach ( $scan_results as $plugin_result ) {
+            foreach ( $plugin_result['findings'] as $finding ) {
+                $flat[] = array_merge( $finding, [ 'plugin' => $plugin_result['plugin'] ] );
+            }
+        }
+
+        usort( $flat, function ( $a, $b ) use ( $priority_order ) {
+            $ai = array_search( $a['pattern'], $priority_order, true );
+            $bi = array_search( $b['pattern'], $priority_order, true );
+            $ai = $ai === false ? 999 : $ai;
+            $bi = $bi === false ? 999 : $bi;
+            return $ai - $bi;
+        } );
+
+        $top = array_slice( $flat, 0, 10 );
+
+        // Build snippet blocks with ±10 lines of context
+        $blocks = [];
+        foreach ( $top as $idx => $s ) {
+            $abs = WP_PLUGIN_DIR . '/' . $s['plugin'] . '/' . $s['file'];
+            $ctx = '';
+            if ( is_readable( $abs ) ) {
+                $lines = @file( $abs, FILE_IGNORE_NEW_LINES ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+                if ( is_array( $lines ) ) {
+                    $start = max( 0, $s['line'] - 11 );
+                    $end   = min( count( $lines ) - 1, $s['line'] + 9 );
+                    for ( $i = $start; $i <= $end; $i++ ) {
+                        $marker = ( $i + 1 === $s['line'] ) ? '  // <<< FLAGGED' : '';
+                        $ctx   .= ( $i + 1 ) . ': ' . $lines[ $i ] . $marker . "\n";
+                    }
+                }
+            }
+            if ( ! $ctx ) {
+                $ctx = $s['line'] . ': ' . $s['snippet'] . "  // <<< FLAGGED\n";
+            }
+            $blocks[] = '[' . ( $idx + 1 ) . '] Plugin: ' . $s['plugin']
+                . ' | File: ' . $s['file']
+                . ' | Line: ' . $s['line']
+                . ' | Flagged as: ' . $s['pattern'] . "\n"
+                . "```php\n" . $ctx . '```';
+        }
+
+        $system = 'You are a WordPress PHP security expert. Analyse code snippets flagged by automated static analysis. Determine whether each is a genuine exploitable vulnerability or a false positive. Be precise — many static flags are false positives (e.g. eval() inside a template engine, base64_decode() for legitimate asset loading, shell_exec() behind a capability check). Return ONLY a valid JSON array with no markdown wrapping.';
+
+        $user = 'Analyse these ' . count( $blocks ) . " flagged PHP snippets from active WordPress plugins. The flagged line is marked // <<< FLAGGED.\n\n"
+              . implode( "\n\n", $blocks ) . "\n\n"
+              . "Return a JSON array — one object per snippet:\n"
+              . '{"id":<n>,"verdict":"confirmed|false_positive|needs_context","severity":"critical|high|medium|low|none","type":"<vulnerability type or null>","explanation":"<1-2 concise sentences>","fix":"<specific code-level fix or null if false positive>"}';
+
+        // Use cheapest/fastest model for triage — cost ~$0.01-0.03 per scan
+        $provider     = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
+        $triage_model = $provider === 'gemini' ? 'gemini-2.0-flash' : 'claude-haiku-4-5-20251001';
+
+        try {
+            $raw = self::dispatch_ai_call( $system, $user, $triage_model, 2048 );
+        } catch ( \Throwable $e ) {
+            return [ 'skipped' => true, 'reason' => 'api_error', 'error' => $e->getMessage(), 'results' => [] ];
+        }
+
+        // Strip markdown fences if present
+        $raw = preg_replace( '/^```(?:json)?\s*/i', '', trim( $raw ) );
+        $raw = preg_replace( '/\s*```$/i', '', trim( $raw ) );
+
+        $verdicts = json_decode( $raw, true );
+        if ( ! is_array( $verdicts ) ) {
+            return [ 'skipped' => true, 'reason' => 'parse_error', 'raw_preview' => substr( $raw, 0, 300 ), 'results' => [] ];
+        }
+
+        // Index verdicts by id for merge
+        $by_id = [];
+        foreach ( $verdicts as $v ) {
+            if ( isset( $v['id'] ) ) { $by_id[ (int) $v['id'] ] = $v; }
+        }
+
+        $output = [];
+        foreach ( $top as $idx => $s ) {
+            $v        = $by_id[ $idx + 1 ] ?? [];
+            $output[] = [
+                'plugin'      => $s['plugin'],
+                'file'        => $s['file'],
+                'line'        => $s['line'],
+                'pattern'     => $s['pattern'],
+                'verdict'     => $v['verdict']     ?? 'needs_context',
+                'severity'    => $v['severity']    ?? 'unknown',
+                'type'        => $v['type']        ?? null,
+                'explanation' => $v['explanation'] ?? null,
+                'fix'         => $v['fix']         ?? null,
+            ];
+        }
+
+        $confirmed = array_filter( $output, function ( $r ) { return $r['verdict'] === 'confirmed'; } );
+
+        return [
+            'skipped'          => false,
+            'snippets_triaged' => count( $output ),
+            'confirmed_count'  => count( $confirmed ),
+            'results'          => $output,
+        ];
     }
 
     private static function audit_users(): array {
@@ -10497,6 +10686,33 @@ PROMPT;
         $malware        = self::scan_malware_indicators();
         $user_audit     = self::audit_users();
         $cron_audit     = self::audit_cron_events();
+
+        // PHP end-of-life status
+        $php_eol_dates = [
+            '5.6' => '2018-12-31',
+            '7.0' => '2019-01-10',
+            '7.1' => '2019-12-01',
+            '7.2' => '2019-11-30',
+            '7.3' => '2020-12-06',
+            '7.4' => '2022-11-28',
+            '8.0' => '2023-11-26',
+            '8.1' => '2025-12-31',
+            '8.2' => '2026-12-31',
+            '8.3' => '2027-12-31',
+            '8.4' => '2028-12-31',
+        ];
+        $php_minor    = implode( '.', array_slice( explode( '.', PHP_VERSION ), 0, 2 ) );
+        $php_eol_date = $php_eol_dates[ $php_minor ] ?? null;
+        $php_is_eol   = $php_eol_date !== null && strtotime( $php_eol_date ) < time();
+        $php_eol_info = [
+            'version'    => PHP_VERSION,
+            'minor'      => $php_minor,
+            'eol_date'   => $php_eol_date,
+            'is_eol'     => $php_is_eol,
+            'days_since' => ( $php_is_eol && $php_eol_date ) ? (int) round( ( time() - strtotime( $php_eol_date ) ) / 86400 ) : null,
+            'known'      => $php_eol_date !== null,
+        ];
+
         return array_merge( $base, [
             'theme'              => $theme,
             'auth_salts'         => $salts,
@@ -10508,6 +10724,7 @@ PROMPT;
             'malware_indicators' => $malware,
             'external_checks'    => $external,
             'plugin_code_scan'   => $code_scan,
+            'php_eol'            => $php_eol_info,
         ] );
     }
 
@@ -10517,7 +10734,7 @@ You are a professional penetration tester and WordPress security expert performi
 
 You will receive a JSON object with these categories:
 
-1. Internal config — WP/PHP versions, debug flags, DISALLOW_FILE_EDIT/MODS, FORCE_SSL_ADMIN, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey counts), login URL obfuscation, wp-config.php permissions. Also includes app_passwords: enabled flag, how many admins have application passwords created (app passwords bypass 2FA).
+1. Internal config — WP/PHP versions (also php_eol key: version, minor, eol_date, is_eol, days_since — EOL PHP receives no security patches, treat as critical if is_eol=true), debug flags, DISALLOW_FILE_EDIT/MODS, FORCE_SSL_ADMIN, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey counts), login URL obfuscation, wp-config.php permissions. Also includes app_passwords: enabled flag, how many admins have application passwords created (app passwords bypass 2FA).
 2. Site config — open user registration, pingbacks enabled (DDoS amplification), WP version in meta generator tag, comment defaults.
 3. Theme — active theme name/version, pending update for active or parent theme.
 4. Auth salts — all 8 WP secret keys/salts set and non-default (weak salts = session forgery).
@@ -10526,9 +10743,10 @@ You will receive a JSON object with these categories:
 7. Plugin WP.org data (plugin_wporg) — for each active plugin: last_updated, abandoned (>2 years since update), years_since_update, active_installs, tested_up_to. Abandoned plugins with low install counts are high risk.
 8. Known CVEs (plugin_cves) — each entry has: plugin slug, version installed, CVE ID, title, severity (critical/high/medium/low), CVSS score, fixed_in version. ANY unfixed CVE at critical/high severity is a critical finding.
 9. Core file integrity (core_integrity) — MD5 comparison of key WP core files against WordPress.org checksums. modified_files = likely backdoor. This is CRITICAL if any files are listed.
-8. Malware indicators (malware_indicators) — php_files_in_uploads (PHP files found in uploads dir — should be zero, any found = likely webshell), recently_modified_php (core PHP files modified in last 7 days outside plugin/theme dirs — warrants investigation).
-10. External checks — SSL validity/expiry, HTTP→HTTPS redirect, wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum, author enum, directory listing, exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (SPF/DMARC), security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy).
-10. Plugin code scan — static analysis findings: RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
+9. Malware indicators (malware_indicators) — php_files_in_uploads (PHP files found in uploads dir — should be zero, any found = likely webshell), recently_modified_php (core PHP files modified in last 7 days outside plugin/theme dirs — warrants investigation).
+10. External checks — SSL validity/expiry, HTTP→HTTPS redirect, TLS weak protocols (tls_weak_protocols: checked, tls10_accepted, tls11_accepted — TLS 1.0/1.1 deprecated since 2021, susceptible to POODLE/BEAST attacks), wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum (rest_users: exposed, count, slugs), author enum, directory listings (uploads_listing, plugins_listing, themes_listing — plugins/themes listing reveals exact software versions to attackers), exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (email_dns: spf_present, dmarc_present, dkim_present, dkim_selector — all three required for full email spoofing protection), security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, access-control-allow-origin — wildcard "*" allows credential theft from any origin).
+11. Plugin code scan — raw static analysis findings (may include false positives): RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
+12. Code triage (code_triage) — AI-verified verdicts on the static scan findings. Each entry: plugin, file, line, verdict (confirmed|false_positive|needs_context), severity, type, explanation, fix. ONLY report confirmed findings as real vulnerabilities — ignore false_positives. Use triage severity for confirmed items. For needs_context, mention at low severity with explanation.
 
 Cross-correlate ALL categories for compound risks:
 - Known CVE (critical/high) = immediately critical regardless of other factors
@@ -10546,6 +10764,13 @@ Cross-correlate ALL categories for compound risks:
 - Application passwords enabled + admins have app passwords = 2FA bypassable via REST API
 - Suspicious cron hooks = possible malware persistence mechanism
 - WP session cookies missing Secure/HttpOnly = session hijacking risk
+- PHP EOL (php_eol.is_eol=true) = no security patches for PHP engine itself — critical if days_since > 365
+- TLS 1.0/1.1 accepted = deprecated protocols, POODLE/BEAST exploitable — mark high
+- Missing DKIM (dkim_present=false) = email spoofing possible even with SPF+DMARC — all three needed
+- plugins_listing or themes_listing exposed = reveals exact plugin/theme versions to targeted attackers
+- access-control-allow-origin: "*" = wildcard CORS allows any site to make credentialed requests — critical if combined with sensitive REST endpoints
+- REST API user enum exposed (rest_users.exposed=true) = real usernames exposed for credential stuffing — escalates brute force risk significantly
+- Abandoned plugin (plugin_wporg: abandoned=true) with no active CVEs = still high risk — unpatched future vulnerabilities likely
 
 Return ONLY a JSON object (no markdown, no code fences, no explanation):
 {
@@ -10620,7 +10845,8 @@ PROMPT;
             $model     = get_option( 'csdt_devtools_deep_scan_model', '_auto_deep' );
             $base_data = self::gather_security_data();
             $external  = self::gather_external_checks();
-            $code_scan = self::scan_plugin_code();
+            $code_scan   = self::scan_plugin_code();
+            $code_triage = self::triage_code_snippets_with_ai( $code_scan );
 
             if ( get_transient( 'csdt_deep_scan_cancelled' ) ) {
                 delete_transient( 'csdt_deep_scan_cancelled' );
@@ -10628,9 +10854,10 @@ PROMPT;
             }
 
             $msg_internal = 'WordPress internal configuration data (JSON):' . "\n\n" . wp_json_encode( $base_data, JSON_PRETTY_PRINT );
-            $msg_external = 'WordPress external exposure and plugin code scan data (JSON):' . "\n\n" . wp_json_encode( [
+            $msg_external = 'WordPress external exposure, plugin code scan, and AI code triage data (JSON):' . "\n\n" . wp_json_encode( [
                 'external_checks'  => $external,
                 'plugin_code_scan' => $code_scan,
+                'code_triage'      => $code_triage,
             ], JSON_PRETTY_PRINT );
 
             if ( function_exists( 'curl_multi_init' ) ) {
@@ -10643,7 +10870,7 @@ PROMPT;
             } else {
                 // Fallback: single sequential call
                 error_log( '[CSDT-DEEP] curl_multi unavailable, falling back to sequential, model=' . $model );
-                $text   = self::dispatch_ai_call( self::default_deep_scan_prompt(), 'WordPress site full security data (JSON):' . "\n\n" . wp_json_encode( [ 'internal' => $base_data, 'external_checks' => $external, 'plugin_code_scan' => $code_scan ], JSON_PRETTY_PRINT ), $model, 8192 );
+                $text   = self::dispatch_ai_call( self::default_deep_scan_prompt(), 'WordPress site full security data (JSON):' . "\n\n" . wp_json_encode( [ 'internal' => $base_data, 'external_checks' => $external, 'plugin_code_scan' => $code_scan, 'code_triage' => $code_triage ], JSON_PRETTY_PRINT ), $model, 8192 );
                 $report = self::parse_ai_json( $text );
             }
 
@@ -10658,10 +10885,11 @@ PROMPT;
         }
 
         $output = [
-            'report'     => $report,
-            'model_used' => get_option( 'csdt_devtools_ai_provider', 'anthropic' ) . '/' . $model,
-            'scanned_at' => time(),
-            'from_cache' => false,
+            'report'      => $report,
+            'code_triage' => $code_triage,
+            'model_used'  => get_option( 'csdt_devtools_ai_provider', 'anthropic' ) . '/' . $model,
+            'scanned_at'  => time(),
+            'from_cache'  => false,
         ];
 
         update_option( 'csdt_deep_scan_v1', $output, false );
