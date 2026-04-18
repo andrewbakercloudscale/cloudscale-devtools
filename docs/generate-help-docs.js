@@ -19,7 +19,7 @@ helpLib.run({
     pluginFile: `${__dirname}/../cs-code-block.php`,
 
     sections: [
-        { id: 'code-block', label: 'Code Block Overview',  file: 'panel-code-block.png',  elementSelector: '#cs-panel-code-settings' },
+        { id: 'code-block', label: 'Code Block Overview',  file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings' },
         { id: 'migrator',   label: 'Code Block Migrator',  file: 'panel-migrator.png',    elementSelector: '#cs-panel-migrator' },
         { id: 'sql-tool',   label: 'SQL Query Tool',       file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=sql"]', elementSelector: '#cs-panel-sql' },
         { id: 'hide-login', label: 'Hide Login URL',       file: 'panel-hide-login.png',  tabSelector: 'a[href*="tab=login"]', elementSelector: '#cs-panel-hide-login' },
