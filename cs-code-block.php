@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.34
+ * Version: 1.9.36
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.34';
+    const VERSION      = '1.9.36';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -8177,6 +8177,7 @@ class CloudScale_DevTools {
                 'wp_debug_log'       => defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG,
                 'disallow_file_edit' => defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT,
                 'disallow_file_mods' => defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS,
+                'force_ssl_admin'    => defined( 'FORCE_SSL_ADMIN' ) && FORCE_SSL_ADMIN,
                 'db_prefix'          => $wpdb->prefix,
                 'db_prefix_default'  => $wpdb->prefix === 'wp_',
                 'wp_config_perms'    => $config_perms,
@@ -8984,6 +8985,36 @@ PROMPT;
             'http_code'   => $http_code,
         ];
 
+        // WAF / CDN detection
+        $waf_detected  = [];
+        $waf_headers_r = wp_remote_get( $base, [ 'timeout' => 5, 'sslverify' => false ] );
+        if ( ! is_wp_error( $waf_headers_r ) ) {
+            $wh = wp_remote_retrieve_headers( $waf_headers_r );
+            if ( $wh['cf-ray'] || $wh['cf-cache-status'] || $wh['cf-request-id'] ) {
+                $waf_detected[] = 'Cloudflare';
+            }
+            if ( $wh['x-sucuri-id'] || $wh['x-sucuri-cache'] ) {
+                $waf_detected[] = 'Sucuri';
+            }
+            if ( $wh['x-fw-hash'] || $wh['x-fw-static'] ) {
+                $waf_detected[] = 'Wordfence';
+            }
+            if ( $wh['x-cache'] && stripos( (string) $wh['x-cache'], 'cloudfront' ) !== false ) {
+                $waf_detected[] = 'CloudFront';
+            }
+        }
+        // Also check if Wordfence plugin is active (server-side indicator)
+        $active_plugins = (array) get_option( 'active_plugins', [] );
+        foreach ( $active_plugins as $pf ) {
+            if ( stripos( $pf, 'wordfence' ) !== false && ! in_array( 'Wordfence', $waf_detected, true ) ) {
+                $waf_detected[] = 'Wordfence (plugin active)';
+            }
+        }
+        $ext['waf_cdn'] = [
+            'detected' => ! empty( $waf_detected ),
+            'providers'=> $waf_detected,
+        ];
+
         // Email security — SPF and DMARC DNS records
         $ext['email_dns'] = self::check_email_dns( $host );
 
@@ -9116,6 +9147,222 @@ PROMPT;
         return $results;
     }
 
+    private static function enrich_plugins_with_wporg( array $active_plugin_files ): array {
+        $results = [];
+        $two_years_ago = strtotime( '-2 years' );
+
+        foreach ( $active_plugin_files as $plugin_file ) {
+            $slug = dirname( $plugin_file );
+            if ( $slug === '.' ) {
+                continue; // single-file plugin, skip
+            }
+
+            $resp = wp_remote_get(
+                'https://api.wordpress.org/plugins/info/1.0/' . rawurlencode( $slug ) . '.json',
+                [ 'timeout' => 6, 'sslverify' => true ]
+            );
+            if ( is_wp_error( $resp ) || wp_remote_retrieve_response_code( $resp ) !== 200 ) {
+                continue;
+            }
+            $data = json_decode( wp_remote_retrieve_body( $resp ), true );
+            if ( empty( $data ) || isset( $data['error'] ) ) {
+                continue; // not in WP.org repo (premium plugin etc.)
+            }
+
+            $last_updated_ts = isset( $data['last_updated'] ) ? strtotime( $data['last_updated'] ) : null;
+            $results[ $slug ] = [
+                'slug'             => $slug,
+                'last_updated'     => $data['last_updated'] ?? null,
+                'last_updated_ts'  => $last_updated_ts,
+                'abandoned'        => $last_updated_ts && $last_updated_ts < $two_years_ago,
+                'years_since_update' => $last_updated_ts ? round( ( time() - $last_updated_ts ) / YEAR_IN_SECONDS, 1 ) : null,
+                'active_installs'  => $data['active_installs'] ?? null,
+                'rating'           => isset( $data['rating'] ) ? (int) $data['rating'] : null,
+                'requires_wp'      => $data['requires'] ?? null,
+                'tested_up_to'     => $data['tested'] ?? null,
+            ];
+        }
+
+        return $results;
+    }
+
+    private static function check_plugin_vulnerabilities( array $active_plugin_files, array $all_plugins ): array {
+        $vulns = [];
+
+        foreach ( $active_plugin_files as $plugin_file ) {
+            $slug    = dirname( $plugin_file );
+            $version = $all_plugins[ $plugin_file ]['Version'] ?? null;
+            if ( $slug === '.' || ! $version ) {
+                continue;
+            }
+
+            // Patchstack public vulnerability API — no key required
+            $resp = wp_remote_get(
+                'https://patchstack.com/database/api/v1/vulnerability?search=' . rawurlencode( $slug ) . '&per_page=5',
+                [ 'timeout' => 8, 'sslverify' => true ]
+            );
+            if ( is_wp_error( $resp ) || wp_remote_retrieve_response_code( $resp ) !== 200 ) {
+                continue;
+            }
+            $data = json_decode( wp_remote_retrieve_body( $resp ), true );
+            if ( empty( $data['data'] ) || ! is_array( $data['data'] ) ) {
+                continue;
+            }
+
+            foreach ( $data['data'] as $vuln ) {
+                $fixed_in = $vuln['fixed_in'] ?? null;
+                // Only include if the installed version is affected (below fixed_in, or no fix released)
+                $affected = ! $fixed_in || version_compare( $version, $fixed_in, '<' );
+                if ( ! $affected ) {
+                    continue;
+                }
+                $vulns[] = [
+                    'plugin'       => $slug,
+                    'version'      => $version,
+                    'cve'          => $vuln['cve_id'] ?? null,
+                    'title'        => $vuln['title'] ?? $vuln['vuln_type'] ?? 'Unknown vulnerability',
+                    'severity'     => $vuln['severity'] ?? null,
+                    'cvss'         => $vuln['cvss_score'] ?? null,
+                    'fixed_in'     => $fixed_in,
+                    'disclosed_at' => $vuln['disclosed_at'] ?? null,
+                ];
+                if ( count( $vulns ) >= 20 ) {
+                    break 2; // cap total
+                }
+            }
+        }
+
+        return $vulns;
+    }
+
+    private static function check_core_integrity(): array {
+        $version = get_bloginfo( 'version' );
+        $resp    = wp_remote_get(
+            'https://api.wordpress.org/core/checksums/1.0/?version=' . rawurlencode( $version ) . '&locale=en_US',
+            [ 'timeout' => 8, 'sslverify' => true ]
+        );
+        if ( is_wp_error( $resp ) || wp_remote_retrieve_response_code( $resp ) !== 200 ) {
+            return [ 'available' => false, 'error' => 'Could not fetch checksums from WordPress.org' ];
+        }
+        $body      = json_decode( wp_remote_retrieve_body( $resp ), true );
+        $checksums = $body['checksums'] ?? null;
+        if ( ! is_array( $checksums ) ) {
+            return [ 'available' => false, 'error' => 'Invalid checksum response' ];
+        }
+
+        // High-value files most commonly backdoored
+        $check_files = [
+            'index.php',
+            'wp-login.php',
+            'wp-settings.php',
+            'wp-load.php',
+            'wp-config-sample.php',
+            'wp-includes/functions.php',
+            'wp-includes/pluggable.php',
+            'wp-includes/class-wp-hook.php',
+            'wp-includes/class-wp-query.php',
+            'wp-includes/user.php',
+            'wp-admin/index.php',
+            'wp-admin/includes/file.php',
+        ];
+
+        $modified  = [];
+        $missing   = [];
+        $checked   = 0;
+
+        foreach ( $check_files as $file ) {
+            if ( ! isset( $checksums[ $file ] ) ) {
+                continue;
+            }
+            $path = ABSPATH . $file;
+            if ( ! file_exists( $path ) ) {
+                $missing[] = $file;
+                continue;
+            }
+            $checked++;
+            // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+            $actual = @md5_file( $path );
+            if ( $actual && $actual !== $checksums[ $file ] ) {
+                $modified[] = $file;
+            }
+        }
+
+        return [
+            'available'      => true,
+            'wp_version'     => $version,
+            'files_checked'  => $checked,
+            'modified_files' => $modified,
+            'missing_files'  => $missing,
+            'clean'          => empty( $modified ) && empty( $missing ),
+        ];
+    }
+
+    private static function scan_malware_indicators(): array {
+        $uploads_dir = wp_upload_dir();
+        $uploads_base= $uploads_dir['basedir'];
+
+        // 1. PHP files in uploads directory (should be zero)
+        $php_in_uploads = [];
+        if ( is_dir( $uploads_base ) ) {
+            $iter = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator( $uploads_base, FilesystemIterator::SKIP_DOTS ),
+                RecursiveIteratorIterator::LEAVES_ONLY
+            );
+            foreach ( $iter as $file ) {
+                if ( $file->getExtension() === 'php' ) {
+                    $php_in_uploads[] = str_replace( $uploads_base . '/', '', $file->getPathname() );
+                    if ( count( $php_in_uploads ) >= 10 ) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 2. PHP files modified in the last 7 days outside plugin/theme dirs
+        $recently_modified = [];
+        $cutoff            = time() - ( 7 * DAY_IN_SECONDS );
+        $skip_paths        = [ WP_PLUGIN_DIR, get_theme_root() ];
+
+        $scan_dirs = [ ABSPATH, ABSPATH . 'wp-includes', ABSPATH . 'wp-admin' ];
+        foreach ( $scan_dirs as $dir ) {
+            if ( ! is_dir( $dir ) ) {
+                continue;
+            }
+            $iter = new RecursiveIteratorIterator(
+                new RecursiveCallbackFilterIterator(
+                    new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
+                    function ( $file, $key, $iter ) use ( $skip_paths ) {
+                        if ( $iter->hasChildren() ) {
+                            foreach ( $skip_paths as $skip ) {
+                                if ( strpos( $file->getPathname(), $skip ) === 0 ) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        }
+                        return $file->getExtension() === 'php';
+                    }
+                ),
+                RecursiveIteratorIterator::LEAVES_ONLY
+            );
+            foreach ( $iter as $file ) {
+                if ( $file->getMTime() > $cutoff ) {
+                    $recently_modified[] = str_replace( ABSPATH, '', $file->getPathname() );
+                    if ( count( $recently_modified ) >= 15 ) {
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        return [
+            'php_files_in_uploads'      => $php_in_uploads,
+            'php_files_in_uploads_count'=> count( $php_in_uploads ),
+            'recently_modified_php'     => $recently_modified,
+            'recently_modified_count'   => count( $recently_modified ),
+        ];
+    }
+
     private static function gather_theme_data(): array {
         $theme        = wp_get_theme();
         $parent       = $theme->parent();
@@ -9148,16 +9395,29 @@ PROMPT;
     }
 
     private static function gather_deep_security_data(): array {
-        $base      = self::gather_security_data();
-        $external  = self::gather_external_checks();
-        $code_scan = self::scan_plugin_code();
-        $theme     = self::gather_theme_data();
-        $salts     = self::check_auth_salts();
+        $base           = self::gather_security_data();
+        $active_files   = (array) get_option( 'active_plugins', [] );
+        if ( ! function_exists( 'get_plugins' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $all_plugins    = get_plugins();
+        $external       = self::gather_external_checks();
+        $code_scan      = self::scan_plugin_code();
+        $theme          = self::gather_theme_data();
+        $salts          = self::check_auth_salts();
+        $wporg_data     = self::enrich_plugins_with_wporg( $active_files );
+        $cve_data       = self::check_plugin_vulnerabilities( $active_files, $all_plugins );
+        $core_integrity = self::check_core_integrity();
+        $malware        = self::scan_malware_indicators();
         return array_merge( $base, [
-            'theme'            => $theme,
-            'auth_salts'       => $salts,
-            'external_checks'  => $external,
-            'plugin_code_scan' => $code_scan,
+            'theme'              => $theme,
+            'auth_salts'         => $salts,
+            'plugin_wporg'       => $wporg_data,
+            'plugin_cves'        => $cve_data,
+            'core_integrity'     => $core_integrity,
+            'malware_indicators' => $malware,
+            'external_checks'    => $external,
+            'plugin_code_scan'   => $code_scan,
         ] );
     }
 
@@ -9165,28 +9425,37 @@ PROMPT;
         return <<<'PROMPT'
 You are a professional penetration tester and WordPress security expert performing a comprehensive security audit.
 
-You will receive a JSON object containing five categories of data:
-1. Internal WordPress configuration — WP/PHP versions, debug flags, DISALLOW_FILE_EDIT/MODS, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey), login URL obfuscation, wp-config.php permissions.
-2. Site configuration — open user registration, pingbacks/trackbacks enabled (DDoS amplification vector), WordPress version exposed in meta generator tag, comment status defaults.
-3. Theme security — active theme name/version, whether the active or parent theme has a pending update.
-4. Authentication salts — whether all 8 WordPress secret keys/salts are set and non-default (weak or default salts allow session forgery).
-5. External checks — probing the site from outside: SSL certificate validity and days to expiry, HTTP→HTTPS redirect, wp-login.php/xmlrpc.php/wp-cron.php accessibility, REST API user enumeration, author enumeration (?author=1), uploads directory listing, exposed sensitive files (debug.log, .env, wp-config.php.bak, .git/config, readme.html, phpinfo.php, error_log, composer.json, backup archives), database admin tools (adminer, phpMyAdmin), server-status/server-info pages, email DNS (SPF and DMARC present), HTTP security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Powered-By).
-6. Plugin code scan — static analysis of active plugin PHP files flagging dangerous patterns: RCE (eval, exec, shell_exec, base64_decode, create_function), SQL injection (wpdb queries with raw user input), XSS (unescaped echo of user input), unserialize with user input, remote file inclusion, file upload functions. Each finding includes plugin name, file path, line number, and code snippet.
+You will receive a JSON object with these categories:
 
-Analyse ALL findings thoroughly. Cross-correlate categories for compound risks. Examples:
+1. Internal config — WP/PHP versions, debug flags, DISALLOW_FILE_EDIT/MODS, FORCE_SSL_ADMIN, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey counts), login URL obfuscation, wp-config.php permissions.
+2. Site config — open user registration, pingbacks enabled (DDoS amplification), WP version in meta generator tag, comment defaults.
+3. Theme — active theme name/version, pending update for active or parent theme.
+4. Auth salts — all 8 WP secret keys/salts set and non-default (weak salts = session forgery).
+5. Plugin WP.org data (plugin_wporg) — for each active plugin: last_updated, abandoned (>2 years since update), years_since_update, active_installs, tested_up_to. Abandoned plugins with low install counts are high risk.
+6. Known CVEs (plugin_cves) — each entry has: plugin slug, version installed, CVE ID, title, severity (critical/high/medium/low), CVSS score, fixed_in version. ANY unfixed CVE at critical/high severity is a critical finding.
+7. Core file integrity (core_integrity) — MD5 comparison of key WP core files against WordPress.org checksums. modified_files = likely backdoor. This is CRITICAL if any files are listed.
+8. Malware indicators (malware_indicators) — php_files_in_uploads (PHP files found in uploads dir — should be zero, any found = likely webshell), recently_modified_php (core PHP files modified in last 7 days outside plugin/theme dirs — warrants investigation).
+9. External checks — SSL validity/expiry, HTTP→HTTPS redirect, wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum, author enum, directory listing, exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), email DNS (SPF/DMARC), security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy).
+10. Plugin code scan — static analysis findings: RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
+
+Cross-correlate ALL categories for compound risks:
+- Known CVE (critical/high) = immediately critical regardless of other factors
+- Modified core files = active compromise, treat as critical
+- PHP files in uploads = likely webshell, treat as critical
 - wp-login.php accessible + brute force disabled = critical combined risk
-- Open registration + no email verification = account abuse
-- Missing SPF + missing DMARC = email spoofing possible
-- wp-cron.php publicly accessible = unauthenticated resource exhaustion / DDoS vector
-- Default auth salts = active sessions can be forged
-- Plugin with eval() or exec() = assess risk in context of what the plugin does
+- Abandoned plugin (>2 years) + known CVE = critical
+- No WAF/CDN detected + multiple exposed endpoints = significantly elevated risk
+- Missing SPF + DMARC = email spoofing trivially possible
+- wp-cron.php public = unauthenticated resource exhaustion
+- Default auth salts = any active session can be forged
 - debug.log exposed = credentials and stack traces publicly readable
+- WP version in meta + outdated WP = targeted exploit possible
 
-Return ONLY a JSON object (no markdown, no code fences, no explanation) with this exact schema:
+Return ONLY a JSON object (no markdown, no code fences, no explanation):
 {
   "score": <integer 0-100>,
   "score_label": "<Excellent|Good|Fair|Poor|Critical>",
-  "summary": "<2-3 sentence executive summary covering the most critical findings and overall posture>",
+  "summary": "<2-3 sentence executive summary — lead with the most critical finding>",
   "critical": [{"title":"...","detail":"...","fix":"..."}],
   "high":     [{"title":"...","detail":"...","fix":"..."}],
   "medium":   [{"title":"...","detail":"...","fix":"..."}],
@@ -9194,16 +9463,14 @@ Return ONLY a JSON object (no markdown, no code fences, no explanation) with thi
   "good":     [{"title":"...","detail":"..."}]
 }
 
-Scoring guide (be strict — external exposure findings lower the score significantly):
-90-100: Excellent — hardened config, no significant external exposure
-75-89:  Good — minor issues only, no critical exposure
-55-74:  Fair — some external exposure or config weaknesses
-35-54:  Poor — significant exposure or multiple high-severity issues
-0-34:   Critical — actively exploitable exposure, urgent remediation required
+Scoring (be strict — known CVEs and modified core files force score to 0-34):
+90-100: Excellent — no CVEs, clean core, hardened config, no significant exposure
+75-89:  Good — minor issues only, no critical/high CVEs
+55-74:  Fair — medium CVEs or some external exposure
+35-54:  Poor — high CVEs, multiple exposures, or config weaknesses
+0-34:   Critical — critical CVE, modified core files, webshell indicators, or actively exploitable exposure
 
-Prioritise EXTERNAL exposure (attackers can probe without credentials) at critical/high.
-Include GOOD PRACTICES for correctly hardened settings — especially compound wins.
-Be specific: name the exact plugin, file path, setting, or DNS record involved.
+Name exact plugin slugs, CVE IDs, file paths, and settings in every finding. Include GOOD PRACTICES for correctly hardened items.
 PROMPT;
     }
 
