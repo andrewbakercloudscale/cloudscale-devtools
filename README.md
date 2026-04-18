@@ -1,59 +1,132 @@
-# CloudScale Devtools
+# CloudScale Cyber and Devtools
 
-![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue) ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple) ![License](https://img.shields.io/badge/License-GPLv2-green) ![Version](https://img.shields.io/badge/Version-1.8.42-orange)
+![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue) ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple) ![License](https://img.shields.io/badge/License-GPLv2-green)
 
-A free WordPress developer toolkit. Everything runs on your server — no external APIs, no subscriptions, no upsells.
+**AI-powered WordPress security auditing, one-click hardening, and a full developer toolkit — free, zero-dependency, everything runs on your server.**
 
-## Features
+---
 
-### Code Block
-- Syntax highlighting via **highlight.js 11.11.1** with 190+ languages and auto-detection
+## Security Features
+
+### AI Cyber Audit
+The centrepiece of the plugin. Connects to **Anthropic Claude** (claude-sonnet-4-6, claude-opus-4-7) or **Google Gemini** (gemini-2.0-flash, gemini-2.5-pro) to deliver a scored, prioritised security report in under 60 seconds — the kind of analysis that would normally cost hundreds of dollars from a consultant.
+
+- **Standard scan** — analyses WordPress config, active plugins, user roles, file permissions, wp-config.php hardening constants, and debug settings
+- **Deep Dive scan** — extends the standard scan with live HTTP probes, DNS checks, TLS quality, PHP end-of-life detection, directory listing checks, static plugin code analysis, and AI-powered code triage
+- Findings scored **Critical / High / Medium / Low / Good** with prioritised remediation steps
+- **Scan History** — last 10 results saved automatically; click any entry to reload the full report
+- **Scheduled Scans** — daily or weekly background scans with email and ntfy.sh push notifications
+- **AI Code Triage** — static findings pre-classified as Confirmed / False Positive / Needs Context before main AI analysis
+
+### Deep Dive — What It Checks
+| Category | Details |
+|---|---|
+| HTTP security headers | Presence + quality of CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy |
+| CSP quality | Flags `unsafe-inline`, `unsafe-eval`, wildcard sources, missing `default-src` |
+| HSTS quality | Validates `max-age ≥ 31536000` and `includeSubDomains` |
+| Email DNS | SPF strictness (`~all` vs `-all`), DMARC policy strength (`p=none` flagged), DKIM selector probes — all gated on MX record presence |
+| TLS | Weak cipher / protocol detection |
+| PHP EOL | Flags end-of-life PHP versions |
+| Auto-updates | Detects `AUTOMATIC_UPDATER_DISABLED` and `WP_AUTO_UPDATE_CORE=false` |
+| display_errors | Flags PHP error exposure in production |
+| Inactive plugins | Lists deactivated plugins still on disk |
+| Server header leak | Detects version strings in `Server:` response header |
+| Directory listing | Checks for open directory browsing |
+
+### Quick Fixes — One-Click Hardening
+| Fix | What it does |
+|---|---|
+| Security Headers | Enables X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy |
+| Disable Pingbacks | Closes default ping/trackback status |
+| Disable Registration | Turns off open user registration |
+| Disable App Passwords | Blocks REST API application passwords |
+| Hide WP Version | Removes generator meta tag and strips `?ver=` query strings |
+| Close Comments | Disables comments on new posts by default |
+| wp-config.php Permissions | Chmods wp-config.php to 0600 |
+| Move debug.log | Relocates debug.log above the web root; rewrites WP_DEBUG_LOG in wp-config.php |
+
+### CSP Builder
+Dedicated panel for building and managing a Content Security Policy without breaking your site:
+- Enable/disable toggle with **Enforce** or **Report-Only** (test) mode
+- Service checkboxes: Google Analytics, Google AdSense, Google Tag Manager, Cloudflare Insights, Facebook Pixel, Google reCAPTCHA, YouTube embeds, Vimeo embeds
+- Custom directives field for anything not covered
+- Live header preview before saving
+- **Backup/rollback** — every save snapshots the previous config; a one-click Rollback button (with time-ago label) instantly restores it
+
+### Login Security
+- **Brute-Force Protection** — per-username account lockout after N failed attempts (configurable)
+- **Hide Login URL** — moves `/wp-login.php` to a secret slug; bots get a 404
+- **Two-Factor Authentication** — Email OTP, TOTP (Google Authenticator / Authy / 1Password), or Passkey
+- **Passkeys (WebAuthn / FIDO2)** — Face ID, Touch ID, Windows Hello, YubiKey; phishing-resistant by design
+- **Force 2FA** for all administrators site-wide
+- **Test Account Manager** — temporary subscriber accounts with app passwords for Playwright / CI pipelines; auto-delete on expiry or first use
+
+### Server Logs
+Read-only browser viewer for PHP error log, WordPress debug log, and web server access/error logs:
+- Source picker with availability indicators (readable / not found / permission denied / empty)
+- Live search, severity filter (Emergency → Debug), configurable line count
+- Auto-refresh tail mode (30-second interval)
+- Custom log path manager
+- One-click PHP error log setup
+
+---
+
+## Developer Tools
+
+### Syntax-Highlighted Code Block
+- Powered by **highlight.js 11.11.1** bundled locally — zero external CDN requests
+- 190+ languages with auto-detection
 - **14 colour themes**: Atom One, GitHub, Monokai, Nord, Dracula, Tokyo Night, VS 2015, VS Code, Stack Overflow, Night Owl, Gruvbox, Solarized, Panda, Shades of Purple
-- Dark/light toggle per block, site-wide default in settings
-- One-click copy to clipboard, optional line numbers, optional filename label
+- Dark/light toggle (stored per browser in localStorage), line numbers, copy to clipboard
 - Gutenberg block (`cloudscale/code`) and `[cs_code]` shortcode
+- Auto-repair for INI/TOML blocks that Gutenberg splits into fragments
 
 ### Code Block Migrator
-- Bulk converts legacy `wp:code`, `wp:preformatted`, Code Syntax Block, and shortcode blocks to CloudScale format
-- Scan → Preview (side-by-side diff) → Migrate single or all
+Bulk converts `wp:code`, `wp:preformatted`, Code Syntax Block, and legacy shortcode blocks to CloudScale format. Scan → Preview (side-by-side diff) → Migrate single or all.
 
 ### SQL Query Tool
-- Run read-only `SELECT`, `SHOW`, `DESCRIBE`, and `EXPLAIN` queries from wp-admin
-- 14 built-in quick queries: health diagnostics, content summary, bloat/cleanup, URL migration helpers
-- Restricted to `manage_options` capability; all write operations blocked
+Read-only `SELECT`, `SHOW`, `DESCRIBE`, `EXPLAIN` queries from wp-admin. 14 built-in quick queries covering health diagnostics, content summary, bloat/cleanup, and URL migration. All write operations blocked; requires `manage_options` capability.
 
-### Hide Login URL
-- Moves `/wp-login.php` to a secret slug of your choosing
-- Bots probing the default URL get a 404; the real form is served transparently at the new address
-- `wp_login_url()`, `logout_url()`, and `lostpassword_url()` filters updated automatically
+### Social Preview Diagnostics
+URL checker, recent posts scan, og:image generation, Cloudflare cache purge integration, Media Library audit.
 
-### Two-Factor Authentication
-- **Email OTP** — 6-digit code emailed after password login, expires in 10 minutes
-- **TOTP** (RFC 6238) — Google Authenticator, Authy, 1Password, or any compatible app
-- **Passkey** — biometric or hardware key (see below)
-- Force 2FA for all administrators site-wide
+### SMTP Mail
+Replaces PHP `mail()` with authenticated SMTP. Test button, email log, configurable from/reply-to.
 
-### Passkeys (WebAuthn / FIDO2)
-- Register Face ID, Touch ID, Windows Hello, or YubiKey as a 2FA second factor
-- Private key never leaves the device; phishing-resistant by design
-- Test button verifies each registered passkey without logging out
+### Performance Monitor
+Overlay panel (toggleable) tracking query count, HTTP requests, PHP errors, hooks, assets, and transients per page load.
+
+### Custom 404 Page
+Branded 404 with **seven browser mini-games** and a site-wide leaderboard.
+
+---
+
+## AI Provider Setup
+
+Supply your own API key — keys are stored in `wp_options` and sent only to the provider's API endpoint.
+
+| Provider | Models | Cost |
+|---|---|---|
+| Anthropic Claude | claude-sonnet-4-6, claude-opus-4-7 | Pay-as-you-go |
+| Google Gemini | gemini-2.0-flash, gemini-2.5-pro | Free tier available |
+
+---
 
 ## Requirements
 
 - WordPress 6.0+
 - PHP 7.4+
-- MySQL 5.7+ or MariaDB 10.3+
 
 ## Installation
 
-1. Download the latest release zip from the [Releases](../../releases) page
-2. In WordPress admin go to **Plugins > Add New > Upload Plugin**
-3. Upload the zip, click **Install Now**, then **Activate**
-4. Navigate to **Tools > 🌩️ CloudScale Devtools**
+1. Download the latest zip from [Releases](../../releases)
+2. In WordPress admin: **Plugins > Add New > Upload Plugin**
+3. Upload, install, activate
+4. Navigate to **Tools > Cyber and Devtools**
 
 ## License
 
-GPLv2 or later. See [LICENSE](LICENSE) for the full text.
+GPLv2 or later. See [LICENSE](LICENSE).
 
 ## Author
 
