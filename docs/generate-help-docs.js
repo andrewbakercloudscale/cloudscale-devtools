@@ -9,14 +9,65 @@ helpLib.run({
     docsDir:    process.env.WP_DOCS_DIR,
 
     pluginName: 'CloudScale Cyber and Devtools',
-    pluginDesc: 'AI-powered WordPress security auditing, one-click hardening, server log viewer, syntax-highlighted code blocks, SQL tool, login security (2FA, passkeys, hide login), and a site performance monitor. Everything runs on your server — no external APIs required except your own AI key.',
+    pluginDesc: 'AI-powered WordPress security auditing, one-click hardening, login security, server logs, syntax-highlighted code blocks, SQL tool, and a site performance monitor — completely free, everything runs on your server.',
     pageTitle:  'CloudScale Cyber and Devtools',
-    pageSlug:   'cloudscale-devtools-help',
+    pageSlug:   'cloudscale-cyber-devtools-help',
     downloadUrl: 'https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
     repoUrl:     'https://github.com/andrewbakercloudscale/cloudscale-cyber-devtools',
     adminUrl:   `${process.env.WP_BASE_URL}/wp-admin/tools.php?page=cloudscale-devtools`,
 
     pluginFile: `${__dirname}/../cs-code-block.php`,
+
+    pluginIntro: `
+<h2 style="font-size:1.6em;font-weight:800;color:#0f172a;margin:0 0 16px;">What is CloudScale Cyber and Devtools?</h2>
+<p style="font-size:1.05em;color:#374151;margin:0 0 20px;line-height:1.75;">CloudScale Cyber and Devtools is a <strong>free, zero-dependency WordPress plugin</strong> that brings together professional-grade security auditing and developer tools in a single install. There is no premium tier, no nag screens, and no external services required — everything runs on your own server.</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:0 0 28px;">
+<div style="background:#fff5f5;border-left:4px solid #e53e3e;border-radius:0 8px 8px 0;padding:18px 20px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🛡️ Security</h3>
+<ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
+<li><strong>AI Cyber Audit</strong> — scored security report in under 60 seconds using Claude or Gemini</li>
+<li><strong>Deep Dive Scan</strong> — HTTP probes, DNS checks, TLS, PHP code analysis</li>
+<li><strong>Quick Fixes</strong> — one-click hardening for common misconfigurations</li>
+<li><strong>Scheduled Scans</strong> — daily/weekly background scans with email alerts</li>
+<li><strong>CSP Builder</strong> — build a Content Security Policy safely with rollback</li>
+<li><strong>Server Logs</strong> — read PHP, WordPress and web server logs in-browser</li>
+</ul>
+</div>
+<div style="background:#f0f9ff;border-left:4px solid #0e6b8f;border-radius:0 8px 8px 0;padding:18px 20px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🔐 Login Security</h3>
+<ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
+<li><strong>Hide Login URL</strong> — move /wp-login.php to a secret slug</li>
+<li><strong>Two-Factor Authentication</strong> — email OTP, TOTP (authenticator app), or passkeys</li>
+<li><strong>Passkeys (WebAuthn)</strong> — Face ID, Touch ID, Windows Hello, YubiKey</li>
+<li><strong>Brute-Force Protection</strong> — per-account lockout after N failed attempts</li>
+<li><strong>Force 2FA for admins</strong> — block dashboard access until 2FA is set up</li>
+<li><strong>Test Account Manager</strong> — temporary accounts for Playwright / CI pipelines</li>
+</ul>
+</div>
+<div style="background:#f0fdf4;border-left:4px solid #16a34a;border-radius:0 8px 8px 0;padding:18px 20px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🛠️ Developer Tools</h3>
+<ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
+<li><strong>Syntax-highlighted Code Block</strong> — 190+ languages, 14 themes, bundled locally</li>
+<li><strong>Code Block Migrator</strong> — batch-convert blocks from other plugins</li>
+<li><strong>SQL Query Tool</strong> — read-only SELECT queries in-browser</li>
+<li><strong>SMTP Mail</strong> — replace PHP mail() with authenticated SMTP</li>
+<li><strong>Performance Monitor</strong> — overlay showing queries, hooks, assets per page</li>
+<li><strong>Custom 404 Page</strong> — branded 404 with 7 playable mini-games and leaderboard</li>
+</ul>
+</div>
+<div style="background:#fafafa;border-left:4px solid #6366f1;border-radius:0 8px 8px 0;padding:18px 20px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">⚡ Getting Started</h3>
+<ol style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
+<li>Download the zip using the button above</li>
+<li>In WordPress: <strong>Plugins → Add New → Upload Plugin</strong></li>
+<li>Upload, install, and activate</li>
+<li>Go to <strong>Tools → Cyber and Devtools</strong></li>
+<li>For the AI Cyber Audit: get a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> (no credit card) or <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic</a></li>
+</ol>
+<p style="margin:12px 0 0;font-size:.9em;color:#64748b;"><strong>Requirements:</strong> WordPress 6.0+, PHP 7.4+</p>
+</div>
+</div>`,
 
     sections: [
         { id: 'security',   label: 'AI Cyber Audit',        file: 'panel-security.png',    tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-panel-security' },

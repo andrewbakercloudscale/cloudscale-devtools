@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.97
+ * Version: 1.9.98
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.97';
+    const VERSION      = '1.9.98';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -957,7 +957,7 @@ class CloudScale_DevTools {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
         $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
         if ( strpos( $uri, 'code-block-help' ) !== false ) {
-            wp_redirect( home_url( '/wordpress-plugin-help/cloudscale-devtools-help/' ), 301 );
+            wp_redirect( home_url( '/wordpress-plugin-help/cloudscale-cyber-devtools-help/' ), 301 );
             exit;
         }
     }
@@ -1233,7 +1233,7 @@ class CloudScale_DevTools {
                 <div id="cs-banner-right">
                     <span class="cs-badge cs-badge-green">✅ <?php esc_html_e( 'Totally Free', 'cloudscale-devtools' ); ?></span>
                     <a href="https://your-wordpress-site.example.com" target="_blank" rel="noopener noreferrer" class="cs-badge cs-badge-orange" style="text-decoration:none">andrewbaker.ninja</a>
-                    <a href="https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-devtools-help/" target="_blank" rel="noopener noreferrer" class="cs-badge cs-badge-help" style="text-decoration:none">❓ <?php esc_html_e( 'Help', 'cloudscale-devtools' ); ?></a>
+                    <a href="https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-cyber-devtools-help/" target="_blank" rel="noopener noreferrer" class="cs-badge cs-badge-help" style="text-decoration:none">❓ <?php esc_html_e( 'Help', 'cloudscale-devtools' ); ?></a>
                 </div>
             </div>
 
