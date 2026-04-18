@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.90
+ * Version: 1.9.91
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.90';
+    const VERSION      = '1.9.91';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9542,7 +9542,7 @@ class CloudScale_DevTools {
                     [ 'name' => 'Code Triage',         'rec' => 'Info',         'html' => 'After a deep scan, the top 10 highest-risk static findings are sent to an AI model with ±10 lines of surrounding code. The model classifies each as <strong>Confirmed</strong> (genuine risk), <strong>False Positive</strong> (safe code), or <strong>Needs Context</strong> (depends on usage). Only confirmed findings are forwarded to the main audit AI, reducing noise.' ],
                     [ 'name' => 'Scan History',        'rec' => 'Info',         'html' => 'The last 10 scan results are saved automatically. Click any entry in the history table to reload that report instantly — useful for comparing your security posture over time or reviewing a scan after making changes.' ],
                     [ 'name' => 'Scheduled Scans',     'rec' => 'Optional',     'html' => 'Run a deep scan automatically on a daily or weekly schedule. Results are stored in scan history. Enable email alerts to receive the AI summary in your inbox whenever a scheduled scan completes.' ],
-                    [ 'name' => 'AI Providers',        'rec' => 'Info',         'html' => 'Supports <strong>Anthropic Claude</strong> (claude-sonnet-4-5 or later) and <strong>Google Gemini</strong> (gemini-2.0-flash or later). Bring your own API key — no keys are stored server-side beyond your WordPress options table. Deep scans with code triage use the cheapest available model for the triage step to minimise cost.' ],
+                    [ 'name' => 'AI Providers',        'rec' => 'Info',         'html' => '<p>Two AI providers are supported. You supply your own API key — keys are stored only in your WordPress database (<code>wp_options</code>) and sent only to the provider\'s own API endpoint.</p><p><strong>Anthropic Claude</strong> — recommended for best results.<br>Get your key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a><br>Models: <code>claude-sonnet-4-6</code> (fast, cost-effective) · <code>claude-opus-4-7</code> (most capable)<br><a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener">View latest Claude models →</a></p><p><strong>Google Gemini</strong> — free tier available.<br>Get your key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a><br>Models: <code>gemini-2.0-flash</code> (fast, free tier) · <code>gemini-2.5-pro</code> (most capable)<br><a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener">View latest Gemini models →</a></p><p>Deep Dive scans run two AI calls — Code Triage pre-classification uses the faster model first to reduce cost before the main audit call.</p>' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
