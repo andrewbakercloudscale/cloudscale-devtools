@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.87
+ * Version: 1.9.88
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.87';
+    const VERSION      = '1.9.88';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -323,6 +323,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_scan_history',       [ __CLASS__, 'ajax_scan_history' ] );
         add_action( 'wp_ajax_csdt_devtools_save_schedule',      [ __CLASS__, 'ajax_save_schedule' ] );
         add_action( 'wp_ajax_csdt_devtools_quick_fix',          [ __CLASS__, 'ajax_apply_quick_fix' ] );
+        add_action( 'wp_ajax_csdt_devtools_csp_save',           [ __CLASS__, 'ajax_csp_save' ] );
+        add_action( 'send_headers',                             [ __CLASS__, 'output_security_headers' ] );
         add_action( 'wp_ajax_csdt_test_account_create',          [ __CLASS__, 'ajax_create_test_account' ] );
         add_action( 'wp_ajax_csdt_test_account_revoke',          [ __CLASS__, 'ajax_revoke_test_account' ] );
         add_action( 'wp_ajax_csdt_test_account_settings_save',   [ __CLASS__, 'ajax_save_test_account_settings' ] );
@@ -8844,6 +8846,13 @@ class CloudScale_DevTools {
                 'fix_label' => 'Set to 0600',
             ],
             [
+                'id'        => 'security_headers',
+                'title'     => 'Security headers not set',
+                'detail'    => 'X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy are missing. These prevent MIME sniffing, clickjacking, and referrer leakage.',
+                'fixed'     => get_option( 'csdt_devtools_safe_headers_enabled', '0' ) === '1',
+                'fix_label' => 'Enable Headers',
+            ],
+            [
                 'id'        => 'block_debug_log',
                 'title'     => 'debug.log exposed publicly',
                 'detail'    => 'debug.log is HTTP-accessible. On nginx, .htaccess rules are ignored — the only PHP-level fix is to move the file one directory above the web root. It stays readable via the Server Logs tab.',
@@ -8851,6 +8860,265 @@ class CloudScale_DevTools {
                 'fix_label' => 'Move Outside Web Root',
             ],
         ];
+    }
+
+    // ── Security Headers ──────────────────────────────────────────────────────
+
+    public static function output_security_headers(): void {
+        if ( is_admin() ) { return; }
+        if ( get_option( 'csdt_devtools_safe_headers_enabled', '0' ) === '1' ) {
+            header( 'X-Content-Type-Options: nosniff' );
+            header( 'X-Frame-Options: SAMEORIGIN' );
+            header( 'Referrer-Policy: strict-origin-when-cross-origin' );
+            header( 'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()' );
+        }
+        if ( get_option( 'csdt_devtools_csp_enabled', '0' ) === '1' ) {
+            $csp = self::build_csp_header();
+            if ( $csp ) {
+                $mode = get_option( 'csdt_devtools_csp_mode', 'enforce' );
+                $hdr  = $mode === 'report_only' ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
+                header( $hdr . ': ' . $csp );
+            }
+        }
+    }
+
+    private static function build_csp_header(): string {
+        $services = json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true );
+        if ( ! is_array( $services ) ) { $services = []; }
+        $custom = trim( get_option( 'csdt_devtools_csp_custom', '' ) );
+
+        $d = [
+            'default-src' => [ "'self'" ],
+            'script-src'  => [ "'self'", "'unsafe-inline'" ],
+            'style-src'   => [ "'self'", "'unsafe-inline'" ],
+            'img-src'     => [ "'self'", 'data:', 'https:' ],
+            'font-src'    => [ "'self'", 'data:' ],
+            'connect-src' => [ "'self'" ],
+            'frame-src'   => [ "'self'" ],
+            'object-src'  => [ "'none'" ],
+            'base-uri'    => [ "'self'" ],
+            'form-action' => [ "'self'" ],
+        ];
+
+        $map = [
+            'google_analytics'    => [
+                'script-src'  => [ 'https://www.googletagmanager.com', 'https://www.google-analytics.com' ],
+                'img-src'     => [ 'https://www.google-analytics.com', 'https://www.googletagmanager.com' ],
+                'connect-src' => [ 'https://www.google-analytics.com', 'https://analytics.google.com', 'https://stats.g.doubleclick.net', 'https://region1.google-analytics.com' ],
+            ],
+            'google_adsense'      => [
+                'script-src'  => [ 'https://pagead2.googlesyndication.com', 'https://partner.googleadservices.com', 'https://tpc.googlesyndication.com' ],
+                'frame-src'   => [ 'https://googleads.g.doubleclick.net', 'https://tpc.googlesyndication.com' ],
+                'img-src'     => [ 'https://pagead2.googlesyndication.com' ],
+                'connect-src' => [ 'https://pagead2.googlesyndication.com' ],
+            ],
+            'google_tag_manager'  => [
+                'script-src'  => [ 'https://www.googletagmanager.com' ],
+                'img-src'     => [ 'https://www.googletagmanager.com' ],
+            ],
+            'cloudflare_insights' => [
+                'script-src'  => [ 'https://static.cloudflareinsights.com' ],
+                'connect-src' => [ 'https://cloudflareinsights.com' ],
+            ],
+            'facebook_pixel'      => [
+                'script-src'  => [ 'https://connect.facebook.net' ],
+                'img-src'     => [ 'https://www.facebook.com' ],
+                'connect-src' => [ 'https://www.facebook.com' ],
+            ],
+            'recaptcha'           => [
+                'script-src'  => [ 'https://www.google.com', 'https://www.gstatic.com' ],
+                'frame-src'   => [ 'https://www.google.com' ],
+            ],
+            'youtube'             => [
+                'frame-src'   => [ 'https://www.youtube.com', 'https://www.youtube-nocookie.com' ],
+            ],
+            'vimeo'               => [
+                'frame-src'   => [ 'https://player.vimeo.com' ],
+            ],
+        ];
+
+        foreach ( $services as $svc ) {
+            if ( ! isset( $map[ $svc ] ) ) { continue; }
+            foreach ( $map[ $svc ] as $dir => $vals ) {
+                foreach ( $vals as $v ) {
+                    if ( ! in_array( $v, $d[ $dir ], true ) ) { $d[ $dir ][] = $v; }
+                }
+            }
+        }
+
+        $parts = [];
+        foreach ( $d as $dir => $vals ) { $parts[] = $dir . ' ' . implode( ' ', $vals ); }
+        if ( $custom ) { $parts[] = $custom; }
+        return implode( '; ', $parts );
+    }
+
+    private static function render_csp_panel(): void {
+        $csp_on       = get_option( 'csdt_devtools_csp_enabled', '0' ) === '1';
+        $csp_mode     = get_option( 'csdt_devtools_csp_mode', 'enforce' );
+        $csp_services = json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true );
+        if ( ! is_array( $csp_services ) ) { $csp_services = []; }
+        $csp_custom   = get_option( 'csdt_devtools_csp_custom', '' );
+
+        $services = [
+            'google_analytics'    => 'Google Analytics (GA4 / gtag.js)',
+            'google_adsense'      => 'Google AdSense',
+            'google_tag_manager'  => 'Google Tag Manager',
+            'cloudflare_insights' => 'Cloudflare Web Analytics',
+            'facebook_pixel'      => 'Facebook Pixel',
+            'recaptcha'           => 'Google reCAPTCHA',
+            'youtube'             => 'YouTube embeds',
+            'vimeo'               => 'Vimeo embeds',
+        ];
+        ?>
+        <hr class="cs-sec-divider">
+        <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #6366f1;margin-bottom:0;">
+            <span>🛡️ <?php esc_html_e( 'Content Security Policy (CSP)', 'cloudscale-devtools' ); ?></span>
+            <span class="cs-header-hint"><?php esc_html_e( 'Block unauthorised scripts and resources. Select the services your site uses before enabling.', 'cloudscale-devtools' ); ?></span>
+        </div>
+        <div style="padding:16px 0 8px;" id="cs-csp-panel">
+
+            <!-- Enable + Mode -->
+            <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:0 2px 14px;border-bottom:1px solid #f1f5f9;margin-bottom:14px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">
+                    <input type="checkbox" id="cs-csp-enabled" <?php checked( $csp_on ); ?>>
+                    <?php esc_html_e( 'Enable CSP', 'cloudscale-devtools' ); ?>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                    <input type="radio" name="cs-csp-mode" value="enforce" <?php checked( $csp_mode, 'enforce' ); ?>>
+                    <?php esc_html_e( 'Enforce', 'cloudscale-devtools' ); ?>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                    <input type="radio" name="cs-csp-mode" value="report_only" <?php checked( $csp_mode, 'report_only' ); ?>>
+                    <?php esc_html_e( 'Report-Only (test mode)', 'cloudscale-devtools' ); ?>
+                </label>
+            </div>
+
+            <!-- Service checkboxes -->
+            <div style="margin-bottom:14px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:10px;"><?php esc_html_e( 'Third-party services used on this site', 'cloudscale-devtools' ); ?></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px;">
+                    <?php foreach ( $services as $key => $label ) : ?>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:7px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;">
+                        <input type="checkbox" class="cs-csp-service" value="<?php echo esc_attr( $key ); ?>" <?php checked( in_array( $key, $csp_services, true ) ); ?>>
+                        <?php echo esc_html( $label ); ?>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- Custom directives -->
+            <div style="margin-bottom:14px;">
+                <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;"><?php esc_html_e( 'Additional directives (appended verbatim)', 'cloudscale-devtools' ); ?></label>
+                <input type="text" id="cs-csp-custom" class="cs-text-input" style="width:100%;font-family:monospace;font-size:12px;"
+                       placeholder="upgrade-insecure-requests; block-all-mixed-content"
+                       value="<?php echo esc_attr( $csp_custom ); ?>">
+            </div>
+
+            <!-- Live preview -->
+            <div style="margin-bottom:14px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;"><?php esc_html_e( 'Preview', 'cloudscale-devtools' ); ?></div>
+                <pre id="cs-csp-preview" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0;max-height:140px;overflow-y:auto;"></pre>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button type="button" id="cs-csp-save-btn" class="cs-btn-primary cs-btn-sm"><?php esc_html_e( 'Save CSP Settings', 'cloudscale-devtools' ); ?></button>
+                <span id="cs-csp-saved" style="display:none;color:#16a34a;font-size:13px;font-weight:600;">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+            </div>
+        </div>
+
+        <script>
+        (function(){
+            var base = {
+                'default-src': ["'self'"],
+                'script-src':  ["'self'","'unsafe-inline'"],
+                'style-src':   ["'self'","'unsafe-inline'"],
+                'img-src':     ["'self'","data:","https:"],
+                'font-src':    ["'self'","data:"],
+                'connect-src': ["'self'"],
+                'frame-src':   ["'self'"],
+                'object-src':  ["'none'"],
+                'base-uri':    ["'self'"],
+                'form-action': ["'self'"]
+            };
+            var serviceMap = {
+                google_analytics:    { 'script-src':['https://www.googletagmanager.com','https://www.google-analytics.com'], 'img-src':['https://www.google-analytics.com','https://www.googletagmanager.com'], 'connect-src':['https://www.google-analytics.com','https://analytics.google.com','https://stats.g.doubleclick.net','https://region1.google-analytics.com'] },
+                google_adsense:      { 'script-src':['https://pagead2.googlesyndication.com','https://partner.googleadservices.com','https://tpc.googlesyndication.com'], 'frame-src':['https://googleads.g.doubleclick.net','https://tpc.googlesyndication.com'], 'img-src':['https://pagead2.googlesyndication.com'], 'connect-src':['https://pagead2.googlesyndication.com'] },
+                google_tag_manager:  { 'script-src':['https://www.googletagmanager.com'], 'img-src':['https://www.googletagmanager.com'] },
+                cloudflare_insights: { 'script-src':['https://static.cloudflareinsights.com'], 'connect-src':['https://cloudflareinsights.com'] },
+                facebook_pixel:      { 'script-src':['https://connect.facebook.net'], 'img-src':['https://www.facebook.com'], 'connect-src':['https://www.facebook.com'] },
+                recaptcha:           { 'script-src':['https://www.google.com','https://www.gstatic.com'], 'frame-src':['https://www.google.com'] },
+                youtube:             { 'frame-src':['https://www.youtube.com','https://www.youtube-nocookie.com'] },
+                vimeo:               { 'frame-src':['https://player.vimeo.com'] }
+            };
+
+            function buildPreview() {
+                var d = JSON.parse(JSON.stringify(base));
+                document.querySelectorAll('.cs-csp-service:checked').forEach(function(cb){
+                    var svc = serviceMap[cb.value];
+                    if (!svc) return;
+                    Object.keys(svc).forEach(function(dir){
+                        svc[dir].forEach(function(v){ if (d[dir].indexOf(v) === -1) d[dir].push(v); });
+                    });
+                });
+                var parts = Object.keys(d).map(function(k){ return k + ' ' + d[k].join(' '); });
+                var custom = document.getElementById('cs-csp-custom');
+                if (custom && custom.value.trim()) parts.push(custom.value.trim());
+                document.getElementById('cs-csp-preview').textContent = parts.join(';\n');
+            }
+
+            document.querySelectorAll('.cs-csp-service').forEach(function(cb){ cb.addEventListener('change', buildPreview); });
+            var customIn = document.getElementById('cs-csp-custom');
+            if (customIn) customIn.addEventListener('input', buildPreview);
+            buildPreview();
+
+            var saveBtn  = document.getElementById('cs-csp-save-btn');
+            var savedMsg = document.getElementById('cs-csp-saved');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function(){
+                    saveBtn.disabled = true;
+                    var services = [];
+                    document.querySelectorAll('.cs-csp-service:checked').forEach(function(cb){ services.push(cb.value); });
+                    var modeEl = document.querySelector('input[name="cs-csp-mode"]:checked');
+                    var fd = new FormData();
+                    fd.append('action',   'csdt_devtools_csp_save');
+                    fd.append('nonce',    csdtVulnScan.nonce);
+                    fd.append('enabled',  document.getElementById('cs-csp-enabled').checked ? '1' : '0');
+                    fd.append('mode',     modeEl ? modeEl.value : 'enforce');
+                    fd.append('services', JSON.stringify(services));
+                    fd.append('custom',   customIn ? customIn.value.trim() : '');
+                    fetch(csdtVulnScan.ajaxUrl, { method:'POST', body:fd })
+                        .then(function(r){ return r.json(); })
+                        .then(function(){
+                            saveBtn.disabled = false;
+                            if (savedMsg) { savedMsg.style.display = 'inline'; setTimeout(function(){ savedMsg.style.display = 'none'; }, 2000); }
+                        })
+                        .catch(function(){ saveBtn.disabled = false; });
+                });
+            }
+        })();
+        </script>
+        <?php
+    }
+
+    public static function ajax_csp_save(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+
+        $enabled  = isset( $_POST['enabled'] )  ? sanitize_key( wp_unslash( $_POST['enabled'] ) )                       : '0';
+        $mode     = isset( $_POST['mode'] )     ? sanitize_key( wp_unslash( $_POST['mode'] ) )                          : 'enforce';
+        $services = isset( $_POST['services'] ) ? json_decode( sanitize_text_field( wp_unslash( $_POST['services'] ) ), true ) : [];
+        $custom   = isset( $_POST['custom'] )   ? sanitize_textarea_field( wp_unslash( $_POST['custom'] ) )             : '';
+
+        if ( ! is_array( $services ) ) { $services = []; }
+        $allowed_services = [ 'google_analytics', 'google_adsense', 'google_tag_manager', 'cloudflare_insights', 'facebook_pixel', 'recaptcha', 'youtube', 'vimeo' ];
+        $services = array_values( array_intersect( $services, $allowed_services ) );
+
+        update_option( 'csdt_devtools_csp_enabled',  $enabled === '1' ? '1' : '0' );
+        update_option( 'csdt_devtools_csp_mode',     in_array( $mode, [ 'enforce', 'report_only' ], true ) ? $mode : 'enforce' );
+        update_option( 'csdt_devtools_csp_services', wp_json_encode( $services ) );
+        update_option( 'csdt_devtools_csp_custom',   $custom );
+
+        wp_send_json_success();
     }
 
     public static function register_dashboard_widget(): void {
@@ -9338,6 +9606,8 @@ class CloudScale_DevTools {
                 <?php endforeach; ?>
                 </div>
 
+                <?php self::render_csp_panel(); ?>
+
                 <hr class="cs-sec-divider">
 
                 <div class="cs-scan-row">
@@ -9568,6 +9838,9 @@ class CloudScale_DevTools {
         }
 
         switch ( $fix_id ) {
+            case 'security_headers':
+                update_option( 'csdt_devtools_safe_headers_enabled', '1' );
+                break;
             case 'disable_pingbacks':
                 update_option( 'default_ping_status',   'closed' );
                 update_option( 'default_pingback_flag', 0 );
