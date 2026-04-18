@@ -70,7 +70,46 @@ helpLib.run({
 </div>`,
 
     sections: [
-        { id: 'security',   label: 'AI Cyber Audit',        file: 'panel-security.png',    tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-panel-security' },
+        { id: 'security',   label: 'AI Cyber Audit',        file: 'panel-security.png',    tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-panel-security',
+          jsBeforeShot: () => {
+            // Inject demo data: score 100, no real findings
+            var r = document.getElementById('cs-vuln-results');
+            if (r) {
+                r.style.display = 'block';
+                r.innerHTML =
+                    '<div class="cs-audit-header">' +
+                    '<div class="cs-audit-score-circle cs-audit-score-excellent">' +
+                    '<span class="cs-audit-score-num">100</span>' +
+                    '<span class="cs-audit-score-lbl">Excellent</span>' +
+                    '</div>' +
+                    '<div class="cs-audit-meta">' +
+                    '<p class="cs-audit-summary-text">Your WordPress installation demonstrates exceptional security. All critical controls are in place — security headers, 2FA, hidden login URL, disabled file editing, and no vulnerable plugins. Nothing to remediate.</p>' +
+                    '<span class="cs-audit-meta-line">Model: claude-sonnet-4-6 · Auto AI Model</span>' +
+                    '</div></div>' +
+                    '<div class="cs-audit-section cs-audit-sec-good">' +
+                    '<h4 class="cs-audit-section-title">Good Practices (8)</h4>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>Security headers configured</strong> — X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy all set.</div></div>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>WordPress auto-updates enabled</strong> — Core security patches applied automatically.</div></div>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>File editing disabled</strong> — DISALLOW_FILE_EDIT is set in wp-config.php.</div></div>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>Debug mode off in production</strong> — WP_DEBUG and display_errors are disabled.</div></div>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>Strong administrator credentials</strong> — No default or weak passwords detected.</div></div>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>Login URL hidden</strong> — Custom login path protects against automated brute-force attempts.</div></div>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>Two-factor authentication active</strong> — All administrator accounts protected with 2FA.</div></div>' +
+                    '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div><strong>XML-RPC disabled</strong> — Endpoint blocked to prevent credential-stuffing attacks.</div></div>' +
+                    '</div>';
+            }
+            // Make all quick fixes show as fixed
+            document.querySelectorAll('#cs-quick-fixes-list [data-fix-id]').forEach(function(btn) {
+                var wrap = btn.closest('div[style*="flex-shrink"]') || btn.parentElement;
+                if (wrap) wrap.innerHTML = '<span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed \u2713</span>';
+            });
+            // Hide scan controls to show only the result
+            var ctrl = document.querySelector('.cs-sec-settings');
+            if (ctrl) ctrl.style.display = 'none';
+            var intro = document.querySelector('.cs-tab-intro');
+            if (intro) intro.style.display = 'none';
+          }
+        },
         { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=logs"]', elementSelector: '#cs-panel-logs' },
         { id: 'hide-login', label: 'Hide Login URL',        file: 'panel-hide-login.png',  tabSelector: 'a[href*="tab=login"]', elementSelector: '#cs-panel-hide-login' },
         { id: '2fa',        label: 'Two-Factor Auth',       file: 'panel-2fa.png',         tabSelector: 'a[href*="tab=login"]', elementSelector: '#cs-panel-2fa' },

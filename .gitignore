@@ -26,3 +26,4 @@ generate-help-docs.sh
 docs/screenshots/
 repo/
 *.backup
+tests/.auth/
