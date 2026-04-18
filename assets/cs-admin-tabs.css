@@ -1224,28 +1224,25 @@
     padding: 1px 8px;
 }
 .cs-bf-chart {
-    position: relative;
     display: flex;
     gap: 4px;
     align-items: flex-end;
     margin-bottom: 16px;
-    padding-left: 30px;
     padding-right: 12px;
 }
 .cs-bf-yaxis {
-    position: absolute;
-    left: 0;
-    top: 0;
+    align-self: flex-start;
+    flex-shrink: 0;
     width: 26px;
     height: 70px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     align-items: flex-end;
-    padding-right: 4px;
-    font-size: 10px;
-    font-weight: 600;
-    color: #666;
+    padding-right: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #555;
     user-select: none;
     line-height: 1;
     box-sizing: border-box;

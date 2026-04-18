@@ -436,6 +436,8 @@
             </div>`;
         } ).join( '' );
         bfChart.innerHTML = yAxis + bars;
+        // y-axis uses align-self:flex-start to pin to top of bar-track (70px)
+        // while day divs (90px) remain bottom-aligned via parent align-items:flex-end
     }
 
     function renderBfTable( log, now ) {
