@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.89
+ * Version: 1.9.90
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.89';
+    const VERSION      = '1.9.90';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9362,29 +9362,46 @@ class CloudScale_DevTools {
         <style>
         .cs-home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;padding:20px 20px 0;}
         .cs-home-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-        .cs-home-card-hd{background:#f8fafc;border-bottom:1px solid #e5e7eb;padding:11px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;display:flex;align-items:center;gap:6px;}
+        .cs-home-card-hd{background:#f8fafc;border-bottom:1px solid #e5e7eb;padding:11px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;display:flex;align-items:center;justify-content:space-between;gap:6px;text-decoration:none;}
+        a.cs-home-card-hd:hover{background:#f1f5f9;color:#0e6b8f;}
+        .cs-home-card-hd-lft{display:flex;align-items:center;gap:6px;}
+        .cs-home-card-hd-arrow{font-size:11px;color:#94a3b8;}
+        a.cs-home-card-hd:hover .cs-home-card-hd-arrow{color:#0e6b8f;}
         .cs-home-row{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;border-bottom:1px solid #f1f5f9;font-size:13px;}
         .cs-home-row:last-child{border-bottom:none;}
-        .cs-home-lbl{color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+        .cs-home-lbl{color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;flex-shrink:0;}
+        .cs-home-rval{display:flex;align-items:center;gap:8px;}
         .cs-hv-green{color:#16a34a;font-weight:600;}
         .cs-hv-red{color:#dc2626;font-weight:600;}
         .cs-hv-orange{color:#d97706;font-weight:600;}
         .cs-hv-neutral{color:#1e293b;font-weight:600;}
         .cs-hv-muted{color:#94a3b8;}
+        .cs-home-nav{font-size:11px;font-weight:600;color:#0e6b8f;text-decoration:none;white-space:nowrap;padding:2px 6px;border-radius:4px;background:#eff6ff;}
+        .cs-home-nav:hover{background:#dbeafe;color:#1d4ed8;}
         .cs-home-actions{display:flex;gap:10px;padding:16px 20px 20px;}
         .cs-home-actions .cs-btn-primary,.cs-home-actions .cs-btn-secondary{flex:1;text-align:center;justify-content:center;}
         </style>
 
+        <?php
+        $sec_url   = $base_url . '&tab=security';
+        $login_url = $base_url . '&tab=login';
+        ?>
         <div id="cs-panel-home" class="cs-panel" style="margin-bottom:0;">
         <div class="cs-home-grid">
 
             <!-- AI Security -->
             <div class="cs-home-card">
-                <div class="cs-home-card-hd">🤖 <?php esc_html_e( 'AI Security', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-card-hd">
+                    <span class="cs-home-card-hd-lft">🤖 <?php esc_html_e( 'AI Security', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-card-hd-arrow">Security Scan →</span>
+                </a>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'STATUS', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo $has_key ? 'cs-hv-green' : 'cs-hv-red'; ?>">
-                        <?php echo $has_key ? '✅ ' . esc_html__( 'Configured', 'cloudscale-devtools' ) : '⚠️ ' . esc_html__( 'API key not set', 'cloudscale-devtools' ); ?>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo $has_key ? 'cs-hv-green' : 'cs-hv-red'; ?>">
+                            <?php echo $has_key ? '✅ ' . esc_html__( 'Configured', 'cloudscale-devtools' ) : '⚠️ ' . esc_html__( 'Not set', 'cloudscale-devtools' ); ?>
+                        </span>
+                        <?php if ( ! $has_key ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Set up API key', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
                     </span>
                 </div>
                 <div class="cs-home-row">
@@ -9393,15 +9410,21 @@ class CloudScale_DevTools {
                 </div>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'SCHEDULED SCANS', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo $sched_on ? 'cs-hv-green' : 'cs-hv-muted'; ?>">
-                        <?php echo $sched_on ? esc_html( ucfirst( $sched_freq ) ) : esc_html__( 'Disabled', 'cloudscale-devtools' ); ?>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo $sched_on ? 'cs-hv-green' : 'cs-hv-muted'; ?>">
+                            <?php echo $sched_on ? esc_html( ucfirst( $sched_freq ) ) : esc_html__( 'Disabled', 'cloudscale-devtools' ); ?>
+                        </span>
+                        <?php if ( ! $sched_on ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Schedule', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
                     </span>
                 </div>
             </div>
 
             <!-- Last Scan -->
             <div class="cs-home-card">
-                <div class="cs-home-card-hd">🛡️ <?php esc_html_e( 'Last Security Scan', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-card-hd">
+                    <span class="cs-home-card-hd-lft">🛡️ <?php esc_html_e( 'Last Security Scan', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-card-hd-arrow"><?php echo $last_scan ? esc_html__( 'View report', 'cloudscale-devtools' ) : esc_html__( 'Run scan', 'cloudscale-devtools' ); ?> →</span>
+                </a>
                 <?php if ( $last_scan ) : ?>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'SCORE', 'cloudscale-devtools' ); ?></span>
@@ -9409,11 +9432,17 @@ class CloudScale_DevTools {
                 </div>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'CRITICAL', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo (int) ( $last_scan['critical_count'] ?? 0 ) > 0 ? 'cs-hv-red' : 'cs-hv-green'; ?>"><?php echo (int) ( $last_scan['critical_count'] ?? 0 ); ?></span>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo (int) ( $last_scan['critical_count'] ?? 0 ) > 0 ? 'cs-hv-red' : 'cs-hv-green'; ?>"><?php echo (int) ( $last_scan['critical_count'] ?? 0 ); ?></span>
+                        <?php if ( (int) ( $last_scan['critical_count'] ?? 0 ) > 0 ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'View', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
+                    </span>
                 </div>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'HIGH', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo (int) ( $last_scan['high_count'] ?? 0 ) > 0 ? 'cs-hv-orange' : 'cs-hv-green'; ?>"><?php echo (int) ( $last_scan['high_count'] ?? 0 ); ?></span>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo (int) ( $last_scan['high_count'] ?? 0 ) > 0 ? 'cs-hv-orange' : 'cs-hv-green'; ?>"><?php echo (int) ( $last_scan['high_count'] ?? 0 ); ?></span>
+                        <?php if ( (int) ( $last_scan['high_count'] ?? 0 ) > 0 ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'View', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
+                    </span>
                 </div>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'TYPE', 'cloudscale-devtools' ); ?></span>
@@ -9426,53 +9455,74 @@ class CloudScale_DevTools {
                 <?php else : ?>
                 <div class="cs-home-row">
                     <span class="cs-hv-muted"><?php esc_html_e( 'No scans run yet', 'cloudscale-devtools' ); ?></span>
-                    <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" class="cs-btn-primary cs-btn-sm"><?php esc_html_e( 'Run now', 'cloudscale-devtools' ); ?></a>
+                    <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Run now', 'cloudscale-devtools' ); ?> →</a>
                 </div>
                 <?php endif; ?>
             </div>
 
             <!-- Quick Fixes -->
             <div class="cs-home-card">
-                <div class="cs-home-card-hd">⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-card-hd">
+                    <span class="cs-home-card-hd-lft">⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-card-hd-arrow"><?php esc_html_e( 'Fix all', 'cloudscale-devtools' ); ?> →</span>
+                </a>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'RESOLVED', 'cloudscale-devtools' ); ?></span>
                     <span class="<?php echo esc_attr( $fixes_cls ); ?>"><?php echo esc_html( $fixes_done . ' / ' . $fixes_tot ); ?></span>
                 </div>
                 <?php foreach ( $fixes as $fix ) : ?>
                 <div class="cs-home-row">
-                    <span class="cs-home-lbl" style="font-size:11px;max-width:65%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?php echo esc_attr( $fix['title'] ); ?>"><?php echo esc_html( strtoupper( $fix['title'] ) ); ?></span>
-                    <span class="<?php echo ! empty( $fix['fixed'] ) ? 'cs-hv-green' : 'cs-hv-red'; ?>"><?php echo ! empty( $fix['fixed'] ) ? '✅' : '⚠️ ' . esc_html__( 'Fix needed', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-lbl" style="max-width:55%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?php echo esc_attr( $fix['title'] ); ?>"><?php echo esc_html( strtoupper( $fix['title'] ) ); ?></span>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo ! empty( $fix['fixed'] ) ? 'cs-hv-green' : 'cs-hv-red'; ?>"><?php echo ! empty( $fix['fixed'] ) ? '✅' : '⚠️'; ?></span>
+                        <?php if ( empty( $fix['fixed'] ) ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Fix', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
+                    </span>
                 </div>
                 <?php endforeach; ?>
             </div>
 
             <!-- Login Security -->
             <div class="cs-home-card">
-                <div class="cs-home-card-hd">🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-card-hd">
+                    <span class="cs-home-card-hd-lft">🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-card-hd-arrow"><?php esc_html_e( 'Settings', 'cloudscale-devtools' ); ?> →</span>
+                </a>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'BRUTE FORCE', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo $bf_on ? 'cs-hv-green' : 'cs-hv-red'; ?>"><?php echo $bf_on ? '✅ ' . esc_html__( 'Enabled', 'cloudscale-devtools' ) : '⚠️ ' . esc_html__( 'Disabled', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo $bf_on ? 'cs-hv-green' : 'cs-hv-red'; ?>"><?php echo $bf_on ? '✅ ' . esc_html__( 'Enabled', 'cloudscale-devtools' ) : '⚠️ ' . esc_html__( 'Disabled', 'cloudscale-devtools' ); ?></span>
+                        <?php if ( ! $bf_on ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Enable', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
+                    </span>
                 </div>
                 <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( '2FA ADMIN COVERAGE', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo $adm_2fa === $adm_tot ? 'cs-hv-green' : 'cs-hv-orange'; ?>"><?php echo esc_html( $adm_2fa . ' / ' . $adm_tot . ' ' . __( 'admins', 'cloudscale-devtools' ) ); ?></span>
+                    <span class="cs-home-lbl"><?php esc_html_e( '2FA ADMINS', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo $adm_2fa === $adm_tot ? 'cs-hv-green' : 'cs-hv-orange'; ?>"><?php echo esc_html( $adm_2fa . ' / ' . $adm_tot ); ?></span>
+                        <?php if ( $adm_2fa < $adm_tot ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Set up 2FA', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
+                    </span>
                 </div>
                 <div class="cs-home-row">
                     <span class="cs-home-lbl"><?php esc_html_e( 'HIDE LOGIN', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo $login_slug ? 'cs-hv-green' : 'cs-hv-orange'; ?>"><?php echo $login_slug ? '✅ ' . esc_html__( 'Active', 'cloudscale-devtools' ) : '⚠️ ' . esc_html__( 'Default /wp-login.php', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo $login_slug ? 'cs-hv-green' : 'cs-hv-orange'; ?>"><?php echo $login_slug ? '✅ /' . esc_html( $login_slug ) : '⚠️ ' . esc_html__( 'Default URL', 'cloudscale-devtools' ); ?></span>
+                        <?php if ( ! $login_slug ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Set up', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
+                    </span>
                 </div>
                 <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'FORCE 2FA ADMINS', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-lbl"><?php esc_html_e( 'FORCE 2FA', 'cloudscale-devtools' ); ?></span>
                     <?php $force_2fa = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1'; ?>
-                    <span class="<?php echo $force_2fa ? 'cs-hv-green' : 'cs-hv-muted'; ?>"><?php echo $force_2fa ? '✅ ' . esc_html__( 'Enforced', 'cloudscale-devtools' ) : esc_html__( 'Optional', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-home-rval">
+                        <span class="<?php echo $force_2fa ? 'cs-hv-green' : 'cs-hv-muted'; ?>"><?php echo $force_2fa ? '✅ ' . esc_html__( 'Enforced', 'cloudscale-devtools' ) : esc_html__( 'Optional', 'cloudscale-devtools' ); ?></span>
+                        <?php if ( ! $force_2fa ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Enforce', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
+                    </span>
                 </div>
             </div>
 
         </div><!-- /grid -->
 
         <div class="cs-home-actions">
-            <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" class="cs-btn-primary">🔍 <?php esc_html_e( 'Run Security Scan', 'cloudscale-devtools' ); ?></a>
-            <a href="<?php echo esc_url( $base_url . '&tab=login' ); ?>" class="cs-btn-secondary">🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-primary">🔍 <?php esc_html_e( 'Run Security Scan', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $login_url ); ?>" class="cs-btn-secondary">🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></a>
         </div>
 
         </div><!-- /cs-panel -->
