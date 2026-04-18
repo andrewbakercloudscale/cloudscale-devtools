@@ -45,8 +45,8 @@ $content = <<<'HTML'
 
 <div class="cs-hero">
 <a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
-<h1>CloudScale Devtools &amp; Cyber</h1>
-<p>A free WordPress developer toolkit with <strong>enterprise-grade AI security scanning built in</strong>. The <strong>AI Cyber Audit</strong> uses frontier AI models (Anthropic Claude or Google Gemini) to perform deep security analysis of your WordPress installation — hardening checks, live HTTP header inspection, endpoint exposure, plugin code vulnerability review, user account risks, and more — delivering scored findings with step-by-step remediation. Bring your own API key and run the kind of security analysis that would normally cost hundreds of dollars, in under 60 seconds. Also includes: syntax-highlighted code blocks, social preview diagnostics, read-only SQL tool, bulk code migrator, login security (passkeys, TOTP, 2FA, hide URL, brute-force protection), SMTP mail, performance monitor, and a custom 404 page with mini-games.</p>
+<h1>CloudScale Cyber and Devtools</h1>
+<p>A free WordPress developer toolkit with <strong>enterprise-grade AI security scanning built in</strong>. The <strong>AI Cyber Audit</strong> uses frontier AI models (Anthropic Claude or Google Gemini) to perform deep security analysis of your WordPress installation — hardening checks, live HTTP probes, DNS record validation, weak TLS detection, plugin code vulnerability analysis, PHP end-of-life checks, one-click automated fixes, scheduled scans with email alerts, and full scan history. Bring your own API key and run the kind of security analysis that would normally cost hundreds of dollars, in under 60 seconds. Also includes: read-only server log viewer, temporary test accounts for CI pipelines, syntax-highlighted code blocks, social preview diagnostics, read-only SQL tool, bulk code migrator, login security (passkeys, TOTP, 2FA, hide URL, brute-force protection), SMTP mail, performance monitor, and a custom 404 page with mini-games.</p>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;">
 <a class="cs-download-btn" href="https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">&#11015; Download Latest Version (.zip)</a>
 <a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a>
@@ -62,7 +62,13 @@ $content = <<<'HTML'
 <li><a href="#2fa">Two-Factor Auth</a></li>
 <li><a href="#passkeys">Passkeys (WebAuthn)</a></li>
 <li><a href="#brute-force">Brute Force Protection</a></li>
+<li><a href="#test-accounts">Test Account Manager</a></li>
 <li><a href="#ai-security">AI Cyber Audit</a></li>
+<li><a href="#quick-fixes">Quick Fixes</a></li>
+<li><a href="#scan-history">Scan History</a></li>
+<li><a href="#scheduled-scans">Scheduled Scans</a></li>
+<li><a href="#code-triage">AI Code Triage</a></li>
+<li><a href="#server-logs">Server Logs</a></li>
 <li><a href="#smtp">SMTP / Mail</a></li>
 <li><a href="#thumbnails">Social Preview &amp; Thumbnails</a></li>
 <li><a href="#sql-tool">SQL Query Tool</a></li>
@@ -107,7 +113,7 @@ $content = <<<'HTML'
 <h3 class="cs-panel-heading" id="migrator">Code Block Migrator</h3>
 <figure class="cs-screenshot"><img decoding="async" src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-migrator-5.jpg" alt="Code Block Migrator" /></figure>
 <div class="cs-panel-body">
-<p>The <strong>Code Block Migrator</strong> (Tools → CloudScale Devtools → Migrate tab) converts legacy code block shortcodes and blocks from other plugins to CloudScale Devtools blocks in a single batch operation.</p>
+<p>The <strong>Code Block Migrator</strong> (Tools → CloudScale Cyber and Devtools → Migrate tab) converts legacy code block shortcodes and blocks from other plugins to CloudScale Devtools blocks in a single batch operation.</p>
 <p><strong>Supported source formats:</strong></p>
 <ul>
 <li>WordPress core <code>&lt;!-- wp:code --&gt;</code> and <code>&lt;!-- wp:preformatted --&gt;</code> blocks.</li>
@@ -133,7 +139,7 @@ $content = <<<'HTML'
 <div class="cs-panel-body">
 <p>The <strong>Hide Login URL</strong> feature moves your WordPress login from the default <code>/wp-login.php</code> to a custom URL slug of your choice. Requests to <code>/wp-login.php</code> return a 404 to automated scanners and bots.</p>
 <p><strong>How it works:</strong> The feature hooks into <code>init</code> and rewrites the login request transparently — no redirect occurs, so there is no latency penalty. It overrides <code>login_url</code>, <code>lostpassword_url</code>, and <code>register_url</code> filters so all WordPress-generated links point to your custom slug automatically. WP-CLI, REST API, XML-RPC, and WP Cron connections are unaffected.</p>
-<p><strong>Setup:</strong> Tools → CloudScale Devtools → Login tab → enter your chosen slug (e.g. <code>my-login</code>) and save. Your login URL becomes <code>https://yoursite.com/my-login</code>. Keep a note of your slug — if you forget it you can recover it by deactivating the plugin.</p>
+<p><strong>Setup:</strong> Tools → CloudScale Cyber and Devtools → Login tab → enter your chosen slug (e.g. <code>my-login</code>) and save. Your login URL becomes <code>https://yoursite.com/my-login</code>. Keep a note of your slug — if you forget it you can recover it by deactivating the plugin.</p>
 <p><strong>Session Duration:</strong> Also on the Login tab, you can set a custom session duration (in days). When set, login cookies are issued with that lifetime so users stay logged in without re-authenticating on every visit.</p>
 </div>
 </div>
@@ -143,7 +149,7 @@ $content = <<<'HTML'
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="2fa">Two-Factor Authentication</h3>
 <div class="cs-panel-body">
-<p>CloudScale Devtools supports three 2FA methods, all configurable under Tools → CloudScale Devtools → Login tab.</p>
+<p>CloudScale Devtools supports three 2FA methods, all configurable under Tools → CloudScale Cyber and Devtools → Login tab.</p>
 
 <h4 class="cs-sub-heading">Email Code</h4>
 <p>After a successful password login, a 6-digit code is emailed to the user's registered address. The code expires after 10 minutes. No third-party service is required — the code is generated and verified entirely on your server.</p>
@@ -176,7 +182,7 @@ $content = <<<'HTML'
 <li><strong>Per-device registration</strong> — register multiple devices with individual labels. Remove any device at any time from the Login tab.</li>
 <li><strong>Test without logout</strong> — after registering a passkey you can verify it works from the Login tab without signing out first.</li>
 </ul>
-<p><strong>Registration:</strong> Tools → CloudScale Devtools → Login tab → Passkeys section → click Register and follow your browser/OS prompt. Give the device a recognisable label (e.g. "MacBook Touch ID").</p>
+<p><strong>Registration:</strong> Tools → CloudScale Cyber and Devtools → Login tab → Passkeys section → click Register and follow your browser/OS prompt. Give the device a recognisable label (e.g. "MacBook Touch ID").</p>
 </div>
 </div>
 <hr class="cs-divider"/>
@@ -185,14 +191,44 @@ $content = <<<'HTML'
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="brute-force">Brute Force Protection</h3>
 <div class="cs-panel-body">
-<p>The <strong>Brute Force Protection</strong> feature rate-limits repeated failed login attempts on a per-username and per-IP basis, locking out attackers before they can exhaust your password space.</p>
-<p><strong>Configuration</strong> (Tools → CloudScale Devtools → Login tab):</p>
+<p>The <strong>Brute Force Protection</strong> feature rate-limits repeated failed login attempts on a per-username basis, locking out attackers before they can exhaust your password space.</p>
+<p><strong>Configuration</strong> (Tools → CloudScale Cyber and Devtools → Login tab):</p>
 <ul>
 <li><strong>Max attempts</strong> — number of consecutive failed logins before a lockout is triggered (default: 5).</li>
-<li><strong>Lockout duration</strong> — how long the account/IP is blocked after the threshold is reached (configurable in minutes).</li>
+<li><strong>Lockout duration</strong> — how long the account is blocked after the threshold is reached (configurable in minutes).</li>
 </ul>
-<p>Failed attempts and lockout state are stored as WordPress transients — no extra database tables. Lockouts clear automatically when the transient expires. Successful logins reset the counter.</p>
+<p>The lock is <strong>per-username, not per-IP</strong> — this stops distributed attacks spread across multiple IPs. Failed attempts and lockout state are stored as WordPress transients — no extra database tables. Lockouts clear automatically when the transient expires. Successful logins reset the counter.</p>
 <p><strong>Works alongside 2FA:</strong> Brute force protection fires at the password stage, before any 2FA challenge. An attacker cannot reach the 2FA prompt if they have already been locked out.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ TEST ACCOUNT MANAGER ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="test-accounts">Test Account Manager</h3>
+<div class="cs-panel-body">
+<p>The <strong>Test Account Manager</strong> creates short-lived subscriber-level WordPress accounts with application passwords — designed for Playwright, Cypress, and other automated testing pipelines that need to authenticate against the WordPress REST API without storing production credentials in CI configuration.</p>
+
+<h4 class="cs-sub-heading">How It Works</h4>
+<p>When enabled, clicking <strong>Create Test Account</strong> generates a new subscriber account with a random username (e.g. <code>csdt-test-a1b2c3</code>) and an application password. Credentials are displayed <strong>once only</strong> — copy them immediately. The account and its app password are automatically deleted when the TTL expires.</p>
+<p>The feature restricts app passwords to test accounts only — all production accounts remain blocked. This means you can have the security benefit of disabled app passwords for regular users while still giving CI pipelines a safe authentication path.</p>
+
+<h4 class="cs-sub-heading">Configuration</h4>
+<ul>
+<li><strong>Default TTL</strong> — how long an account lives before automatic deletion: 30 min, 1 hour, 2 hours, or 24 hours.</li>
+<li><strong>Single-use</strong> — delete the account immediately on the first successful authentication. Useful for one-shot test runs; may cause issues if Playwright retries a failed request.</li>
+</ul>
+
+<h4 class="cs-sub-heading">Using Credentials in Playwright</h4>
+<p>After creating an account, the panel shows copy buttons for:</p>
+<ul>
+<li><strong>JSON</strong> — paste into a <code>.env</code> file or a Playwright fixture</li>
+<li><strong>curl example</strong> — test the credentials from the command line</li>
+</ul>
+<p>The REST URL shown is the base URL for authenticated API calls using Basic Auth with the app password.</p>
+
+<h4 class="cs-sub-heading">Active Account List</h4>
+<p>The panel shows all currently active test accounts with their expiry time. Click <strong>Revoke</strong> on any account to delete it immediately rather than waiting for the TTL.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
@@ -202,27 +238,49 @@ $content = <<<'HTML'
 <h3 class="cs-panel-heading" id="ai-security">AI Cyber Audit</h3>
 <div class="cs-panel-body">
 <div style="background:#fdf4ff;border-left:4px solid #7c3aed;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
-<p style="margin:0 0 8px;"><strong>🛡️ Enterprise-grade security analysis — free, in under 60 seconds.</strong> The AI Cyber Audit submits your WordPress environment to a frontier AI model (Claude or Gemini) which analyses it like an expert penetration tester: cross-referencing configuration decisions, live HTTP responses, exposed endpoints, and plugin code to find real vulnerabilities — not just checklist items.</p>
+<p style="margin:0 0 8px;"><strong>🛡️ Enterprise-grade security analysis — free, in under 60 seconds.</strong> The AI Cyber Audit submits your WordPress environment to a frontier AI model (Claude or Gemini) which analyses it like an expert penetration tester: cross-referencing configuration decisions, live HTTP responses, DNS records, TLS configuration, exposed endpoints, and plugin code to find real vulnerabilities — not just checklist items.</p>
 <p style="margin:0;">Results are scored <strong>Critical / High / Medium / Low / Good</strong>, each with a plain-English explanation and a concrete step-by-step remediation — the same quality you'd expect from a paid security consultant.</p>
 </div>
-<p>Access the audit at <strong>Tools → CloudScale Devtools → Security tab</strong>. Two scan modes are available:</p>
+<p>Access the audit at <strong>Tools → CloudScale Cyber and Devtools → Security tab</strong>. Two scan modes are available:</p>
 
-<h4 class="cs-sub-heading">Run AI Cyber Audit</h4>
-<p>The fast scan. Collects server-side configuration — active plugins, PHP/WordPress/MySQL versions, file permissions, exposed debug flags, user accounts and roles, 2FA coverage, brute-force settings, and key <code>wp-config.php</code> hardening constants — and runs AI analysis in ~15–30 seconds.</p>
+<h4 class="cs-sub-heading">Run AI Cyber Audit (Standard)</h4>
+<p>The fast scan (~15–30 seconds). Collects server-side configuration data and sends it to your chosen AI model:</p>
+<ul>
+<li>PHP and WordPress core versions</li>
+<li>Active plugins and themes (versions, known vulnerability flags)</li>
+<li>File permissions on key files and directories</li>
+<li>Exposed debug flags (<code>WP_DEBUG</code>, <code>WP_DEBUG_LOG</code>, <code>SCRIPT_DEBUG</code>)</li>
+<li>User accounts, roles, and 2FA coverage</li>
+<li>Brute-force protection configuration</li>
+<li>Key <code>wp-config.php</code> security constants (<code>DISALLOW_FILE_EDIT</code>, <code>FORCE_SSL_ADMIN</code>, table prefix, secret key strength)</li>
+<li>WordPress version display and XML-RPC exposure</li>
+</ul>
 
 <h4 class="cs-sub-heading">Run AI Deep Dive Cyber Audit</h4>
-<p>The comprehensive scan. Extends the fast scan with live external checks run concurrently via parallel AI calls: HTTP security headers (CSP, HSTS, X-Frame-Options, Permissions-Policy), public endpoint exposure (<code>/wp-json/</code> user enumeration, XML-RPC, <code>/wp-cron.php</code>, directory listing), SSL/TLS certificate validity, login URL obfuscation, and static analysis of active plugin PHP code for known vulnerability patterns. Results are merged and weighted (internal config 45%, external exposure 55%) into a single scored report. Typically completes in 30–60 seconds.</p>
+<p>The comprehensive scan (~30–90 seconds). Extends the standard scan with:</p>
+<ul>
+<li><strong>Live HTTP header inspection</strong> — Content-Security-Policy, HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy, Referrer-Policy, and CORS (<code>Access-Control-Allow-Origin</code>).</li>
+<li><strong>Endpoint exposure probes</strong> — <code>/wp-json/wp/v2/users</code> (user enumeration), XML-RPC, <code>/wp-cron.php</code>, open redirect test, and upload URL accessibility.</li>
+<li><strong>Directory listing checks</strong> — verifies that <code>/wp-content/plugins/</code> and <code>/wp-content/themes/</code> do not return a browsable file listing (a common information disclosure risk).</li>
+<li><strong>SSL/TLS certificate</strong> — expiry date and days remaining.</li>
+<li><strong>Weak TLS protocol detection</strong> — tests whether your server still accepts connections over TLS 1.0 or TLS 1.1 (deprecated since 2021; rejected by modern browsers).</li>
+<li><strong>DNS email security</strong> — SPF, DMARC, and DKIM records for your sending domain. DKIM is probed across 12 common selectors (google, default, mail, selector1, selector2, sendgrid, etc.).</li>
+<li><strong>PHP end-of-life status</strong> — flags PHP versions that have reached end-of-life and are no longer receiving security patches, with the exact EOL date.</li>
+<li><strong>Static code analysis</strong> — scans active plugin PHP files for known vulnerability patterns: <code>eval()</code>, <code>base64_decode()</code> on user input, <code>shell_exec()</code>/<code>system()</code>, dynamic <code>include</code>/<code>require</code>, obfuscated variable names, and suspicious SQL construction.</li>
+<li><strong>AI code triage</strong> — top static findings are sent to an AI model for classification before the main audit (see <a href="#code-triage">AI Code Triage</a> below).</li>
+</ul>
+<p>Results from all checks are merged and weighted (internal config 45%, external exposure 55%) into a single scored report with cross-correlated findings — for example, flagging when weak TLS is combined with a missing HSTS header, or when PHP is EOL and also has plugins with known vulnerabilities.</p>
 
 <h4 class="cs-sub-heading">AI Providers</h4>
 <p>The audit supports two AI providers. Select your preferred provider and enter your API key on the Security tab settings panel:</p>
 <ul>
-<li><strong>Anthropic Claude</strong> — uses the Claude API (<code>api.anthropic.com</code>). Get an API key at <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>. Default models: Claude Sonnet 4.6 (standard scan), Claude Opus 4.7 (deep dive).</li>
-<li><strong>Google Gemini</strong> — uses the Gemini API (<code>generativelanguage.googleapis.com</code>). Get an API key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Default models: Gemini 2.0 Flash (standard scan), Gemini 2.5 Pro (deep dive). A free tier is available.</li>
+<li><strong>Anthropic Claude</strong> — uses the Claude API (<code>api.anthropic.com</code>). Get an API key at <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>. Default models: Claude Sonnet 4.6 (standard), Claude Opus 4.7 (deep dive).</li>
+<li><strong>Google Gemini</strong> — uses the Gemini API (<code>generativelanguage.googleapis.com</code>). Get an API key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Default models: Gemini 2.0 Flash (standard), Gemini 2.5 Pro (deep dive). A free tier is available.</li>
 </ul>
 <p>You can customise the model selection and edit the system prompt directly in the settings panel to tune the analysis for your environment.</p>
 
 <h4 class="cs-sub-heading">How Scans Run (No Timeout Risk)</h4>
-<p>Scans can take 30–120 seconds. To avoid HTTP gateway timeouts, CloudScale Devtools uses <code>fastcgi_finish_request()</code> to close the browser connection immediately after the scan starts, then continues running the analysis in the same PHP-FPM worker in the background. A progress bar updates every 3 seconds via polling until the result is ready. This approach does <strong>not</strong> depend on WP Cron — <code>DISABLE_WP_CRON</code> and cron configuration have no effect on the scan.</p>
+<p>Scans can take 30–120 seconds. To avoid HTTP gateway timeouts, CloudScale Devtools uses <code>fastcgi_finish_request()</code> to close the browser connection immediately after the scan starts, then continues running the analysis in the same PHP-FPM worker in the background. A progress bar updates every 3 seconds via polling until the result is ready. This approach does <strong>not</strong> depend on WP Cron — <code>DISABLE_WP_CRON</code> and cron configuration have no effect on on-demand scans.</p>
 
 <h4 class="cs-sub-heading">External Services Used</h4>
 <p>When a scan runs, the following external requests are made:</p>
@@ -233,7 +291,142 @@ $content = <<<'HTML'
 <p>API keys are stored in <code>wp_options</code> and never exposed to the browser. The Security tab displays a masked version of the stored key.</p>
 
 <h4 class="cs-sub-heading">Access Control</h4>
-<p>The Security tab requires the <code>manage_options</code> capability (administrators only). The AJAX endpoints are protected by nonce verification and capability checks.</p>
+<p>The Security tab requires the <code>manage_options</code> capability (administrators only). All AJAX endpoints are protected by nonce verification and capability checks.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ QUICK FIXES ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="quick-fixes">Quick Fixes</h3>
+<div class="cs-panel-body">
+<p>The <strong>Quick Fixes</strong> panel (Security tab, above the AI Audit controls) shows a checklist of common WordPress security misconfigurations. Each item displays its current status and, where automation is possible, a one-click fix button.</p>
+
+<h4 class="cs-sub-heading">What It Checks</h4>
+<ul>
+<li><strong>debug.log exposed</strong> — checks whether <code>wp-content/debug.log</code> exists and is publicly accessible. The fix button moves the file to a directory outside the web root and rewrites the <code>WP_DEBUG_LOG</code> constant in <code>wp-config.php</code> to point to the new safe path, preventing the file from being recreated at the old location.</li>
+<li><strong>WordPress version displayed</strong> — checks whether <code>wp_generator</code> is emitting your WordPress version in page <code>&lt;head&gt;</code>. The fix removes the generator meta tag.</li>
+<li><strong>XML-RPC enabled</strong> — checks whether <code>/xmlrpc.php</code> is accessible. The fix disables it via a filter (unless you have WooCommerce or JetPack which require it).</li>
+<li><strong>Application passwords</strong> — checks whether WordPress application passwords are enabled. The fix disables them unless the Test Account Manager feature is active (which requires app passwords for its CI pipeline accounts).</li>
+<li><strong>Directory browsing</strong> — checks whether Apache/Nginx is serving directory listings for your uploads folder.</li>
+<li><strong>File editing in wp-admin</strong> — checks whether the built-in theme/plugin code editor is enabled (<code>DISALLOW_FILE_EDIT</code>).</li>
+</ul>
+
+<h4 class="cs-sub-heading">Status Indicators</h4>
+<p>Each item shows one of:</p>
+<ul>
+<li><strong style="color:#16a34a;">✓ Fixed</strong> — the issue is not present (or has been resolved).</li>
+<li><strong style="color:#dc2626;">⚠ Action needed</strong> — the issue is present; a fix button is shown if automation is available.</li>
+<li><strong style="color:#d97706;">⚠ Warning</strong> — fixed but with a caveat (e.g. <code>wp-config.php</code> was not writable so only a partial fix was applied).</li>
+</ul>
+<p>The checklist refreshes automatically after each fix is applied.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ SCAN HISTORY ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="scan-history">Scan History</h3>
+<div class="cs-panel-body">
+<p>Every scan result — both on-demand and scheduled — is automatically saved to scan history. The last <strong>10 results</strong> are kept, stored in <code>wp_options</code> so they survive across sessions and server restarts.</p>
+<p>The history table (Security tab, below the scan controls) shows:</p>
+<ul>
+<li>Scan type (Standard or Deep Dive)</li>
+<li>Date and time the scan completed</li>
+<li>Overall score and top-level risk rating</li>
+</ul>
+<p>Click any row to instantly reload that scan's full AI report into the results panel — useful for:</p>
+<ul>
+<li>Comparing your security posture before and after making changes</li>
+<li>Reviewing a scan result after returning to a page that had been navigated away from</li>
+<li>Sharing a specific scan with a colleague (results are stored server-side, not in the browser)</li>
+</ul>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ SCHEDULED SCANS ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="scheduled-scans">Scheduled Scans</h3>
+<div class="cs-panel-body">
+<p>The <strong>Scheduled Scans</strong> panel (Security tab) lets you run a deep dive cyber audit automatically on a recurring schedule, without having to visit the admin panel.</p>
+
+<h4 class="cs-sub-heading">Configuration</h4>
+<ul>
+<li><strong>Schedule</strong> — choose Daily or Weekly.</li>
+<li><strong>Email alerts</strong> — when enabled, the AI audit summary is emailed to the administrator's registered email address after each scheduled scan completes.</li>
+<li><strong>ntfy.sh notifications</strong> — enter an ntfy.sh topic to receive a push notification on your phone when a scan completes. Useful for monitoring sites without checking email. The notification includes the overall risk score and a summary of the top findings.</li>
+</ul>
+
+<h4 class="cs-sub-heading">How Scheduled Scans Run</h4>
+<p>Scheduled scans are dispatched via WP-Cron. The scan runs as a background PHP process (same mechanism as on-demand scans) so it does not block a web request. Results are saved to scan history automatically. If a scheduled scan fails — for example because an API key has expired — the failure is logged in the scan history table.</p>
+<p><strong>Note:</strong> WP-Cron fires on page load. On low-traffic sites, scheduled scans may run slightly later than the configured interval if no page loads occur at the scheduled time. You can use a server-side cron job calling <code>wp-cron.php</code> directly for more reliable scheduling.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ CODE TRIAGE ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="code-triage">AI Code Triage</h3>
+<div class="cs-panel-body">
+<p>The <strong>AI Code Triage</strong> is an intermediate analysis step that runs automatically during every deep dive scan. It sits between the static code scanner and the main AI audit, acting as a filter to separate genuine risks from false positives before expensive AI analysis is performed.</p>
+
+<h4 class="cs-sub-heading">How It Works</h4>
+<ol>
+<li><strong>Static scan</strong> — CloudScale Devtools scans the PHP files of all active plugins for patterns associated with malicious code: <code>eval()</code>, base64-encoded payloads, shell execution functions, dynamic file includes, obfuscated variable names, and suspicious SQL construction. This step is instant and costs nothing.</li>
+<li><strong>Risk prioritisation</strong> — findings are sorted by risk level. The top 10 highest-risk snippets are selected.</li>
+<li><strong>Context extraction</strong> — for each finding, 10 lines of code before and after the flagged line are extracted to give the AI enough context to make an accurate judgement.</li>
+<li><strong>AI classification</strong> — snippets are sent in a single batch to the cheapest available AI model (Claude Haiku or Gemini Flash) with instructions to classify each as one of three verdicts.</li>
+<li><strong>Main audit filtering</strong> — only <strong>Confirmed</strong> findings are forwarded to the main deep dive audit AI. False positives are silently dropped, reducing noise in the final report.</li>
+</ol>
+
+<h4 class="cs-sub-heading">Verdicts</h4>
+<ul>
+<li><strong style="color:#dc2626;">Confirmed</strong> — the AI assessed the snippet as a genuine security risk in this context.</li>
+<li><strong style="color:#16a34a;">False Positive</strong> — the code is safe; the pattern matched a legitimate use (e.g. a plugin legitimately using <code>eval()</code> for a templating engine).</li>
+<li><strong style="color:#d97706;">Needs Context</strong> — the risk depends on how the function is called or what data it receives; reported as advisory.</li>
+</ul>
+<p>All three verdict types are shown in the Code Triage section of the deep scan report. The main AI report only reflects confirmed findings.</p>
+
+<h4 class="cs-sub-heading">Cost</h4>
+<p>Triage adds a small AI cost per deep scan — typically $0.01–0.03 USD using Claude Haiku or Gemini Flash. If no static findings are detected, the triage step is skipped entirely at zero cost.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ SERVER LOGS ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="server-logs">Server Logs</h3>
+<div class="cs-panel-body">
+<p>The <strong>Server Logs</strong> tab provides a read-only in-browser viewer for PHP error logs, the WordPress debug log, and web server access/error logs — without needing SSH or a file manager.</p>
+
+<h4 class="cs-sub-heading">Log Sources</h4>
+<p>The panel auto-detects common log file paths for the most popular server stacks: Apache (<code>access.log</code>, <code>error.log</code>), Nginx, PHP-FPM, the WordPress debug log (<code>wp-content/debug.log</code>), and any custom paths you add. Each source button shows a colour-coded availability status:</p>
+<ul>
+<li><strong style="color:#16a34a;">Green</strong> — file found and readable</li>
+<li><strong style="color:#d97706;">Amber</strong> — file exists but is empty</li>
+<li><strong style="color:#dc2626;">Red</strong> — file not found or permission denied</li>
+</ul>
+
+<h4 class="cs-sub-heading">PHP Error Log Setup</h4>
+<p>If PHP is logging to <code>/dev/stderr</code> (the default in many Docker and container environments), errors cannot be read in the browser. The panel shows a setup banner with an <strong>Enable</strong> button that installs a mu-plugin to redirect PHP errors to <code>wp-content/php-error.log</code>. The mu-plugin loads before all other plugins on every request.</p>
+
+<h4 class="cs-sub-heading">Viewing and Filtering</h4>
+<p>Click any source button to load its most recent lines. Use the controls to filter what you see:</p>
+<ul>
+<li><strong>Search</strong> — live text filter across all visible lines.</li>
+<li><strong>Level</strong> — show only lines at or above a severity (emergency, alert, critical, error, warning, notice, info, debug). Lines are colour-coded: red for errors/critical, amber for warnings, blue for notice/info, grey for debug.</li>
+<li><strong>Lines</strong> — how many tail lines to fetch from the server (100 to 2000). Changing this setting re-fetches the log.</li>
+</ul>
+
+<h4 class="cs-sub-heading">Auto-Refresh (Tail Mode)</h4>
+<p>Enable the <strong>Tail</strong> checkbox to poll the selected log every 30 seconds automatically. Useful for watching a running process or debugging a live issue.</p>
+
+<h4 class="cs-sub-heading">Custom Log Paths</h4>
+<p>Add any absolute file path readable by the web server user. Common additions include application logs (e.g. <code>/var/www/html/storage/logs/laravel.log</code>), cron output files, or custom PHP-FPM pool logs. Labels are free-text. Custom paths are saved as a WordPress option and persist across plugin updates.</p>
+
+<h4 class="cs-sub-heading">Permissions</h4>
+<p>System logs (e.g. <code>/var/log/syslog</code>, <code>/var/log/auth.log</code>) are typically owned by <code>root</code> and not readable by <code>www-data</code>. This is intentional OS hardening — the panel shows a clear "permission denied" notice. To expose a system log, add your web server user to the <code>adm</code> group, or use a log-shipping tool to copy entries to a file the web server can read.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
@@ -243,7 +436,7 @@ $content = <<<'HTML'
 <h3 class="cs-panel-heading" id="smtp">SMTP / Mail</h3>
 <div class="cs-panel-body">
 <p>The <strong>SMTP</strong> tab replaces WordPress's default <code>wp_mail()</code> (which relies on PHP's <code>mail()</code> function) with authenticated SMTP delivery. This fixes delivery failures on servers where PHP mail is disabled or flagged as spam.</p>
-<p><strong>Configuration</strong> (Tools → CloudScale Devtools → Mail tab):</p>
+<p><strong>Configuration</strong> (Tools → CloudScale Cyber and Devtools → Mail tab):</p>
 <ul>
 <li><strong>SMTP host</strong> — your mail server hostname (e.g. <code>smtp.gmail.com</code>, <code>smtp.sendgrid.net</code>, or your hosting provider's SMTP server).</li>
 <li><strong>Port</strong> — typically 587 (STARTTLS) or 465 (SSL).</li>
@@ -261,7 +454,7 @@ $content = <<<'HTML'
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="thumbnails">Social Preview &amp; Thumbnails</h3>
 <div class="cs-panel-body">
-<p>The <strong>Thumbnails</strong> tab (Tools → CloudScale Devtools → Thumbnails) is a social preview diagnostics suite for ensuring every post shares correctly on Facebook, Twitter/X, LinkedIn, and WhatsApp.</p>
+<p>The <strong>Thumbnails</strong> tab (Tools → CloudScale Cyber and Devtools → Thumbnails) is a social preview diagnostics suite for ensuring every post shares correctly on Facebook, Twitter/X, LinkedIn, and WhatsApp.</p>
 
 <h4 class="cs-sub-heading">URL Checker</h4>
 <p>Enter any URL on your site and get a full breakdown of its <code>og:image</code>, <code>og:title</code>, <code>og:description</code>, <code>twitter:card</code>, and related meta tags — exactly as a social crawler would see them. Diagnoses common problems such as missing tags, wrong image dimensions, or images blocked by Cloudflare's crawler challenge.</p>
@@ -305,7 +498,7 @@ $content = <<<'HTML'
 <li><strong>Miner</strong> — tile-based digging game.</li>
 <li><strong>Asteroids</strong> — classic space shooter; arrow keys + Space to fire.</li>
 <li><strong>Snake</strong> — classic snake; arrow keys.</li>
-<li><strong>Space Invaders</strong> — classic fixed-shooter; arrow keys to move, Space to fire.</li>
+<li><strong>Space Invaders</strong> — classic fixed-shooter; arrow keys to move, Space to fire. On-screen buttons for mobile.</li>
 </ul>
 
 <h4 class="cs-sub-heading">Leaderboard</h4>
@@ -344,12 +537,12 @@ $content = <<<'HTML'
 <li><strong>Transient activity</strong> — set and delete operations on transients.</li>
 <li><strong>Template hierarchy</strong> — the chain of template files WordPress evaluated to render the page.</li>
 </ul>
-<p>The panel is enabled by default. You can disable it under Tools → CloudScale Devtools → Settings. Data is colour-coded by severity and can be exported as JSON for sharing with developers.</p>
+<p>The panel is enabled by default. You can disable it under Tools → CloudScale Cyber and Devtools → Settings. Data is colour-coded by severity and can be exported as JSON for sharing with developers.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
 
-<p style="text-align:center;color:#94a3b8;font-size:.9em;margin-top:40px;">CloudScale Devtools is free and open source. Found a bug or have a feature request? <a href="https://github.com/andrewbakercloudscale/cloudscale-devtools/issues" target="_blank" rel="noopener">Open an issue on GitHub</a>.</p>
+<p style="text-align:center;color:#94a3b8;font-size:.9em;margin-top:40px;">CloudScale Cyber and Devtools is free and open source. Found a bug or have a feature request? <a href="https://github.com/andrewbakercloudscale/cloudscale-devtools/issues" target="_blank" rel="noopener">Open an issue on GitHub</a>.</p>
 </div>
 HTML;
 

@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: CloudScale Devtools
+ * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.79
+ * Version: 1.9.80
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.79';
+    const VERSION      = '1.9.80';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -970,8 +970,8 @@ class CloudScale_DevTools {
 
     public static function add_tools_page() {
         add_management_page(
-            'CloudScale Devtools & Cyber',
-            '🌩️ Devtools & Cyber',
+            'CloudScale Cyber and Devtools',
+            '🌩️ Cyber & Devtools',
             'manage_options',
             self::TOOLS_SLUG,
             [ __CLASS__, 'render_tools_page' ]
@@ -1223,7 +1223,7 @@ class CloudScale_DevTools {
             <!-- Banner -->
             <div id="cs-banner">
                 <div>
-                    <div id="cs-banner-title">⚡ CloudScale Devtools &amp; Cyber</div>
+                    <div id="cs-banner-title">⚡ CloudScale Cyber and Devtools</div>
                     <div id="cs-banner-sub"><?php esc_html_e( 'Code blocks, SQL tools, code migrator, site monitor &amp; login security', 'cloudscale-devtools' ); ?> &middot; v<?php echo esc_html( self::VERSION ); ?></div>
                 </div>
                 <div id="cs-banner-right">
@@ -1624,6 +1624,14 @@ class CloudScale_DevTools {
             <div class="cs-section-header" style="background:linear-gradient(90deg,#1a2035 0%,#1e2d40 100%);border-left:3px solid #4a9eff;">
                 <span>📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Read-only view of PHP error log, WordPress debug log, and web server logs', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'server-logs', 'Server Logs', [
+                    [ 'name' => 'Log Sources',       'rec' => 'Info',        'html' => 'The panel automatically detects common log file locations for your server stack — Apache, Nginx, PHP-FPM, WordPress debug log, and any custom paths you add. Each source button shows a colour-coded status: <strong>green</strong> (readable), <strong>amber</strong> (empty), <strong>red</strong> (not found or permission denied).' ],
+                    [ 'name' => 'PHP Error Log',     'rec' => 'Recommended', 'html' => 'If PHP is logging to <code>/dev/stderr</code> (the default in many Docker/container setups), errors cannot be read here. Click <strong>Enable</strong> to install a mu-plugin that redirects PHP errors to <code>wp-content/php-error.log</code>. The mu-plugin runs on every request before other plugins load.' ],
+                    [ 'name' => 'Filters',           'rec' => 'Info',        'html' => '<ul><li><strong>Search</strong> — live text filter across all visible lines</li><li><strong>Level</strong> — show only lines at or above a severity (emergency → debug)</li><li><strong>Lines</strong> — how many tail lines to fetch from the server (100–2000)</li></ul>Colour coding: red = error/critical, amber = warning, blue = notice/info, grey = debug.' ],
+                    [ 'name' => 'Auto-refresh',      'rec' => 'Optional',    'html' => 'Enable <em>Tail mode</em> to poll the selected log every 30 seconds automatically. Useful when watching a running process or debugging a live issue without leaving the page.' ],
+                    [ 'name' => 'Custom Log Paths',  'rec' => 'Optional',    'html' => 'Add any absolute file path your web server user can read. Common extras: application logs (Laravel <code>storage/logs/laravel.log</code>), cron output files, or a custom PHP-FPM pool log. Labels are free-text — choose something descriptive. Custom paths are saved as a WordPress option and survive plugin updates.' ],
+                    [ 'name' => 'Permissions',       'rec' => 'Info',        'html' => 'System logs (e.g. <code>/var/log/syslog</code>, <code>/var/log/auth.log</code>) are typically owned by <code>root</code> and not readable by <code>www-data</code>. This is intentional OS hardening — the plugin shows a clear "permission denied" message rather than an error. To expose a system log, add your web server user to the <code>adm</code> group or use a log-shipping tool.' ],
+                ] ); ?>
             </div>
             <div class="cs-panel-body">
 
@@ -6629,8 +6637,8 @@ class CloudScale_DevTools {
             $mail->addAddress( $to );
             $mail->isHTML( true );
             $mail->CharSet = 'UTF-8';
-            $mail->Subject  = sprintf( '[%s] CloudScale Devtools — SMTP Test', $site );
-            $mail->Body     = '<p>This is a test email from <strong>CloudScale Devtools</strong>.</p>'
+            $mail->Subject  = sprintf( '[%s] CloudScale Cyber and Devtools — SMTP Test', $site );
+            $mail->Body     = '<p>This is a test email from <strong>CloudScale Cyber and Devtools</strong>.</p>'
                             . '<p>Your SMTP configuration is working correctly.</p>';
 
             $mail->send();
@@ -8842,6 +8850,15 @@ class CloudScale_DevTools {
             <div class="cs-section-header cs-section-header-red">
                 <span>🛡️ <?php esc_html_e( 'AI Cyber Audit', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Claude AI analyses your WordPress configuration and gives prioritised remediation advice', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'cyber-audit', 'AI Cyber Audit', [
+                    [ 'name' => 'Quick Fixes',         'rec' => 'Critical',     'html' => 'Automated one-click remediations for common misconfigurations — moving <code>debug.log</code> outside the web root, disabling XML-RPC, hiding the WordPress version, and more. Each fix shows its current status so you can see what still needs attention at a glance.' ],
+                    [ 'name' => 'Standard Cyber Scan', 'rec' => 'Recommended',  'html' => 'A fast scan (a few seconds) that checks your WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php for common security misconfigurations. Results are sent to an AI model which prioritises findings and gives tailored remediation advice.' ],
+                    [ 'name' => 'Deep Dive Scan',      'rec' => 'Recommended',  'html' => 'A comprehensive scan that adds: static code analysis of plugin PHP files (looking for <code>eval</code>, shell functions, obfuscation, and suspicious patterns), external HTTP probes (open redirects, directory listing on <code>/wp-content/plugins/</code> and <code>/wp-content/themes/</code>, weak TLS protocols, CORS headers), DNS checks (SPF, DMARC, DKIM), PHP end-of-life status, and an AI-powered code triage step that classifies each static finding as confirmed, false positive, or needs-context.' ],
+                    [ 'name' => 'Code Triage',         'rec' => 'Info',         'html' => 'After a deep scan, the top 10 highest-risk static findings are sent to an AI model with ±10 lines of surrounding code. The model classifies each as <strong>Confirmed</strong> (genuine risk), <strong>False Positive</strong> (safe code), or <strong>Needs Context</strong> (depends on usage). Only confirmed findings are forwarded to the main audit AI, reducing noise.' ],
+                    [ 'name' => 'Scan History',        'rec' => 'Info',         'html' => 'The last 10 scan results are saved automatically. Click any entry in the history table to reload that report instantly — useful for comparing your security posture over time or reviewing a scan after making changes.' ],
+                    [ 'name' => 'Scheduled Scans',     'rec' => 'Optional',     'html' => 'Run a deep scan automatically on a daily or weekly schedule. Results are stored in scan history. Enable email alerts to receive the AI summary in your inbox whenever a scheduled scan completes.' ],
+                    [ 'name' => 'AI Providers',        'rec' => 'Info',         'html' => 'Supports <strong>Anthropic Claude</strong> (claude-sonnet-4-5 or later) and <strong>Google Gemini</strong> (gemini-2.0-flash or later). Bring your own API key — no keys are stored server-side beyond your WordPress options table. Deep scans with code triage use the cheapest available model for the triage step to minimise cost.' ],
+                ] ); ?>
             </div>
             <div class="cs-panel-body">
 
