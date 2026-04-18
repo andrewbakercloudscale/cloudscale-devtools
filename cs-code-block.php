@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.86
+ * Version: 1.9.87
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.86';
+    const VERSION      = '1.9.87';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -8877,9 +8877,20 @@ class CloudScale_DevTools {
             $score_cls = $s >= 75 ? '#16a34a' : ( $s >= 55 ? '#d97706' : '#dc2626' );
         }
 
-        $fixes      = self::get_quick_fixes();
-        $fixes_tot  = count( $fixes );
-        $fixes_done = count( array_filter( $fixes, function ( $f ) { return ! empty( $f['fixed'] ); } ) );
+        $bf_on      = get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1';
+        $login_slug = get_option( 'csdt_devtools_login_slug', '' );
+        $force_2fa  = get_option( 'csdt_devtools_force_2fa', '0' ) === '1';
+        $email_2fa  = get_option( 'csdt_devtools_2fa_method', 'off' ) === 'email';
+        $admins     = get_users( [ 'role' => 'administrator' ] );
+        $adm_tot    = count( $admins );
+        $adm_2fa    = 0;
+        foreach ( $admins as $u ) {
+            if ( get_user_meta( $u->ID, 'csdt_devtools_totp_enabled', true ) === '1'
+                 || ! empty( get_user_meta( $u->ID, 'csdt_devtools_passkeys', true ) )
+                 || $email_2fa ) {
+                $adm_2fa++;
+            }
+        }
 
         $base_url = admin_url( 'tools.php?page=cloudscale-devtools' );
         ?>
@@ -8924,10 +8935,22 @@ class CloudScale_DevTools {
         <div class="cs-dw-row"><span style="color:#94a3b8;"><?php esc_html_e( 'No scans run yet', 'cloudscale-devtools' ); ?></span></div>
         <?php endif; ?>
 
-        <div class="cs-dw-section" style="margin-top:10px;">⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></div>
+        <div class="cs-dw-section" style="margin-top:10px;">🔒 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></div>
         <div class="cs-dw-row">
-            <span class="cs-dw-lbl"><?php esc_html_e( 'RESOLVED', 'cloudscale-devtools' ); ?></span>
-            <span style="color:<?php echo $fixes_done === $fixes_tot ? '#16a34a' : '#d97706'; ?>;font-weight:600;"><?php echo esc_html( $fixes_done . ' / ' . $fixes_tot ); ?></span>
+            <span class="cs-dw-lbl"><?php esc_html_e( 'BRUTE FORCE', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo $bf_on ? '#16a34a' : '#dc2626'; ?>;font-weight:600;"><?php echo $bf_on ? esc_html__( 'Protected', 'cloudscale-devtools' ) : esc_html__( 'Disabled', 'cloudscale-devtools' ); ?></span>
+        </div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( '2FA ADMINS', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo $adm_2fa === $adm_tot ? '#16a34a' : ( $adm_2fa > 0 ? '#d97706' : '#dc2626' ); ?>;font-weight:600;"><?php echo esc_html( $adm_2fa . ' / ' . $adm_tot ); ?></span>
+        </div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'HIDE LOGIN', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo ! empty( $login_slug ) ? '#16a34a' : '#dc2626'; ?>;font-weight:600;"><?php echo ! empty( $login_slug ) ? '✅ /' . esc_html( $login_slug ) : esc_html__( 'Disabled', 'cloudscale-devtools' ); ?></span>
+        </div>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'FORCE 2FA', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo $force_2fa ? '#16a34a' : '#94a3b8'; ?>;font-weight:600;"><?php echo $force_2fa ? esc_html__( 'On', 'cloudscale-devtools' ) : esc_html__( 'Off', 'cloudscale-devtools' ); ?></span>
         </div>
 
         <div class="cs-dw-actions">
