@@ -188,6 +188,18 @@
 .cs-panel-body {
     padding: 20px 24px;
 }
+.cs-tab-intro {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.65;
+}
+.cs-tab-intro p { margin: 0 0 8px; }
+.cs-tab-intro p:last-child { margin-bottom: 0; }
 
 /* ── Field layout ────────────────────────────────── */
 .cs-field-row {

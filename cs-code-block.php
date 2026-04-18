@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.91
+ * Version: 1.9.97
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.91';
+    const VERSION      = '1.9.97';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1376,7 +1376,7 @@ class CloudScale_DevTools {
      * @param string $title Modal title.
      * @param array  $items Array of item arrays.
      */
-    private static function render_explain_btn( string $id, string $title, array $items ): void {
+    private static function render_explain_btn( string $id, string $title, array $items, string $intro = '' ): void {
         $btn_id   = 'cs-explain-btn-' . $id;
         $modal_id = 'cs-explain-modal-' . $id;
         ?>
@@ -1396,6 +1396,11 @@ class CloudScale_DevTools {
                         style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;padding:0">&times;</button>
                 </div>
                 <div style="padding:16px 22px 20px">
+                    <?php if ( $intro ) : ?>
+                    <div style="background:#f0f6ff;border-left:4px solid #2271b1;border-radius:0 6px 6px 0;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#1a1a1a;line-height:1.6">
+                        <?php echo wp_kses( $intro, self::$explain_kses ); ?>
+                    </div>
+                    <?php endif; ?>
                     <?php foreach ( $items as $item ) :
                         $rec    = $item['rec'];
                         $is_rec = str_contains( $rec, 'Recommended' );
@@ -9311,8 +9316,8 @@ class CloudScale_DevTools {
         </div>
 
         <div class="cs-dw-actions">
-            <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" class="cs-dw-btn-pri"><?php esc_html_e( 'Run Security Scan', 'cloudscale-devtools' ); ?></a>
-            <a href="<?php echo esc_url( $base_url ); ?>" class="cs-dw-btn-sec"><?php esc_html_e( 'Open Plugin', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $base_url ); ?>" class="cs-dw-btn-pri"><?php esc_html_e( 'View Cyber and Devtools', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" class="cs-dw-btn-sec"><?php esc_html_e( 'Run Security Scan', 'cloudscale-devtools' ); ?></a>
         </div>
         <?php
     }
@@ -9543,9 +9548,15 @@ class CloudScale_DevTools {
                     [ 'name' => 'Scan History',        'rec' => 'Info',         'html' => 'The last 10 scan results are saved automatically. Click any entry in the history table to reload that report instantly — useful for comparing your security posture over time or reviewing a scan after making changes.' ],
                     [ 'name' => 'Scheduled Scans',     'rec' => 'Optional',     'html' => 'Run a deep scan automatically on a daily or weekly schedule. Results are stored in scan history. Enable email alerts to receive the AI summary in your inbox whenever a scheduled scan completes.' ],
                     [ 'name' => 'AI Providers',        'rec' => 'Info',         'html' => '<p>Two AI providers are supported. You supply your own API key — keys are stored only in your WordPress database (<code>wp_options</code>) and sent only to the provider\'s own API endpoint.</p><p><strong>Anthropic Claude</strong> — recommended for best results.<br>Get your key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a><br>Models: <code>claude-sonnet-4-6</code> (fast, cost-effective) · <code>claude-opus-4-7</code> (most capable)<br><a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener">View latest Claude models →</a></p><p><strong>Google Gemini</strong> — free tier available.<br>Get your key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a><br>Models: <code>gemini-2.0-flash</code> (fast, free tier) · <code>gemini-2.5-pro</code> (most capable)<br><a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener">View latest Gemini models →</a></p><p>Deep Dive scans run two AI calls — Code Triage pre-classification uses the faster model first to reduce cost before the main audit call.</p>' ],
-                ] ); ?>
+                ],
+                'The <strong>AI Cyber Audit</strong> uses frontier AI — Anthropic Claude or Google Gemini — to analyse your WordPress installation and produce a prioritised, scored security report in under 60 seconds. Think of it as a security consultant in your admin panel: it doesn\'t just list what\'s wrong, it tells you what to fix first and exactly how to fix it. A Standard scan takes seconds; a Deep Dive goes further with live HTTP probes, DNS checks, TLS quality analysis, and static code scanning of your plugins. You need an API key from one of the two providers — a free Gemini tier is available with no credit card required.' ); ?>
             </div>
             <div class="cs-panel-body">
+
+                <div class="cs-tab-intro">
+                    <p><?php echo wp_kses( __( '<strong>AI Cyber Audit</strong> connects to a frontier AI model — Anthropic Claude or Google Gemini — to analyse your WordPress installation and deliver a prioritised security report in under 60 seconds. It checks your core configuration, plugins, user accounts, file permissions, and key wp-config.php settings, then uses AI to score each finding as Critical / High / Medium / Low and give you specific steps to fix it. The <strong>Deep Dive</strong> extends this with live HTTP probes, DNS checks, TLS quality analysis, static PHP code scanning, and AI-powered triage of suspicious code patterns.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
+                    <p><?php echo wp_kses( __( 'To get started, select an AI provider below, paste in your API key, and click <strong>Run AI Cyber Audit</strong>. You can get a free Gemini key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> with no credit card required.', 'cloudscale-devtools' ), [ 'strong' => [], 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></p>
+                </div>
 
                 <div class="cs-sec-settings">
 
