@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.42
+ * Version: 1.9.43
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.42';
+    const VERSION      = '1.9.43';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -8828,8 +8828,8 @@ class CloudScale_DevTools {
 
         // Fetch the freshly stored result to notify
         $result = $type === 'deep'
-            ? get_transient( 'csdt_deep_scan_v1' )
-            : get_transient( 'csdt_security_scan_v2' );
+            ? get_option( 'csdt_deep_scan_v1' )
+            : get_option( 'csdt_security_scan_v2' );
 
         if ( $result && isset( $result['report'] ) ) {
             self::send_scan_notifications( $result['report'], $type );
@@ -8900,8 +8900,8 @@ class CloudScale_DevTools {
         update_option( 'csdt_devtools_security_model',  $model,      false );
         update_option( 'csdt_devtools_deep_scan_model', $deep_model, false );
         update_option( 'csdt_devtools_security_prompt', $prompt,     false );
-        delete_transient( 'csdt_security_scan_v2' );
-        delete_transient( 'csdt_deep_scan_v1' );
+        delete_option( 'csdt_security_scan_v2' );
+        delete_option( 'csdt_deep_scan_v1' );
 
         $saved_ant = get_option( 'csdt_devtools_anthropic_key', '' );
         $saved_gem = get_option( 'csdt_devtools_gemini_key', '' );
@@ -9215,7 +9215,7 @@ PROMPT;
 
         // Page-load pre-fill: return cache silently or signal nothing cached
         if ( $cache_only ) {
-            $cached = get_transient( 'csdt_security_scan_v2' );
+            $cached = get_option( 'csdt_security_scan_v2' );
             if ( $cached !== false ) {
                 wp_send_json_success( array_merge( $cached, [ 'from_cache' => true ] ) );
             } else {
@@ -9234,7 +9234,7 @@ PROMPT;
         }
 
         // Clear previous result and mark as running
-        delete_transient( 'csdt_security_scan_v2' );
+        delete_option( 'csdt_security_scan_v2' );
         set_transient( 'csdt_vuln_scan_status', [ 'status' => 'running', 'started_at' => time() ], 600 );
 
         // Send response immediately, then run scan after connection closes
@@ -9279,7 +9279,7 @@ PROMPT;
             'from_cache' => false,
         ];
 
-        set_transient( 'csdt_security_scan_v2', $output, DAY_IN_SECONDS );
+        update_option( 'csdt_security_scan_v2', $output, false );
         set_transient( 'csdt_vuln_scan_status', [ 'status' => 'complete', 'completed_at' => time() ], 600 );
         self::append_scan_history( 'standard', $report, $output['model_used'], $output['scanned_at'] );
         error_log( '[CSDT-SCAN] cron complete, score=' . $report['score'] );
@@ -10125,7 +10125,7 @@ PROMPT;
 
         // Page-load pre-fill: return cache silently or signal nothing cached
         if ( $cache_only ) {
-            $cached = get_transient( 'csdt_deep_scan_v1' );
+            $cached = get_option( 'csdt_deep_scan_v1' );
             if ( $cached !== false ) {
                 wp_send_json_success( array_merge( $cached, [ 'from_cache' => true ] ) );
             } else {
@@ -10144,7 +10144,7 @@ PROMPT;
         }
 
         // Clear previous result and mark as running
-        delete_transient( 'csdt_deep_scan_v1' );
+        delete_option( 'csdt_deep_scan_v1' );
         set_transient( 'csdt_deep_scan_status', [ 'status' => 'running', 'started_at' => time() ], 900 );
 
         // Send response immediately, then run scan after connection closes
@@ -10209,7 +10209,7 @@ PROMPT;
             'from_cache' => false,
         ];
 
-        set_transient( 'csdt_deep_scan_v1', $output, DAY_IN_SECONDS );
+        update_option( 'csdt_deep_scan_v1', $output, false );
         set_transient( 'csdt_deep_scan_status', [ 'status' => 'complete', 'completed_at' => time() ], 900 );
         self::append_scan_history( 'deep', $report, $output['model_used'], $output['scanned_at'] );
         error_log( '[CSDT-DEEP] cron complete (parallel), score=' . $report['score'] );
