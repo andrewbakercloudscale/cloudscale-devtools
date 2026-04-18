@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.75
+ * Version: 1.9.77
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.75';
+    const VERSION      = '1.9.77';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9303,33 +9303,67 @@ class CloudScale_DevTools {
                 break;
             case 'block_debug_log':
                 $old_log = WP_CONTENT_DIR . '/debug.log';
-                if ( ! file_exists( $old_log ) ) {
-                    // Already removed or never existed — nothing to do, fixed.
-                    break;
-                }
-                // Move debug.log outside web root (one level above ABSPATH).
                 $new_log = rtrim( dirname( rtrim( ABSPATH, '/\\' ) ), '/\\' ) . '/wordpress-debug.log';
-                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-                $existing = file_get_contents( $old_log );
-                if ( $existing !== false ) {
+
+                // 1. Migrate existing content and delete from web root.
+                if ( file_exists( $old_log ) ) {
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+                    $existing = file_get_contents( $old_log );
+                    if ( $existing !== false && $existing !== '' ) {
+                        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+                        file_put_contents( $new_log, $existing, FILE_APPEND );
+                    }
+                    wp_delete_file( $old_log );
+                }
+
+                // 2. Rewrite WP_DEBUG_LOG in wp-config.php so WordPress writes to the safe
+                //    path from the very first line of execution — before any mu-plugin runs.
+                $cfg_file     = ABSPATH . 'wp-config.php';
+                $cfg_updated  = false;
+                if ( is_readable( $cfg_file ) && is_writable( $cfg_file ) ) {
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+                    $cfg = file_get_contents( $cfg_file );
+                    $safe_path  = str_replace( "'", "\\'", $new_log );
+                    $new_define = "define( 'WP_DEBUG_LOG', '" . $safe_path . "' );";
+                    $pattern    = "/define\s*\(\s*['\"]WP_DEBUG_LOG['\"]\s*,\s*(?:true|false|'[^']*'|\"[^\"]*\")\s*\)\s*;/i";
+                    if ( preg_match( $pattern, $cfg ) ) {
+                        $cfg = preg_replace( $pattern, $new_define, $cfg );
+                    } else {
+                        // No existing define — insert before the "stop editing" marker.
+                        $cfg = preg_replace(
+                            '/\/\*\s*That\'s all[^*]*\*\//is',
+                            $new_define . "\n\n/* That's all, stop editing! Happy publishing. */",
+                            $cfg,
+                            1
+                        );
+                    }
                     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-                    if ( file_put_contents( $new_log, $existing, FILE_APPEND ) === false ) {
-                        wp_send_json_error( 'Could not write to ' . esc_html( $new_log ) . '. The parent directory may not be writable by the web server user.' );
-                        return;
+                    if ( $cfg && file_put_contents( $cfg_file, $cfg ) !== false ) {
+                        $cfg_updated = true;
                     }
                 }
-                wp_delete_file( $old_log );
+
+                // 3. Store new path and write mu-plugin as belt-and-suspenders fallback.
                 update_option( 'csdt_debug_log_path', $new_log, false );
-                // mu-plugin: redirect future WP_DEBUG_LOG writes to new path
                 $mu_dir = WP_CONTENT_DIR . '/mu-plugins';
                 if ( ! is_dir( $mu_dir ) ) { wp_mkdir_p( $mu_dir ); }
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
                 file_put_contents(
                     $mu_dir . '/csdt-secure-logs.php',
                     '<?php' . "\n" .
-                    '// Redirects WP debug log outside web root — installed by CloudScale DevTools.' . "\n" .
+                    '// Belt-and-suspenders: redirect error_log to safe path — by CloudScale DevTools.' . "\n" .
                     '@ini_set( \'error_log\', ' . var_export( $new_log, true ) . ' );' . "\n"
                 );
+
+                if ( ! $cfg_updated ) {
+                    // wp-config.php not writable — mu-plugin is the only protection.
+                    // Return success with a warning so the caller can surface it.
+                    wp_send_json_success( [
+                        'fixes'   => self::get_quick_fixes(),
+                        'warning' => 'debug.log deleted and mu-plugin installed, but wp-config.php is not writable — WP_DEBUG_LOG still points to the old path. The file may reappear on the next PHP error. To make this permanent, set WP_DEBUG_LOG to \'' . $new_log . '\' in wp-config.php manually.',
+                    ] );
+                    return;
+                }
                 break;
             default:
                 wp_send_json_error( 'Unknown fix ID' );

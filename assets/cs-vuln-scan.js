@@ -726,9 +726,19 @@
                     .then(function (res) {
                         if (res.success && res.data && res.data.fixes) {
                             renderQuickFixes(res.data.fixes);
+                            if (res.data.warning) {
+                                var warn = document.createElement('div');
+                                warn.style.cssText = 'margin:8px 0;padding:10px 12px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:13px;color:#92400e';
+                                warn.textContent = '⚠ ' + res.data.warning;
+                                var qfWrap = document.getElementById('cs-quick-fixes-list');
+                                if (qfWrap) qfWrap.insertAdjacentElement('afterend', warn);
+                            }
                         } else {
                             btn.disabled = false;
                             btn.textContent = orig;
+                            if (res.data && typeof res.data === 'string') {
+                                alert('Fix failed: ' + res.data);
+                            }
                         }
                     })
                     .catch(function () {
