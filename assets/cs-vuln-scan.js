@@ -621,7 +621,12 @@
             if (isFixed) {
                 html += '<div style="flex-shrink:0;"><span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed ✓</span></div>';
             } else {
-                html += '<div style="flex-shrink:0;"><button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.id) + '" style="white-space:nowrap;">' + escHtml(fix.fix_label) + '</button></div>';
+                html += '<div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">';
+                html += '<button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.id) + '" style="white-space:nowrap;">' + escHtml(fix.fix_label) + '</button>';
+                if (fix.dismiss_label && fix.dismiss_id) {
+                    html += '<button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.dismiss_id) + '" style="white-space:nowrap;font-size:11px;">' + escHtml(fix.dismiss_label) + '</button>';
+                }
+                html += '</div>';
             }
             html += '</div>';
         });
