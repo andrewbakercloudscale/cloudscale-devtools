@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.100
+Stable tag: 1.9.101
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -82,7 +82,7 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
-= 1.9.100 =
+= 1.9.101 =
 * feat: Home dashboard tab — security summary cards showing AI setup status, last scan score (critical/high counts), quick fixes resolved, and login security posture
 
 = 1.9.83 =
@@ -165,5 +165,5 @@ Google Terms of Service: https://policies.google.com/terms
 
 == Upgrade Notice ==
 
-= 1.9.100 =
+= 1.9.101 =
 New Home dashboard tab with security summary cards. Deep scan now checks CSP/HSTS quality, DMARC/SPF policy strength, auto-updates, display_errors, inactive plugins, and server header version leaks. MX gate prevents false positives on non-email domains.

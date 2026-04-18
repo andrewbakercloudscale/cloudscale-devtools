@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.100
+ * Version: 1.9.101
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.100';
+    const VERSION      = '1.9.101';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9319,8 +9319,7 @@ class CloudScale_DevTools {
         </div>
 
         <div class="cs-dw-actions">
-            <a href="<?php echo esc_url( $base_url ); ?>" class="cs-dw-btn-pri"><?php esc_html_e( 'View Cyber Devtools', 'cloudscale-devtools' ); ?></a>
-            <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" class="cs-dw-btn-sec"><?php esc_html_e( 'Run Security Scan', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $base_url ); ?>" class="cs-dw-btn-pri" style="flex:1;text-align:center;"><?php esc_html_e( 'View Cyber Devtools', 'cloudscale-devtools' ); ?></a>
         </div>
         <?php
     }
