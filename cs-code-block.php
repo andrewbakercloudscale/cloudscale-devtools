@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.32
+ * Version: 1.9.34
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.32';
+    const VERSION      = '1.9.34';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -8182,10 +8182,14 @@ class CloudScale_DevTools {
                 'wp_config_perms'    => $config_perms,
             ],
             'site' => [
-                'url'              => home_url( '/' ),
-                'is_https'         => is_ssl(),
-                'login_url_hidden' => get_option( 'csdt_devtools_login_hide_enabled', '0' ) === '1',
-                'xmlrpc_exists'    => file_exists( ABSPATH . 'xmlrpc.php' ) && (bool) apply_filters( 'xmlrpc_enabled', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+                'url'                    => home_url( '/' ),
+                'is_https'               => is_ssl(),
+                'login_url_hidden'       => get_option( 'csdt_devtools_login_hide_enabled', '0' ) === '1',
+                'xmlrpc_exists'          => file_exists( ABSPATH . 'xmlrpc.php' ) && (bool) apply_filters( 'xmlrpc_enabled', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+                'open_registration'      => (bool) get_option( 'users_can_register', 0 ),
+                'pingbacks_enabled'      => get_option( 'default_ping_status' ) === 'open',
+                'wp_version_in_meta'     => ! has_filter( 'the_generator', '__return_empty_string' ) && ! has_filter( 'wp_head', 'wp_generator' ),
+                'default_comment_status' => get_option( 'default_comment_status' ),
             ],
             'security_features' => [
                 'brute_force_enabled'  => get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1',
@@ -8588,7 +8592,7 @@ class CloudScale_DevTools {
         return <<<'PROMPT'
 You are a WordPress security expert. Analyse the provided internal WordPress configuration data only.
 
-Focus on: WordPress/PHP/MySQL version currency, WP_DEBUG flags, DISALLOW_FILE_EDIT/MODS, database prefix, user accounts (admin username, counts, roles), active plugin list, brute force protection settings, 2FA configuration (email/TOTP/passkey counts), login URL obfuscation, wp-config.php hardening flags.
+Focus on: WordPress/PHP version currency, WP_DEBUG/WP_DEBUG_DISPLAY flags (exposed to public = critical), DISALLOW_FILE_EDIT/MODS, database prefix (wp_ default is a risk), user accounts (admin username exists, counts), active plugin list (outdated plugins), brute force protection, 2FA configuration (email/TOTP/passkey counts per admin), login URL obfuscation, wp-config.php file permissions, open user registration, pingbacks enabled (DDoS amplification), WordPress version in meta generator tag, default comment status.
 
 Return ONLY a JSON object (no markdown, no code fences) with this exact schema:
 {"score":0-100,"score_label":"Excellent|Good|Fair|Poor|Critical","summary":"1-2 sentences on internal config security posture","critical":[{"title":"...","detail":"...","fix":"..."}],"high":[...],"medium":[...],"low":[...],"good":[{"title":"...","detail":"..."}]}
@@ -8601,9 +8605,9 @@ PROMPT;
         return <<<'PROMPT'
 You are a penetration tester. Analyse the provided external exposure checks and plugin code scan data only.
 
-For external checks focus on: HTTP security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy), exposed endpoints (wp-login.php accessibility, xmlrpc.php, wp-json user enumeration, author enumeration via /?author=1, directory listing, sensitive files), SSL certificate validity and expiry.
+For external checks assess: HTTP security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), exposed endpoints (wp-login.php, xmlrpc.php, wp-cron.php, REST API user enumeration, author enumeration /?author=1, directory listing), SSL certificate validity and days to expiry, HTTP→HTTPS redirect enforcement, exposed sensitive files (debug.log, .env, wp-config.php.bak, .git/config, readme.html, phpinfo.php, error_log, composer.json, backup archives), database admin tools accessible (adminer, phpMyAdmin), server-status/server-info pages, and email DNS security (SPF and DMARC records present).
 
-For plugin code scan: flag dangerous PHP functions (eval, exec, shell_exec, base64_decode, create_function, system, passthru) with plugin name and severity context.
+For plugin code scan: flag all detected patterns (RCE functions like eval/exec/shell_exec/base64_decode, SQL injection risk with raw user input in wpdb queries, XSS risk from unescaped echo of user input, unserialize with user input, remote file inclusion, move_uploaded_file, file_put_contents with user input). Name the plugin, file, and line number.
 
 Return ONLY a JSON object (no markdown, no code fences) with this exact schema:
 {"score":0-100,"score_label":"Excellent|Good|Fair|Poor|Critical","summary":"1-2 sentences on external exposure and code scan posture","critical":[{"title":"...","detail":"...","fix":"..."}],"high":[...],"medium":[...],"low":[...],"good":[{"title":"...","detail":"..."}]}
@@ -8817,6 +8821,44 @@ PROMPT;
         ];
     }
 
+    private static function check_email_dns( string $host ): array {
+        $spf_found   = false;
+        $dmarc_found = false;
+        $spf_record  = null;
+        $dmarc_record= null;
+
+        // SPF — TXT record on the apex domain
+        $txt = @dns_get_record( $host, DNS_TXT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        if ( is_array( $txt ) ) {
+            foreach ( $txt as $r ) {
+                if ( isset( $r['txt'] ) && stripos( $r['txt'], 'v=spf1' ) === 0 ) {
+                    $spf_found  = true;
+                    $spf_record = $r['txt'];
+                    break;
+                }
+            }
+        }
+
+        // DMARC — TXT record on _dmarc.domain
+        $dmarc_txt = @dns_get_record( '_dmarc.' . $host, DNS_TXT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        if ( is_array( $dmarc_txt ) ) {
+            foreach ( $dmarc_txt as $r ) {
+                if ( isset( $r['txt'] ) && stripos( $r['txt'], 'v=DMARC1' ) === 0 ) {
+                    $dmarc_found  = true;
+                    $dmarc_record = $r['txt'];
+                    break;
+                }
+            }
+        }
+
+        return [
+            'spf_present'   => $spf_found,
+            'spf_record'    => $spf_record,
+            'dmarc_present' => $dmarc_found,
+            'dmarc_record'  => $dmarc_record,
+        ];
+    }
+
     private static function gather_external_checks(): array {
         $base = home_url( '/' );
         $host = (string) wp_parse_url( $base, PHP_URL_HOST );
@@ -8882,12 +8924,68 @@ PROMPT;
 
         // Exposed sensitive files
         $ext['exposed_files'] = [];
-        foreach ( [ 'readme.html', 'license.txt', 'phpinfo.php', 'wp-config.php.bak', '.env', '.htaccess', '.git/config' ] as $f ) {
+        foreach ( [ 'readme.html', 'license.txt', 'phpinfo.php', 'wp-config.php.bak', '.env', '.htaccess', '.git/config', 'error_log', 'composer.json', 'package.json' ] as $f ) {
             $r = $head( $base . $f );
             if ( isset( $r['code'] ) && is_int( $r['code'] ) && $r['code'] === 200 ) {
                 $ext['exposed_files'][] = $f;
             }
         }
+
+        // wp-cron.php publicly accessible (DDoS / resource-abuse vector)
+        $cron_r = $head( $base . 'wp-cron.php' );
+        $ext['wp_cron_public'] = isset( $cron_r['code'] ) && is_int( $cron_r['code'] ) && $cron_r['code'] < 400;
+
+        // debug.log exposed (leaks credentials, stack traces, internal paths)
+        $debug_r = $head( $base . 'wp-content/debug.log' );
+        $ext['debug_log_exposed'] = isset( $debug_r['code'] ) && $debug_r['code'] === 200;
+
+        // Adminer / phpMyAdmin reachable (full DB access)
+        $db_tools_exposed = [];
+        foreach ( [ 'adminer.php', 'adminer/', 'phpmyadmin/', 'pma/', 'phpMyAdmin/', 'db/' ] as $path ) {
+            $r = $head( $base . $path );
+            if ( isset( $r['code'] ) && is_int( $r['code'] ) && $r['code'] < 400 ) {
+                $db_tools_exposed[] = $path;
+            }
+        }
+        $ext['db_tools_exposed'] = $db_tools_exposed;
+
+        // Apache server-status / server-info (leaks live requests and internal IPs)
+        $server_status_r = $head( $base . 'server-status' );
+        $server_info_r   = $head( $base . 'server-info' );
+        $ext['server_status_exposed'] = isset( $server_status_r['code'] ) && $server_status_r['code'] === 200;
+        $ext['server_info_exposed']   = isset( $server_info_r['code'] )   && $server_info_r['code'] === 200;
+
+        // Backup archives exposed in webroot (full site or DB dump)
+        $backup_files_exposed = [];
+        $domain_slug          = str_replace( '.', '', (string) wp_parse_url( $base, PHP_URL_HOST ) );
+        $backup_candidates    = [
+            'backup.zip', 'backup.tar.gz', 'backup.sql',
+            'site.zip', 'site.tar.gz',
+            'wordpress.zip', 'wordpress.tar.gz',
+            'db.sql', 'database.sql', 'dump.sql',
+            $domain_slug . '.zip', $domain_slug . '.sql',
+            'wp-backup.zip', 'backup.bak',
+        ];
+        foreach ( $backup_candidates as $f ) {
+            $r = $head( $base . $f );
+            if ( isset( $r['code'] ) && $r['code'] === 200 ) {
+                $backup_files_exposed[] = $f;
+            }
+        }
+        $ext['backup_files_exposed'] = $backup_files_exposed;
+
+        // HTTP → HTTPS redirect enforcement
+        $http_base    = preg_replace( '/^https:/i', 'http:', $base );
+        $http_r       = wp_remote_head( $http_base, [ 'timeout' => 5, 'sslverify' => false, 'redirection' => 0 ] );
+        $http_code    = is_wp_error( $http_r ) ? null : wp_remote_retrieve_response_code( $http_r );
+        $http_loc     = is_wp_error( $http_r ) ? null : wp_remote_retrieve_header( $http_r, 'location' );
+        $ext['http_to_https'] = [
+            'redirects'   => $http_code !== null && $http_code >= 300 && $http_code < 400 && $http_loc && stripos( $http_loc, 'https://' ) === 0,
+            'http_code'   => $http_code,
+        ];
+
+        // Email security — SPF and DMARC DNS records
+        $ext['email_dns'] = self::check_email_dns( $host );
 
         // Security headers (from external perspective via public URL)
         $headers_r = wp_remote_get( $base, [ 'timeout' => 5, 'sslverify' => false ] );
@@ -8914,20 +9012,33 @@ PROMPT;
 
         // Patterns that warrant attention in plugin code
         $patterns = [
-            'eval('                 => 'eval()',
-            'base64_decode('        => 'base64_decode()',
-            'exec('                 => 'exec()',
-            'shell_exec('           => 'shell_exec()',
-            'system('               => 'system()',
-            'passthru('             => 'passthru()',
-            'popen('                => 'popen()',
-            'proc_open('            => 'proc_open()',
-            'assert('               => 'assert()',
-            'preg_replace.*\/e'     => 'preg_replace /e modifier',
-            'create_function('      => 'create_function()',
-            'file_put_contents.*$_' => 'file_put_contents with user input',
-            'move_uploaded_file'    => 'move_uploaded_file()',
-            'wp_remote_get.*$_'     => 'outbound request with user input',
+            // Remote code execution
+            'eval('                          => 'eval()',
+            'base64_decode('                 => 'base64_decode()',
+            'exec('                          => 'exec()',
+            'shell_exec('                    => 'shell_exec()',
+            'system('                        => 'system()',
+            'passthru('                      => 'passthru()',
+            'popen('                         => 'popen()',
+            'proc_open('                     => 'proc_open()',
+            'assert('                        => 'assert()',
+            'preg_replace.*\/e'              => 'preg_replace /e modifier',
+            'create_function('               => 'create_function()',
+            // File operations with user input
+            'file_put_contents.*\$_'         => 'file_put_contents with user input',
+            'move_uploaded_file'             => 'move_uploaded_file()',
+            // Outbound requests with user input
+            'wp_remote_get.*\$_'             => 'outbound request with user input',
+            // SQL injection — direct use of user input in DB queries
+            '\$wpdb->(query|get_results|get_row|get_var|prepare).*\$_(GET|POST|REQUEST|COOKIE)' => 'SQL query with raw user input (SQLi risk)',
+            // XSS — echoing user input without escaping
+            'echo\s+\$_(GET|POST|REQUEST|COOKIE|SERVER)\[' => 'echo user input without escaping (XSS risk)',
+            'print\s+\$_(GET|POST|REQUEST|COOKIE)\['       => 'print user input without escaping (XSS risk)',
+            // Unsafe deserialization
+            'unserialize\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)' => 'unserialize() with user input (RCE/object injection)',
+            // Remote file inclusion
+            'include\s*\(\s*\$_(GET|POST|REQUEST)'         => 'include() with user input (RFI risk)',
+            'require\s*\(\s*\$_(GET|POST|REQUEST)'         => 'require() with user input (RFI risk)',
         ];
 
         $results = [];
@@ -9005,12 +9116,47 @@ PROMPT;
         return $results;
     }
 
+    private static function gather_theme_data(): array {
+        $theme        = wp_get_theme();
+        $parent       = $theme->parent();
+        $update_themes = get_site_transient( 'update_themes' );
+        $has_update   = isset( $update_themes->response[ $theme->get_stylesheet() ] );
+        $parent_update = $parent ? isset( $update_themes->response[ $parent->get_stylesheet() ] ) : false;
+        return [
+            'active_theme'        => $theme->get( 'Name' ),
+            'active_theme_version'=> $theme->get( 'Version' ),
+            'active_theme_update' => $has_update,
+            'parent_theme'        => $parent ? $parent->get( 'Name' ) : null,
+            'parent_theme_update' => $parent_update,
+        ];
+    }
+
+    private static function check_auth_salts(): array {
+        $defaults = [ 'put your unique phrase here', '' ];
+        $keys     = [ 'AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY',
+                      'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT' ];
+        $weak     = [];
+        foreach ( $keys as $k ) {
+            if ( ! defined( $k ) || in_array( constant( $k ), $defaults, true ) || strlen( constant( $k ) ) < 32 ) {
+                $weak[] = $k;
+            }
+        }
+        return [
+            'all_set'  => empty( $weak ),
+            'weak_keys'=> $weak,
+        ];
+    }
+
     private static function gather_deep_security_data(): array {
-        $base         = self::gather_security_data();
-        $external     = self::gather_external_checks();
-        $code_scan    = self::scan_plugin_code();
+        $base      = self::gather_security_data();
+        $external  = self::gather_external_checks();
+        $code_scan = self::scan_plugin_code();
+        $theme     = self::gather_theme_data();
+        $salts     = self::check_auth_salts();
         return array_merge( $base, [
-            'external_checks' => $external,
+            'theme'            => $theme,
+            'auth_salts'       => $salts,
+            'external_checks'  => $external,
             'plugin_code_scan' => $code_scan,
         ] );
     }
@@ -9019,18 +9165,28 @@ PROMPT;
         return <<<'PROMPT'
 You are a professional penetration tester and WordPress security expert performing a comprehensive security audit.
 
-You will receive a JSON object containing three categories of data:
-1. Internal WordPress configuration (plugins, users, settings, file permissions, debug flags, brute force settings, etc.)
-2. External checks — results of probing the site from outside: SSL certificate validity, exposed wp-login.php, xmlrpc.php, REST API user enumeration, author enumeration, directory listing, exposed sensitive files, security headers from external perspective.
-3. Plugin code scan — static analysis of active plugin PHP files flagging dangerous function calls (eval, exec, shell_exec, base64_decode, create_function, etc.) with file paths and line numbers.
+You will receive a JSON object containing five categories of data:
+1. Internal WordPress configuration — WP/PHP versions, debug flags, DISALLOW_FILE_EDIT/MODS, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey), login URL obfuscation, wp-config.php permissions.
+2. Site configuration — open user registration, pingbacks/trackbacks enabled (DDoS amplification vector), WordPress version exposed in meta generator tag, comment status defaults.
+3. Theme security — active theme name/version, whether the active or parent theme has a pending update.
+4. Authentication salts — whether all 8 WordPress secret keys/salts are set and non-default (weak or default salts allow session forgery).
+5. External checks — probing the site from outside: SSL certificate validity and days to expiry, HTTP→HTTPS redirect, wp-login.php/xmlrpc.php/wp-cron.php accessibility, REST API user enumeration, author enumeration (?author=1), uploads directory listing, exposed sensitive files (debug.log, .env, wp-config.php.bak, .git/config, readme.html, phpinfo.php, error_log, composer.json, backup archives), database admin tools (adminer, phpMyAdmin), server-status/server-info pages, email DNS (SPF and DMARC present), HTTP security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Powered-By).
+6. Plugin code scan — static analysis of active plugin PHP files flagging dangerous patterns: RCE (eval, exec, shell_exec, base64_decode, create_function), SQL injection (wpdb queries with raw user input), XSS (unescaped echo of user input), unserialize with user input, remote file inclusion, file upload functions. Each finding includes plugin name, file path, line number, and code snippet.
 
-Analyse ALL findings thoroughly. Cross-correlate all three categories. For example: if wp-login.php is publicly accessible AND brute force protection is disabled, that is a critical combined risk. If a plugin uses eval() or exec(), assess the risk in context of what that plugin does.
+Analyse ALL findings thoroughly. Cross-correlate categories for compound risks. Examples:
+- wp-login.php accessible + brute force disabled = critical combined risk
+- Open registration + no email verification = account abuse
+- Missing SPF + missing DMARC = email spoofing possible
+- wp-cron.php publicly accessible = unauthenticated resource exhaustion / DDoS vector
+- Default auth salts = active sessions can be forged
+- Plugin with eval() or exec() = assess risk in context of what the plugin does
+- debug.log exposed = credentials and stack traces publicly readable
 
 Return ONLY a JSON object (no markdown, no code fences, no explanation) with this exact schema:
 {
   "score": <integer 0-100>,
   "score_label": "<Excellent|Good|Fair|Poor|Critical>",
-  "summary": "<2-3 sentence executive summary covering both internal config and external exposure findings>",
+  "summary": "<2-3 sentence executive summary covering the most critical findings and overall posture>",
   "critical": [{"title":"...","detail":"...","fix":"..."}],
   "high":     [{"title":"...","detail":"...","fix":"..."}],
   "medium":   [{"title":"...","detail":"...","fix":"..."}],
@@ -9045,9 +9201,9 @@ Scoring guide (be strict — external exposure findings lower the score signific
 35-54:  Poor — significant exposure or multiple high-severity issues
 0-34:   Critical — actively exploitable exposure, urgent remediation required
 
-Prioritise EXTERNAL exposure issues (things an attacker can probe without credentials) at the critical/high level.
-Include GOOD PRACTICES for things that are correctly hardened — especially combined wins (e.g. xmlrpc blocked AND brute force enabled).
-Be specific: name the exact plugin, file path, or setting involved.
+Prioritise EXTERNAL exposure (attackers can probe without credentials) at critical/high.
+Include GOOD PRACTICES for correctly hardened settings — especially compound wins.
+Be specific: name the exact plugin, file path, setting, or DNS record involved.
 PROMPT;
     }
 
