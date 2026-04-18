@@ -440,7 +440,7 @@
         }
 
         var MODEL_NAMES = {
-            '_auto': 'Auto', '_auto_deep': 'Auto',
+            '_auto': 'Auto AI Model', '_auto_deep': 'Auto AI Model',
             'claude-opus-4-7': 'Opus 4.7', 'claude-sonnet-4-6': 'Sonnet 4.6',
             'claude-haiku-4-5-20251001': 'Haiku 4.5',
             'gemini-2.0-flash': 'Gemini Flash', 'gemini-2.0-flash-lite': 'Flash Lite',
