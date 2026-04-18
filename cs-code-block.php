@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.36
+ * Version: 1.9.38
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.36';
+    const VERSION      = '1.9.38';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -293,6 +293,9 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_cancel_scan',        [ __CLASS__, 'ajax_cancel_scan' ] );
         add_action( 'wp_ajax_csdt_devtools_vuln_save_key',      [ __CLASS__, 'ajax_vuln_save_key' ] );
         add_action( 'wp_ajax_csdt_devtools_security_test_key',  [ __CLASS__, 'ajax_security_test_key' ] );
+        add_action( 'wp_ajax_csdt_devtools_server_logs_status', [ __CLASS__, 'ajax_server_logs_status' ] );
+        add_action( 'wp_ajax_csdt_devtools_server_logs_fetch',  [ __CLASS__, 'ajax_server_logs_fetch' ] );
+        add_action( 'wp_ajax_csdt_devtools_scan_history',       [ __CLASS__, 'ajax_scan_history' ] );
 
         add_action( 'csdt_devtools_run_vuln_scan', [ __CLASS__, 'cron_vuln_scan' ] );
         add_action( 'csdt_devtools_run_deep_scan', [ __CLASS__, 'cron_deep_scan' ] );
@@ -1101,6 +1104,7 @@ class CloudScale_DevTools {
                 'savedDeepModel' => $saved_deep_model,
                 'savedPrompt'    => $saved_prompt,
                 'defaultPrompt'  => self::default_security_prompt(),
+                'scanHistory'    => get_option( 'csdt_scan_history', [] ),
             ] );
         }
 
@@ -1121,6 +1125,22 @@ class CloudScale_DevTools {
             // Thumbnails-tab-specific CSS — injected as inline style to avoid an
             // extra HTTP request and keep the render method free of <style> tags.
             wp_add_inline_style( 'csdt-admin-tabs', self::get_thumbnails_admin_css() );
+        }
+
+        if ( $active_tab === 'logs' ) {
+            $logs_js = plugin_dir_path( __FILE__ ) . 'assets/cs-server-logs.js';
+            wp_enqueue_script(
+                'csdt-server-logs',
+                plugins_url( 'assets/cs-server-logs.js', __FILE__ ),
+                [],
+                file_exists( $logs_js ) ? filemtime( $logs_js ) : self::VERSION,
+                true
+            );
+            wp_localize_script( 'csdt-server-logs', 'csdtServerLogs', [
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'csdt_devtools_server_logs' ),
+                'sources' => self::get_log_sources(),
+            ] );
         }
 
         // Email-verified modal countdown — only needed when the verification
@@ -1200,6 +1220,10 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === '404' ? 'active' : ''; ?>">
                     🎮 <?php esc_html_e( '404 Games', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=logs' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'logs' ? 'active' : ''; ?>">
+                    📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?>
+                </a>
             </div>
 
             <!-- Copy All action bar -->
@@ -1237,6 +1261,10 @@ class CloudScale_DevTools {
             <?php elseif ( $active_tab === 'security' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_security_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'logs' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php self::render_server_logs_panel(); ?>
                 </div>
             <?php endif; ?>
 
@@ -1414,6 +1442,230 @@ class CloudScale_DevTools {
      * @since  1.5.0
      * @return void
      */
+    /* ==================================================================
+       Server Logs tab
+    ================================================================== */
+
+    private static function get_log_sources(): array {
+        $sources = [];
+
+        // PHP error log (from php.ini)
+        $php_log = ini_get( 'error_log' );
+        if ( $php_log ) {
+            $sources['php_error'] = [ 'label' => 'PHP Error Log', 'path' => $php_log ];
+        }
+
+        // WordPress debug.log
+        $wp_debug_log = WP_CONTENT_DIR . '/debug.log';
+        $sources['wp_debug'] = [ 'label' => 'WordPress Debug Log', 'path' => $wp_debug_log ];
+
+        // Apache / Nginx error log — common paths
+        $apache_candidates = [
+            '/var/log/apache2/error.log',
+            '/var/log/httpd/error_log',
+            '/var/log/nginx/error.log',
+            '/var/log/apache2/error_log',
+        ];
+        foreach ( $apache_candidates as $path ) {
+            if ( file_exists( $path ) ) {
+                $sources['web_error'] = [ 'label' => 'Web Server Error Log', 'path' => $path ];
+                break;
+            }
+        }
+
+        // Apache access log
+        $access_candidates = [
+            '/var/log/apache2/access.log',
+            '/var/log/httpd/access_log',
+            '/var/log/nginx/access.log',
+        ];
+        foreach ( $access_candidates as $path ) {
+            if ( file_exists( $path ) ) {
+                $sources['web_access'] = [ 'label' => 'Web Server Access Log', 'path' => $path ];
+                break;
+            }
+        }
+
+        // WordPress cron log if it exists
+        $cron_log = WP_CONTENT_DIR . '/cron.log';
+        if ( file_exists( $cron_log ) ) {
+            $sources['wp_cron'] = [ 'label' => 'WP Cron Log', 'path' => $cron_log ];
+        }
+
+        return $sources;
+    }
+
+    private static function render_server_logs_panel(): void {
+        $sources = self::get_log_sources();
+        ?>
+        <div class="cs-panel" id="cs-panel-logs">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#1a2035 0%,#1e2d40 100%);border-left:3px solid #4a9eff;">
+                <span>📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Read-only view of PHP error log, WordPress debug log, and web server logs', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div class="cs-panel-body">
+
+                <!-- Source picker -->
+                <div id="cs-logs-sources" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                    <?php foreach ( $sources as $key => $src ) : ?>
+                        <button class="cs-btn-secondary cs-log-src-btn" data-source="<?php echo esc_attr( $key ); ?>">
+                            <?php echo esc_html( $src['label'] ); ?>
+                        </button>
+                    <?php endforeach; ?>
+                    <?php if ( empty( $sources ) ) : ?>
+                        <span style="color:#888;font-size:13px;"><?php esc_html_e( 'No log paths detected on this server.', 'cloudscale-devtools' ); ?></span>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Toolbar -->
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;">
+                    <input type="text" id="cs-logs-search" placeholder="<?php esc_attr_e( 'Search…', 'cloudscale-devtools' ); ?>"
+                           style="flex:1;min-width:160px;max-width:320px;" class="cs-text-input">
+                    <select id="cs-logs-level" class="cs-sec-select" style="width:auto;">
+                        <option value=""><?php esc_html_e( 'All levels', 'cloudscale-devtools' ); ?></option>
+                        <option value="error"><?php esc_html_e( 'Error+', 'cloudscale-devtools' ); ?></option>
+                        <option value="warn"><?php esc_html_e( 'Warning only', 'cloudscale-devtools' ); ?></option>
+                        <option value="notice"><?php esc_html_e( 'Notice only', 'cloudscale-devtools' ); ?></option>
+                    </select>
+                    <select id="cs-logs-lines" class="cs-sec-select" style="width:auto;">
+                        <option value="100">100 lines</option>
+                        <option value="300" selected>300 lines</option>
+                        <option value="500">500 lines</option>
+                        <option value="1000">1000 lines</option>
+                    </select>
+                    <button id="cs-logs-refresh" class="cs-btn-secondary">🔄 <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#9da5b4;cursor:pointer;">
+                        <input type="checkbox" id="cs-logs-tail" style="cursor:pointer;">
+                        <?php esc_html_e( 'Auto-refresh (30s)', 'cloudscale-devtools' ); ?>
+                    </label>
+                    <span id="cs-logs-status" style="font-size:12px;color:#888;margin-left:auto;"></span>
+                </div>
+
+                <!-- Log viewer -->
+                <div id="cs-logs-viewer" style="
+                    background:#0d1117;
+                    border:1px solid rgba(255,255,255,0.08);
+                    border-radius:6px;
+                    padding:12px;
+                    height:520px;
+                    overflow-y:auto;
+                    font-family:'SF Mono','Fira Code',monospace;
+                    font-size:12px;
+                    line-height:1.6;
+                    color:#c9d1d9;
+                ">
+                    <div class="cs-logs-placeholder" style="color:#555;padding:20px;text-align:center;">
+                        <?php esc_html_e( 'Select a log source above to view entries.', 'cloudscale-devtools' ); ?>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <style>
+        .cs-log-src-btn.status-ok            { border-color:#22c55e; color:#22c55e; }
+        .cs-log-src-btn.status-not-found     { border-color:#555; color:#555; }
+        .cs-log-src-btn.status-permission-denied { border-color:#f59e0b; color:#f59e0b; }
+        .cs-log-src-btn.status-empty         { border-color:#6366f1; color:#6366f1; }
+        .cs-log-src-btn.active               { background:rgba(74,158,255,0.15); border-color:#4a9eff; color:#4a9eff; }
+        .cs-log-line                         { padding:1px 0; white-space:pre-wrap; word-break:break-all; border-bottom:1px solid rgba(255,255,255,0.03); }
+        .cs-log-line.level-emerg,
+        .cs-log-line.level-alert,
+        .cs-log-line.level-crit              { color:#ff6b6b; }
+        .cs-log-line.level-error             { color:#f87171; }
+        .cs-log-line.level-warn              { color:#fbbf24; }
+        .cs-log-line.level-notice            { color:#a78bfa; }
+        .cs-log-line.level-info              { color:#60a5fa; }
+        .cs-log-line.level-debug             { color:#6b7280; }
+        .cs-log-line.level-default           { color:#c9d1d9; }
+        </style>
+        <?php
+    }
+
+    public static function ajax_server_logs_status(): void {
+        check_ajax_referer( 'csdt_devtools_server_logs', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $sources  = self::get_log_sources();
+        $statuses = [];
+        foreach ( $sources as $key => $src ) {
+            $path = $src['path'];
+            if ( ! file_exists( $path ) ) {
+                $statuses[ $key ] = [ 'status' => 'not_found' ];
+            } elseif ( ! is_readable( $path ) ) {
+                $statuses[ $key ] = [ 'status' => 'permission_denied' ];
+            } elseif ( filesize( $path ) === 0 ) {
+                $statuses[ $key ] = [ 'status' => 'empty' ];
+            } else {
+                $statuses[ $key ] = [ 'status' => 'ok' ];
+            }
+        }
+        wp_send_json_success( $statuses );
+    }
+
+    public static function ajax_server_logs_fetch(): void {
+        check_ajax_referer( 'csdt_devtools_server_logs', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $source_key = isset( $_POST['source'] ) ? sanitize_key( $_POST['source'] ) : '';
+        $lines_req  = min( 1000, max( 50, (int) ( $_POST['lines'] ?? 300 ) ) );
+        $sources    = self::get_log_sources();
+
+        if ( ! isset( $sources[ $source_key ] ) ) {
+            wp_send_json_error( [ 'message' => 'Unknown source.' ] );
+            return;
+        }
+
+        $path = $sources[ $source_key ]['path'];
+
+        if ( ! file_exists( $path ) ) {
+            wp_send_json_success( [ 'status' => 'not_found', 'lines' => [], 'count' => 0, 'path' => $path ] );
+            return;
+        }
+        if ( ! is_readable( $path ) ) {
+            wp_send_json_success( [ 'status' => 'permission_denied', 'lines' => [], 'count' => 0, 'path' => $path ] );
+            return;
+        }
+
+        // Read last N lines efficiently without loading the entire file
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        $handle = @fopen( $path, 'rb' );
+        if ( ! $handle ) {
+            wp_send_json_success( [ 'status' => 'error', 'lines' => [], 'count' => 0, 'path' => $path ] );
+            return;
+        }
+
+        fseek( $handle, 0, SEEK_END );
+        $file_size  = ftell( $handle );
+        $chunk_size = 65536; // 64 KB chunks, read from end
+        $buffer     = '';
+        $pos        = $file_size;
+        $line_count = 0;
+
+        while ( $pos > 0 && $line_count < $lines_req + 1 ) {
+            $read = min( $chunk_size, $pos );
+            $pos -= $read;
+            fseek( $handle, $pos );
+            $buffer     = fread( $handle, $read ) . $buffer;
+            $line_count = substr_count( $buffer, "\n" );
+        }
+        fclose( $handle );
+
+        $all_lines = explode( "\n", $buffer );
+        // Remove trailing empty line
+        if ( end( $all_lines ) === '' ) { array_pop( $all_lines ); }
+        $lines = array_slice( $all_lines, -$lines_req );
+
+        wp_send_json_success( [
+            'status' => count( $lines ) > 0 ? 'ok' : 'empty',
+            'lines'  => $lines,
+            'count'  => count( $lines ),
+            'path'   => $path,
+        ] );
+    }
+
     private static function render_migrate_panel() {
         ?>
         <div class="cs-panel" id="cs-panel-migrator">
@@ -8219,6 +8471,25 @@ class CloudScale_DevTools {
                 'admin_count'          => count( get_users( [ 'role' => 'administrator', 'fields' => 'ID' ] ) ),
                 'failed_logins_1h'     => (int) get_transient( 'csdt_devtools_failed_logins_1h' ),
                 'failed_logins_24h'    => (int) get_transient( 'csdt_devtools_failed_logins_24h' ),
+                'app_passwords'        => ( function () {
+                    $enabled       = function_exists( 'wp_is_application_passwords_available' ) && wp_is_application_passwords_available();
+                    $admins_with   = 0;
+                    $total_app_pw  = 0;
+                    if ( $enabled ) {
+                        foreach ( get_users( [ 'role' => 'administrator', 'fields' => 'ID' ] ) as $id ) {
+                            $pws = WP_Application_Passwords::get_user_application_passwords( (int) $id );
+                            if ( ! empty( $pws ) ) {
+                                $admins_with++;
+                                $total_app_pw += count( $pws );
+                            }
+                        }
+                    }
+                    return [
+                        'enabled'          => $enabled,
+                        'admins_with_app_pw'=> $admins_with,
+                        'total_app_passwords'=> $total_app_pw,
+                    ];
+                } )(),
             ],
             'exposed_files'    => $exposed,
             'security_headers' => $sec_headers,
@@ -8362,6 +8633,47 @@ class CloudScale_DevTools {
                 </div>
 
             </div>
+
+            <!-- Scan History -->
+            <div class="cs-section-header" style="margin-top:24px;background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #6366f1;">
+                <span>📈 <?php esc_html_e( 'Scan History', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Last 10 scans — track your security score over time', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div id="cs-scan-history-wrap" style="padding:12px 0;">
+                <?php
+                $history = get_option( 'csdt_scan_history', [] );
+                if ( empty( $history ) ) :
+                ?>
+                    <p style="color:#888;font-size:13px;margin:0;padding:8px 0;"><?php esc_html_e( 'No scan history yet. Run your first AI Cyber Audit above.', 'cloudscale-devtools' ); ?></p>
+                <?php else : ?>
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                    <?php foreach ( $history as $entry ) :
+                        $score       = (int) ( $entry['score'] ?? 0 );
+                        $label       = esc_html( $entry['score_label'] ?? '' );
+                        $type_label  = $entry['type'] === 'deep' ? 'Deep Dive' : 'AI Cyber Audit';
+                        $date        = $entry['scanned_at'] ? wp_date( 'D j M Y, g:ia', $entry['scanned_at'] ) : '';
+                        $score_color = $score >= 90 ? '#22c55e' : ( $score >= 75 ? '#4ade80' : ( $score >= 55 ? '#fbbf24' : ( $score >= 35 ? '#f97316' : '#ef4444' ) ) );
+                    ?>
+                        <div style="display:flex;align-items:flex-start;gap:14px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="flex-shrink:0;text-align:center;min-width:48px;">
+                                <div style="font-size:1.4rem;font-weight:700;color:<?php echo esc_attr( $score_color ); ?>;line-height:1;"><?php echo esc_html( $score ); ?></div>
+                                <div style="font-size:10px;color:<?php echo esc_attr( $score_color ); ?>;opacity:.8;"><?php echo esc_html( $label ); ?></div>
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:12px;font-weight:600;color:#9da5b4;margin-bottom:3px;">
+                                    <?php echo esc_html( $type_label ); ?>
+                                    <span style="font-weight:400;opacity:.7;margin-left:8px;"><?php echo esc_html( $date ); ?></span>
+                                </div>
+                                <div style="font-size:12px;color:#c5cad4;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+                                    <?php echo esc_html( $entry['summary'] ?? '' ); ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
         </div>
         <?php
     }
@@ -8772,6 +9084,7 @@ PROMPT;
 
         set_transient( 'csdt_security_scan_v2', $output, DAY_IN_SECONDS );
         set_transient( 'csdt_vuln_scan_status', [ 'status' => 'complete', 'completed_at' => time() ], 600 );
+        self::append_scan_history( 'standard', $report, $output['model_used'], $output['scanned_at'] );
         error_log( '[CSDT-SCAN] cron complete, score=' . $report['score'] );
     }
 
@@ -8985,6 +9298,39 @@ PROMPT;
             'http_code'   => $http_code,
         ];
 
+        // Cookie security flags — inspect Set-Cookie headers from wp-login.php
+        $cookie_r = wp_remote_get( $base . 'wp-login.php', [ 'timeout' => 5, 'sslverify' => false ] );
+        $ext['cookie_security'] = [ 'checked' => false ];
+        if ( ! is_wp_error( $cookie_r ) ) {
+            $raw_headers = wp_remote_retrieve_headers( $cookie_r );
+            $set_cookies = [];
+            // WP_HTTP_Requests_Response may return Set-Cookie as array or string
+            $sc = $raw_headers['set-cookie'] ?? [];
+            if ( is_string( $sc ) ) { $sc = [ $sc ]; }
+            foreach ( (array) $sc as $cookie_str ) {
+                if ( stripos( $cookie_str, 'wordpress' ) !== false ) {
+                    $set_cookies[] = $cookie_str;
+                }
+            }
+            if ( ! empty( $set_cookies ) ) {
+                $all_secure   = true;
+                $all_httponly = true;
+                $all_samesite = true;
+                foreach ( $set_cookies as $cs ) {
+                    if ( stripos( $cs, '; Secure' ) === false )   { $all_secure   = false; }
+                    if ( stripos( $cs, '; HttpOnly' ) === false )  { $all_httponly = false; }
+                    if ( stripos( $cs, 'SameSite' ) === false )    { $all_samesite = false; }
+                }
+                $ext['cookie_security'] = [
+                    'checked'    => true,
+                    'secure'     => $all_secure,
+                    'httponly'   => $all_httponly,
+                    'samesite'   => $all_samesite,
+                    'cookie_secure_constant' => defined( 'COOKIE_SECURE' ) && COOKIE_SECURE,
+                ];
+            }
+        }
+
         // WAF / CDN detection
         $waf_detected  = [];
         $waf_headers_r = wp_remote_get( $base, [ 'timeout' => 5, 'sslverify' => false ] );
@@ -9145,6 +9491,94 @@ PROMPT;
         }
 
         return $results;
+    }
+
+    private static function audit_users(): array {
+        $weak_usernames = [ 'admin', 'administrator', 'webmaster', 'root', 'wp-admin', 'wordpress', 'test', 'user', 'demo' ];
+        $admins         = get_users( [ 'role' => 'administrator' ] );
+        $weak_admin_logins = [];
+        $admins_no_2fa     = [];
+
+        foreach ( $admins as $user ) {
+            if ( in_array( strtolower( $user->user_login ), $weak_usernames, true ) ) {
+                $weak_admin_logins[] = $user->user_login;
+            }
+            $has_totp    = get_user_meta( $user->ID, 'csdt_devtools_totp_enabled', true ) === '1';
+            $has_passkey = ! empty( get_user_meta( $user->ID, 'csdt_devtools_passkeys', true ) );
+            $has_email2fa= get_option( 'csdt_devtools_2fa_method', 'off' ) === 'email';
+            if ( ! $has_totp && ! $has_passkey && ! $has_email2fa ) {
+                $admins_no_2fa[] = $user->user_login;
+            }
+        }
+
+        $role_counts = [];
+        foreach ( [ 'editor', 'author', 'contributor', 'subscriber' ] as $role ) {
+            $count = count( get_users( [ 'role' => $role, 'fields' => 'ID' ] ) );
+            if ( $count > 0 ) {
+                $role_counts[ $role ] = $count;
+            }
+        }
+
+        return [
+            'admin_count'         => count( $admins ),
+            'weak_admin_usernames'=> $weak_admin_logins,
+            'admins_without_2fa'  => $admins_no_2fa,
+            'admins_without_2fa_count' => count( $admins_no_2fa ),
+            'non_admin_role_counts'=> $role_counts,
+        ];
+    }
+
+    private static function audit_cron_events(): array {
+        $crons = _get_cron_array();
+        if ( empty( $crons ) || ! is_array( $crons ) ) {
+            return [ 'disable_wp_cron' => defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON, 'total_events' => 0, 'hooks' => [], 'suspicious_hooks' => [] ];
+        }
+
+        // Collect all scheduled hook names
+        $all_hooks = [];
+        foreach ( $crons as $hooks ) {
+            foreach ( array_keys( $hooks ) as $hook ) {
+                $all_hooks[] = $hook;
+            }
+        }
+        $unique_hooks = array_values( array_unique( $all_hooks ) );
+
+        // Known WP core hooks
+        $core_hooks = [
+            'wp_scheduled_delete', 'wp_update_plugins', 'wp_update_themes', 'wp_version_check',
+            'wp_scheduled_auto_draft_delete', 'delete_expired_transients', 'wp_privacy_delete_old_export_files',
+            'recovery_mode_clean_expired_keys', 'wp_site_health_scheduled_check',
+            'wp_update_user_counts', 'wp_delete_temp_updater_backups',
+        ];
+
+        // Build known hooks from active plugins (use option-stored hook prefixes as heuristic)
+        $active_plugins = (array) get_option( 'active_plugins', [] );
+        $plugin_prefixes = array_map( fn( $f ) => strtolower( str_replace( '-', '_', dirname( $f ) ) ), $active_plugins );
+
+        $suspicious = [];
+        foreach ( $unique_hooks as $hook ) {
+            if ( in_array( $hook, $core_hooks, true ) ) {
+                continue;
+            }
+            $matched = false;
+            foreach ( $plugin_prefixes as $prefix ) {
+                if ( $prefix !== '.' && stripos( $hook, $prefix ) !== false ) {
+                    $matched = true;
+                    break;
+                }
+            }
+            // Also pass through anything with common legit patterns
+            if ( ! $matched && ! preg_match( '/^(wp_|wc_|woo|yoast|rank_math|acf_|tribe_|vc_|elementor|jetpack|akismet|wordfence|sucuri|updraft|backup|cache|cron|schedule|clean|purge|sync|check|update|send|mail|report)/i', $hook ) ) {
+                $suspicious[] = $hook;
+            }
+        }
+
+        return [
+            'disable_wp_cron' => defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON,
+            'total_events'    => count( $unique_hooks ),
+            'hooks'           => array_slice( $unique_hooks, 0, 30 ),
+            'suspicious_hooks'=> $suspicious,
+        ];
     }
 
     private static function enrich_plugins_with_wporg( array $active_plugin_files ): array {
@@ -9409,9 +9843,13 @@ PROMPT;
         $cve_data       = self::check_plugin_vulnerabilities( $active_files, $all_plugins );
         $core_integrity = self::check_core_integrity();
         $malware        = self::scan_malware_indicators();
+        $user_audit     = self::audit_users();
+        $cron_audit     = self::audit_cron_events();
         return array_merge( $base, [
             'theme'              => $theme,
             'auth_salts'         => $salts,
+            'user_audit'         => $user_audit,
+            'cron_audit'         => $cron_audit,
             'plugin_wporg'       => $wporg_data,
             'plugin_cves'        => $cve_data,
             'core_integrity'     => $core_integrity,
@@ -9427,15 +9865,17 @@ You are a professional penetration tester and WordPress security expert performi
 
 You will receive a JSON object with these categories:
 
-1. Internal config — WP/PHP versions, debug flags, DISALLOW_FILE_EDIT/MODS, FORCE_SSL_ADMIN, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey counts), login URL obfuscation, wp-config.php permissions.
+1. Internal config — WP/PHP versions, debug flags, DISALLOW_FILE_EDIT/MODS, FORCE_SSL_ADMIN, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey counts), login URL obfuscation, wp-config.php permissions. Also includes app_passwords: enabled flag, how many admins have application passwords created (app passwords bypass 2FA).
 2. Site config — open user registration, pingbacks enabled (DDoS amplification), WP version in meta generator tag, comment defaults.
 3. Theme — active theme name/version, pending update for active or parent theme.
 4. Auth salts — all 8 WP secret keys/salts set and non-default (weak salts = session forgery).
-5. Plugin WP.org data (plugin_wporg) — for each active plugin: last_updated, abandoned (>2 years since update), years_since_update, active_installs, tested_up_to. Abandoned plugins with low install counts are high risk.
-6. Known CVEs (plugin_cves) — each entry has: plugin slug, version installed, CVE ID, title, severity (critical/high/medium/low), CVSS score, fixed_in version. ANY unfixed CVE at critical/high severity is a critical finding.
-7. Core file integrity (core_integrity) — MD5 comparison of key WP core files against WordPress.org checksums. modified_files = likely backdoor. This is CRITICAL if any files are listed.
+5. User audit (user_audit) — admin_count, weak_admin_usernames (e.g. "admin", "administrator"), admins_without_2fa (list of admin logins with no TOTP/passkey/email 2FA), non_admin_role_counts.
+6. Cron audit (cron_audit) — disable_wp_cron flag, suspicious_hooks (scheduled hook names that don't match any active plugin or WP core hook — potential malware persistence).
+7. Plugin WP.org data (plugin_wporg) — for each active plugin: last_updated, abandoned (>2 years since update), years_since_update, active_installs, tested_up_to. Abandoned plugins with low install counts are high risk.
+8. Known CVEs (plugin_cves) — each entry has: plugin slug, version installed, CVE ID, title, severity (critical/high/medium/low), CVSS score, fixed_in version. ANY unfixed CVE at critical/high severity is a critical finding.
+9. Core file integrity (core_integrity) — MD5 comparison of key WP core files against WordPress.org checksums. modified_files = likely backdoor. This is CRITICAL if any files are listed.
 8. Malware indicators (malware_indicators) — php_files_in_uploads (PHP files found in uploads dir — should be zero, any found = likely webshell), recently_modified_php (core PHP files modified in last 7 days outside plugin/theme dirs — warrants investigation).
-9. External checks — SSL validity/expiry, HTTP→HTTPS redirect, wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum, author enum, directory listing, exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), email DNS (SPF/DMARC), security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy).
+10. External checks — SSL validity/expiry, HTTP→HTTPS redirect, wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum, author enum, directory listing, exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (SPF/DMARC), security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy).
 10. Plugin code scan — static analysis findings: RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
 
 Cross-correlate ALL categories for compound risks:
@@ -9450,6 +9890,10 @@ Cross-correlate ALL categories for compound risks:
 - Default auth salts = any active session can be forged
 - debug.log exposed = credentials and stack traces publicly readable
 - WP version in meta + outdated WP = targeted exploit possible
+- Admins without 2FA = single password compromise = full site takeover
+- Application passwords enabled + admins have app passwords = 2FA bypassable via REST API
+- Suspicious cron hooks = possible malware persistence mechanism
+- WP session cookies missing Secure/HttpOnly = session hijacking risk
 
 Return ONLY a JSON object (no markdown, no code fences, no explanation):
 {
@@ -9570,7 +10014,33 @@ PROMPT;
 
         set_transient( 'csdt_deep_scan_v1', $output, DAY_IN_SECONDS );
         set_transient( 'csdt_deep_scan_status', [ 'status' => 'complete', 'completed_at' => time() ], 900 );
+        self::append_scan_history( 'deep', $report, $output['model_used'], $output['scanned_at'] );
         error_log( '[CSDT-DEEP] cron complete (parallel), score=' . $report['score'] );
+    }
+
+    private static function append_scan_history( string $type, array $report, string $model_used, int $scanned_at ): void {
+        $history = get_option( 'csdt_scan_history', [] );
+        if ( ! is_array( $history ) ) { $history = []; }
+        array_unshift( $history, [
+            'type'        => $type,
+            'score'       => $report['score']       ?? null,
+            'score_label' => $report['score_label'] ?? '',
+            'summary'     => $report['summary']     ?? '',
+            'model_used'  => $model_used,
+            'scanned_at'  => $scanned_at,
+        ] );
+        // Keep last 10 across both scan types
+        $history = array_slice( $history, 0, 10 );
+        update_option( 'csdt_scan_history', $history, false );
+    }
+
+    public static function ajax_scan_history(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+            return;
+        }
+        wp_send_json_success( get_option( 'csdt_scan_history', [] ) );
     }
 
     public static function ajax_scan_status(): void {
