@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.43
+ * Version: 1.9.52
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.43';
+    const VERSION      = '1.9.52';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -230,6 +230,16 @@ class CloudScale_DevTools {
         self::maybe_migrate_smtp_prefix();
         self::maybe_migrate_usermeta_prefix();
         add_filter( 'xmlrpc_enabled', '__return_false' );
+
+        // One-click security hardening — option-driven filters applied at every boot
+        if ( get_option( 'csdt_devtools_disable_app_passwords', '0' ) === '1' ) {
+            add_filter( 'wp_is_application_passwords_available', '__return_false' );
+        }
+        if ( get_option( 'csdt_devtools_hide_wp_version', '0' ) === '1' ) {
+            remove_action( 'wp_head', 'wp_generator' );
+            add_filter( 'the_generator', '__return_empty_string' );
+        }
+
         add_action( 'init', [ __CLASS__, 'load_textdomain' ] );
         add_action( 'init', [ __CLASS__, 'register_block' ] );
         add_action( 'init', [ __CLASS__, 'register_shortcode' ] );
@@ -297,6 +307,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_server_logs_fetch',  [ __CLASS__, 'ajax_server_logs_fetch' ] );
         add_action( 'wp_ajax_csdt_devtools_scan_history',       [ __CLASS__, 'ajax_scan_history' ] );
         add_action( 'wp_ajax_csdt_devtools_save_schedule',      [ __CLASS__, 'ajax_save_schedule' ] );
+        add_action( 'wp_ajax_csdt_devtools_quick_fix',          [ __CLASS__, 'ajax_apply_quick_fix' ] );
         add_action( 'csdt_scheduled_scan',                      [ __CLASS__, 'run_scheduled_scan' ] );
         add_filter( 'cron_schedules',                           [ __CLASS__, 'add_cron_schedules' ] );
 
@@ -8499,6 +8510,49 @@ class CloudScale_DevTools {
         ];
     }
 
+    private static function get_quick_fixes(): array {
+        $app_pw_available = function_exists( 'wp_is_application_passwords_available' )
+                           && wp_is_application_passwords_available();
+        return [
+            [
+                'id'        => 'disable_pingbacks',
+                'title'     => 'Pingbacks & trackbacks enabled',
+                'detail'    => 'WordPress sends/receives trackback notifications — commonly abused for DDoS amplification and spam.',
+                'fixed'     => get_option( 'default_ping_status' ) !== 'open',
+                'fix_label' => 'Disable Pingbacks',
+            ],
+            [
+                'id'        => 'close_registration',
+                'title'     => 'Open user registration',
+                'detail'    => 'Anyone can register an account on this site. Widens attack surface for spam and privilege escalation.',
+                'fixed'     => ! (bool) get_option( 'users_can_register', 0 ),
+                'fix_label' => 'Disable Registration',
+            ],
+            [
+                'id'        => 'disable_app_passwords',
+                'title'     => 'Application passwords enabled',
+                'detail'    => 'App passwords allow REST API authentication and can bypass two-factor authentication. Disable unless needed.',
+                'fixed'     => get_option( 'csdt_devtools_disable_app_passwords', '0' ) === '1' || ! $app_pw_available,
+                'fix_label' => 'Disable App Passwords',
+            ],
+            [
+                'id'        => 'hide_wp_version',
+                'title'     => 'WordPress version exposed in HTML',
+                'detail'    => 'The <generator> meta tag reveals your WP version, helping attackers target known vulnerabilities.',
+                'fixed'     => get_option( 'csdt_devtools_hide_wp_version', '0' ) === '1'
+                              || has_filter( 'the_generator', '__return_empty_string' ),
+                'fix_label' => 'Hide WP Version',
+            ],
+            [
+                'id'        => 'close_comments',
+                'title'     => 'Comments open by default on new posts',
+                'detail'    => 'Open comments invite spam, XSS payloads, and link injection attacks.',
+                'fixed'     => get_option( 'default_comment_status' ) !== 'open',
+                'fix_label' => 'Close Comments',
+            ],
+        ];
+    }
+
     private static function render_security_panel(): void {
         ?>
         <div class="cs-panel" id="cs-panel-security">
@@ -8676,6 +8730,38 @@ class CloudScale_DevTools {
 
                 <hr class="cs-sec-divider">
 
+                <!-- Quick Fixes -->
+                <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #f59e0b;margin-bottom:0;">
+                    <span>⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-header-hint"><?php esc_html_e( 'One-click hardening actions for common WordPress security settings', 'cloudscale-devtools' ); ?></span>
+                </div>
+                <div id="cs-quick-fixes-panel" style="padding:12px 0 4px;">
+                <?php foreach ( self::get_quick_fixes() as $fix ) :
+                    $is_fixed = (bool) $fix['fixed'];
+                ?>
+                    <div class="cs-quick-fix-row" data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>" style="display:flex;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px;background:<?php echo $is_fixed ? 'rgba(0,0,0,0.02)' : '#fff'; ?>;border-radius:6px;border:1px solid <?php echo $is_fixed ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.12)'; ?>;">
+                        <div style="flex-shrink:0;font-size:16px;line-height:1;"><?php echo $is_fixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>'; ?></div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:13px;font-weight:600;color:<?php echo $is_fixed ? '#6b7280' : '#1d2327'; ?>;"><?php echo esc_html( $fix['title'] ); ?></div>
+                            <div style="font-size:12px;color:#50575e;margin-top:2px;"><?php echo esc_html( $fix['detail'] ); ?></div>
+                        </div>
+                        <div style="flex-shrink:0;">
+                        <?php if ( $is_fixed ) : ?>
+                            <span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed ✓</span>
+                        <?php else : ?>
+                            <button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn"
+                                    data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>"
+                                    style="white-space:nowrap;">
+                                <?php echo esc_html( $fix['fix_label'] ); ?>
+                            </button>
+                        <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+                </div>
+
+                <hr class="cs-sec-divider">
+
                 <div class="cs-scan-row">
                     <div class="cs-scan-col">
                         <div class="cs-scan-col-header">
@@ -8689,6 +8775,7 @@ class CloudScale_DevTools {
                             <button id="cs-vuln-cancel-btn" class="cs-btn-secondary" style="display:none">
                                 ✕ <?php esc_html_e( 'Cancel', 'cloudscale-devtools' ); ?>
                             </button>
+                            <span id="cs-vuln-model-badge" class="cs-scan-model-badge"></span>
                         </div>
                         <span id="cs-vuln-scan-status" class="cs-vuln-inline-msg"></span>
                         <div id="cs-vuln-progress" class="cs-scan-progress">
@@ -8877,6 +8964,50 @@ class CloudScale_DevTools {
                 'body'    => $body,
             ] );
         }
+    }
+
+    public static function ajax_apply_quick_fix(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $action = isset( $_POST['fix_action'] ) ? sanitize_key( wp_unslash( $_POST['fix_action'] ) ) : '';
+        $fix_id = isset( $_POST['fix_id'] )     ? sanitize_key( wp_unslash( $_POST['fix_id'] ) )     : '';
+
+        if ( $action === 'list' ) {
+            wp_send_json_success( [ 'fixes' => self::get_quick_fixes() ] );
+            return;
+        }
+
+        if ( $action !== 'apply' ) {
+            wp_send_json_error( 'Invalid action' );
+            return;
+        }
+
+        switch ( $fix_id ) {
+            case 'disable_pingbacks':
+                update_option( 'default_ping_status',   'closed' );
+                update_option( 'default_pingback_flag', 0 );
+                break;
+            case 'close_registration':
+                update_option( 'users_can_register', 0 );
+                break;
+            case 'disable_app_passwords':
+                update_option( 'csdt_devtools_disable_app_passwords', '1' );
+                break;
+            case 'hide_wp_version':
+                update_option( 'csdt_devtools_hide_wp_version', '1' );
+                break;
+            case 'close_comments':
+                update_option( 'default_comment_status', 'closed' );
+                break;
+            default:
+                wp_send_json_error( 'Unknown fix ID' );
+                return;
+        }
+
+        wp_send_json_success( [ 'fixes' => self::get_quick_fixes() ] );
     }
 
     public static function ajax_vuln_save_key(): void {

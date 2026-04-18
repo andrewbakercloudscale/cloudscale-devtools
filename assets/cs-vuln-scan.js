@@ -452,6 +452,7 @@
         var modelSel          = document.getElementById('cs-sec-model');
         var deepModelSel      = document.getElementById('cs-sec-deep-model');
         var deepModelBadge    = document.getElementById('cs-deep-model-badge');
+        var vulnModelBadge    = document.getElementById('cs-vuln-model-badge');
         var promptArea        = document.getElementById('cs-sec-prompt');
         var copyBtn           = document.getElementById('cs-sec-copy-prompt');
         var resetBtn          = document.getElementById('cs-sec-reset-prompt');
@@ -485,20 +486,20 @@
             var opts = MODEL_OPTS[provider] || MODEL_OPTS.anthropic;
             populateSelect(modelSel,     opts.standard, isGemini ? '_auto'      : cfg.savedModel);
             populateSelect(deepModelSel, opts.deep,     isGemini ? '_auto_deep' : cfg.savedDeepModel);
-            updateDeepModelBadge();
+            updateModelBadges();
         }
 
-        function updateDeepModelBadge() {
-            if (!deepModelBadge || !deepModelSel) return;
-            var v = deepModelSel.value;
-            var names = {
-                '_auto': 'Auto', '_auto_deep': 'Auto',
-                'claude-opus-4-7': 'Opus 4.7', 'claude-sonnet-4-6': 'Sonnet 4.6',
-                'claude-haiku-4-5-20251001': 'Haiku 4.5',
-                'gemini-2.0-flash': 'Gemini Flash', 'gemini-2.0-flash-lite': 'Flash Lite',
-                'gemini-1.5-pro': 'Gemini 1.5 Pro',
-            };
-            deepModelBadge.textContent = 'Using ' + (names[v] || v);
+        var MODEL_NAMES = {
+            '_auto': 'Auto', '_auto_deep': 'Auto',
+            'claude-opus-4-7': 'Opus 4.7', 'claude-sonnet-4-6': 'Sonnet 4.6',
+            'claude-haiku-4-5-20251001': 'Haiku 4.5',
+            'gemini-2.0-flash': 'Gemini Flash', 'gemini-2.0-flash-lite': 'Flash Lite',
+            'gemini-1.5-pro': 'Gemini 1.5 Pro',
+        };
+
+        function updateModelBadges() {
+            if (vulnModelBadge && modelSel)     vulnModelBadge.textContent = 'Using ' + (MODEL_NAMES[modelSel.value]     || modelSel.value);
+            if (deepModelBadge && deepModelSel) deepModelBadge.textContent = 'Using ' + (MODEL_NAMES[deepModelSel.value] || deepModelSel.value);
         }
 
         // Init provider
@@ -510,7 +511,8 @@
         if (providerSel) {
             providerSel.addEventListener('change', function () { applyProvider(this.value); });
         }
-        if (deepModelSel) deepModelSel.addEventListener('change', updateDeepModelBadge);
+        if (modelSel)     modelSel.addEventListener('change',     updateModelBadges);
+        if (deepModelSel) deepModelSel.addEventListener('change', updateModelBadges);
 
         // ── Test key buttons ──────────────────────────────────────────
 
@@ -643,9 +645,64 @@
             runDeepScan(true);
         }
 
+        // ── Quick fix buttons (PHP-rendered initial state) ────────────
+        wireQuickFixButtons();
+
         // ── Scan history chart ────────────────────────────────────────
         renderScanHistoryChart(cfg.scanHistory || []);
     });
+
+    // ── Quick Fixes ──────────────────────────────────────────────────────
+
+    function renderQuickFixes(fixes) {
+        var panel = document.getElementById('cs-quick-fixes-panel');
+        if (!panel) return;
+        var html = '';
+        fixes.forEach(function (fix) {
+            var isFixed = !!fix.fixed;
+            var bg     = isFixed ? 'rgba(0,0,0,0.02)' : '#fff';
+            var border = isFixed ? 'rgba(0,0,0,0.07)'  : 'rgba(0,0,0,0.12)';
+            html += '<div class="cs-quick-fix-row" data-fix-id="' + escHtml(fix.id) + '" style="display:flex;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px;background:' + bg + ';border-radius:6px;border:1px solid ' + border + ';">';
+            html += '<div style="flex-shrink:0;font-size:16px;line-height:1;">' + (isFixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>') + '</div>';
+            html += '<div style="flex:1;min-width:0;">';
+            html += '<div style="font-size:13px;font-weight:600;color:' + (isFixed ? '#6b7280' : '#1d2327') + ';">' + escHtml(fix.title) + '</div>';
+            html += '<div style="font-size:12px;color:#50575e;margin-top:2px;">' + escHtml(fix.detail) + '</div>';
+            html += '</div>';
+            if (isFixed) {
+                html += '<div style="flex-shrink:0;"><span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed ✓</span></div>';
+            } else {
+                html += '<div style="flex-shrink:0;"><button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.id) + '" style="white-space:nowrap;">' + escHtml(fix.fix_label) + '</button></div>';
+            }
+            html += '</div>';
+        });
+        panel.innerHTML = html;
+        wireQuickFixButtons();
+    }
+
+    function wireQuickFixButtons() {
+        var btns = document.querySelectorAll('.cs-quick-fix-btn');
+        btns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var fixId = btn.getAttribute('data-fix-id');
+                btn.disabled = true;
+                var orig = btn.textContent;
+                btn.textContent = 'Applying…';
+                post('csdt_devtools_quick_fix', { fix_action: 'apply', fix_id: fixId })
+                    .then(function (res) {
+                        if (res.success && res.data && res.data.fixes) {
+                            renderQuickFixes(res.data.fixes);
+                        } else {
+                            btn.disabled = false;
+                            btn.textContent = orig;
+                        }
+                    })
+                    .catch(function () {
+                        btn.disabled = false;
+                        btn.textContent = orig;
+                    });
+            });
+        });
+    }
 
     function renderScanHistoryChart(history) {
         var canvas = document.getElementById('cs-scan-history-chart');
