@@ -419,7 +419,13 @@
             } );
         }
         const max = Math.max( 1, ...days.map( d => d.count ) );
-        bfChart.innerHTML = days.map( d => {
+        const mid = max === 1 ? 1 : Math.round( max / 2 );
+        const yAxis = `<div class="cs-bf-yaxis">
+            <span class="cs-bf-ytick">${max}</span>
+            <span class="cs-bf-ytick">${mid}</span>
+            <span class="cs-bf-ytick">0</span>
+        </div>`;
+        const bars = days.map( d => {
             const pct = Math.round( ( d.count / max ) * 100 );
             const cls = d.count === 0 ? '' : d.count >= max * 0.75 ? ' cs-bf-bar-high' : d.count >= max * 0.4 ? ' cs-bf-bar-mid' : '';
             return `<div class="cs-bf-day">
@@ -429,6 +435,7 @@
                 <div class="cs-bf-day-label">${d.label}</div>
             </div>`;
         } ).join( '' );
+        bfChart.innerHTML = yAxis + `<div class="cs-bf-bars">${bars}</div>`;
     }
 
     function renderBfTable( log, now ) {
