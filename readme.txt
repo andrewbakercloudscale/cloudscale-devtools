@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.60
+Stable tag: 1.9.67
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.9.67 =
+* feat: Test Account Manager — temporary single-use accounts with app passwords for Playwright/CI pipelines; subscriber-level accounts auto-delete on expiry or first use; app passwords blocked for all non-test accounts
 
 = 1.9.10 =
 * feat: replace WPScan with Claude AI-powered security audit — API key, model selector, editable system prompt, scored report with critical/high/medium/low/good sections

@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.60
+ * Version: 1.9.67
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.60';
+    const VERSION      = '1.9.67';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -233,7 +233,16 @@ class CloudScale_DevTools {
 
         // One-click security hardening — option-driven filters applied at every boot
         if ( get_option( 'csdt_devtools_disable_app_passwords', '0' ) === '1' ) {
-            add_filter( 'wp_is_application_passwords_available', '__return_false' );
+            if ( get_option( 'csdt_test_accounts_enabled', '0' ) === '1' ) {
+                // Test-account mode: block per-user (not site-wide) so test accounts still authenticate
+                add_filter( 'wp_is_application_passwords_available_for_user', [ __CLASS__, 'filter_app_pw_for_user' ], 10, 2 );
+            } else {
+                add_filter( 'wp_is_application_passwords_available', '__return_false' );
+            }
+        }
+        // Test-account cleanup cron + single-use hook (always when feature is enabled)
+        if ( get_option( 'csdt_test_accounts_enabled', '0' ) === '1' ) {
+            add_action( 'application_password_did_authenticate', [ __CLASS__, 'test_account_after_auth' ], 10, 2 );
         }
         if ( get_option( 'csdt_devtools_hide_wp_version', '0' ) === '1' ) {
             remove_action( 'wp_head', 'wp_generator' );
@@ -311,6 +320,10 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_scan_history',       [ __CLASS__, 'ajax_scan_history' ] );
         add_action( 'wp_ajax_csdt_devtools_save_schedule',      [ __CLASS__, 'ajax_save_schedule' ] );
         add_action( 'wp_ajax_csdt_devtools_quick_fix',          [ __CLASS__, 'ajax_apply_quick_fix' ] );
+        add_action( 'wp_ajax_csdt_test_account_create',          [ __CLASS__, 'ajax_create_test_account' ] );
+        add_action( 'wp_ajax_csdt_test_account_revoke',          [ __CLASS__, 'ajax_revoke_test_account' ] );
+        add_action( 'wp_ajax_csdt_test_account_settings_save',   [ __CLASS__, 'ajax_save_test_account_settings' ] );
+        add_action( 'csdt_cleanup_test_accounts',                [ __CLASS__, 'cleanup_expired_test_accounts' ] );
         add_action( 'csdt_scheduled_scan',                      [ __CLASS__, 'run_scheduled_scan' ] );
         add_filter( 'cron_schedules',                           [ __CLASS__, 'add_cron_schedules' ] );
 
@@ -1058,6 +1071,19 @@ class CloudScale_DevTools {
                 filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-passkey.js' ),
                 true
             );
+            $ta_js = plugin_dir_path( __FILE__ ) . 'assets/cs-test-accounts.js';
+            wp_enqueue_script(
+                'csdt-test-accounts',
+                plugins_url( 'assets/cs-test-accounts.js', __FILE__ ),
+                [ 'csdt-login' ],
+                file_exists( $ta_js ) ? filemtime( $ta_js ) : self::VERSION,
+                true
+            );
+            wp_localize_script( 'csdt-test-accounts', 'csdtTestAccounts', [
+                'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
+                'nonce'    => wp_create_nonce( 'csdt_devtools_login_nonce' ),
+                'accounts' => self::get_active_test_accounts(),
+            ] );
         }
 
         if ( $active_tab === 'mail' ) {
@@ -2264,6 +2290,112 @@ class CloudScale_DevTools {
             </div>
             <div class="cs-panel-body">
                 <?php CSDT_DevTools_Passkey::render_section( $user_id ); ?>
+            </div>
+        </div>
+
+        <?php
+        /* ── Test Account Manager ─────────────────────────────────────── */
+        $ta_enabled     = get_option( 'csdt_test_accounts_enabled', '0' ) === '1';
+        $ta_ttl         = get_option( 'csdt_test_account_ttl', '1800' );
+        $ta_single_use  = get_option( 'csdt_test_account_single_use', '0' ) === '1';
+        $ta_accounts    = self::get_active_test_accounts();
+        ?>
+        <div class="cs-panel" id="cs-panel-test-accounts">
+            <div class="cs-section-header" style="background:linear-gradient(135deg,#0f172a,#1e3a5f)">
+                <span>🧪 <?php esc_html_e( 'TEST ACCOUNT MANAGER', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Temporary single-use accounts for Playwright / CI pipelines', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div class="cs-panel-body">
+                <div class="cs-sec-settings">
+
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'Enable:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="cs-ta-enabled" <?php checked( $ta_enabled ); ?>>
+                                <span><?php esc_html_e( 'Allow temporary test accounts with application passwords', 'cloudscale-devtools' ); ?></span>
+                            </label>
+                            <span class="cs-hint"><?php esc_html_e( 'Creates subscriber-level accounts with app passwords for automated testing. When enabled, app passwords are restricted to test accounts only — all production accounts remain blocked.', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                    </div>
+
+                    <div id="cs-ta-options" <?php echo $ta_enabled ? '' : 'style="display:none"'; ?>>
+
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'Default TTL:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <select id="cs-ta-ttl" class="cs-sec-select" style="width:auto;">
+                                    <option value="1800"  <?php selected( $ta_ttl, '1800' );  ?>><?php esc_html_e( '30 minutes', 'cloudscale-devtools' ); ?></option>
+                                    <option value="3600"  <?php selected( $ta_ttl, '3600' );  ?>><?php esc_html_e( '1 hour',     'cloudscale-devtools' ); ?></option>
+                                    <option value="7200"  <?php selected( $ta_ttl, '7200' );  ?>><?php esc_html_e( '2 hours',    'cloudscale-devtools' ); ?></option>
+                                    <option value="86400" <?php selected( $ta_ttl, '86400' ); ?>><?php esc_html_e( '24 hours',   'cloudscale-devtools' ); ?></option>
+                                </select>
+                                <span class="cs-hint"><?php esc_html_e( 'Accounts are automatically deleted after this time.', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'Single-use:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="cs-ta-single-use" <?php checked( $ta_single_use ); ?>>
+                                    <span><?php esc_html_e( 'Delete account on first successful authentication', 'cloudscale-devtools' ); ?></span>
+                                </label>
+                                <span class="cs-hint"><?php esc_html_e( 'Extra security — each test run gets fresh credentials. May cause issues if Playwright retries a failed request.', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"></span>
+                            <div class="cs-sec-control" style="display:flex;align-items:center;gap:8px;">
+                                <button type="button" class="cs-btn-primary" id="cs-ta-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
+                                <span class="cs-settings-saved" id="cs-ta-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+
+                        <hr class="cs-sec-divider">
+
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'Create account:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <button type="button" class="cs-btn-primary" id="cs-ta-create">+ <?php esc_html_e( 'Create Test Account', 'cloudscale-devtools' ); ?></button>
+                                <span class="cs-hint"><?php esc_html_e( 'Credentials shown once only — copy them immediately.', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+
+                        <div id="cs-ta-creds" style="display:none;margin:0 0 16px 0;padding:16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;">
+                            <div style="font-weight:600;color:#166534;margin-bottom:10px;">✓ <?php esc_html_e( 'Test account created — copy credentials now (shown once)', 'cloudscale-devtools' ); ?></div>
+                            <div style="font-family:monospace;font-size:13px;line-height:1.9;color:#1d2327;">
+                                <div><strong><?php esc_html_e( 'Username:', 'cloudscale-devtools' ); ?></strong> <span id="cs-ta-cred-user"></span></div>
+                                <div><strong><?php esc_html_e( 'App password:', 'cloudscale-devtools' ); ?></strong> <span id="cs-ta-cred-pw"></span></div>
+                                <div><strong><?php esc_html_e( 'REST URL:', 'cloudscale-devtools' ); ?></strong> <span id="cs-ta-cred-url"></span></div>
+                                <div><strong><?php esc_html_e( 'Expires:', 'cloudscale-devtools' ); ?></strong> <span id="cs-ta-cred-expires"></span></div>
+                            </div>
+                            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                                <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-ta-copy-json">⎘ <?php esc_html_e( 'Copy as JSON', 'cloudscale-devtools' ); ?></button>
+                                <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-ta-copy-curl">⎘ <?php esc_html_e( 'Copy curl example', 'cloudscale-devtools' ); ?></button>
+                            </div>
+                        </div>
+
+                        <div style="font-weight:600;font-size:13px;color:#1d2327;margin-bottom:8px;"><?php esc_html_e( 'Active test accounts:', 'cloudscale-devtools' ); ?></div>
+                        <div id="cs-ta-list">
+                            <?php if ( empty( $ta_accounts ) ) : ?>
+                                <p style="color:#888;font-size:13px;margin:0;"><?php esc_html_e( 'No active test accounts.', 'cloudscale-devtools' ); ?></p>
+                            <?php else : ?>
+                                <?php foreach ( $ta_accounts as $acct ) :
+                                    $mins = max( 0, (int) ceil( ( $acct['expires_at'] - time() ) / 60 ) );
+                                ?>
+                                <div class="cs-ta-account-row" style="display:flex;align-items:center;gap:12px;padding:8px 12px;margin-bottom:4px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;">
+                                    <div style="flex:1;font-family:monospace;font-size:13px;"><?php echo esc_html( $acct['username'] ); ?></div>
+                                    <div style="font-size:12px;color:#6b7280;"><?php printf( esc_html__( 'expires in %dm', 'cloudscale-devtools' ), $mins ); ?></div>
+                                    <button type="button" class="cs-btn-secondary cs-btn-sm cs-ta-revoke" data-user-id="<?php echo esc_attr( $acct['user_id'] ); ?>" style="color:#dc2626;border-color:#fca5a5;"><?php esc_html_e( 'Revoke', 'cloudscale-devtools' ); ?></button>
+                                </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -3847,7 +3979,7 @@ class CloudScale_DevTools {
         // ── debug.log size ────────────────────────────────────────────────────
         $debug_log_mb = null;
         if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
-            $log_path = is_string( WP_DEBUG_LOG ) ? WP_DEBUG_LOG : ( WP_CONTENT_DIR . '/debug.log' );
+            $log_path = get_option( 'csdt_debug_log_path', '' ) ?: ( is_string( WP_DEBUG_LOG ) ? WP_DEBUG_LOG : ( WP_CONTENT_DIR . '/debug.log' ) );
             if ( file_exists( $log_path ) ) {
                 $debug_log_mb = round( (float) filesize( $log_path ) / 1048576, 1 );
             }
@@ -4391,9 +4523,11 @@ class CloudScale_DevTools {
         $entries = [];
 
         // ── 1. Read debug.log ──────────────────────────────────────────────────
-        $log_file = defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG )
-            ? WP_DEBUG_LOG
-            : WP_CONTENT_DIR . '/debug.log';
+        $log_file = get_option( 'csdt_debug_log_path', '' ) ?: (
+            defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG )
+                ? WP_DEBUG_LOG
+                : WP_CONTENT_DIR . '/debug.log'
+        );
 
         if ( is_readable( $log_file ) ) {
             $lines = [];
@@ -8576,14 +8710,10 @@ class CloudScale_DevTools {
             [
                 'id'        => 'block_debug_log',
                 'title'     => 'debug.log exposed publicly',
-                'detail'    => 'debug.log can leak database errors, file paths, stack traces, and credentials. Block HTTP access and delete any existing file.',
-                'fixed'     => ( function () {
-                    $log = WP_CONTENT_DIR . '/debug.log';
-                    if ( file_exists( $log ) ) { return false; }
-                    $htaccess = ABSPATH . '.htaccess';
-                    return file_exists( $htaccess ) && strpos( (string) file_get_contents( $htaccess ), 'debug.log' ) !== false;
-                } )(),
-                'fix_label' => 'Block & Delete',
+                'detail'    => 'debug.log is HTTP-accessible. On nginx, .htaccess rules are ignored — the only PHP-level fix is to move the file one directory above the web root. It stays readable via the Server Logs tab.',
+                'fixed'     => ! file_exists( WP_CONTENT_DIR . '/debug.log' )
+                              && file_exists( WP_CONTENT_DIR . '/mu-plugins/csdt-secure-logs.php' ),
+                'fix_label' => 'Move Outside Web Root',
             ],
         ];
     }
@@ -8899,6 +9029,10 @@ class CloudScale_DevTools {
             'interval' => 30 * DAY_IN_SECONDS,
             'display'  => __( 'Once Monthly', 'cloudscale-devtools' ),
         ];
+        $schedules['csdt_every_5min'] = [
+            'interval' => 5 * MINUTE_IN_SECONDS,
+            'display'  => __( 'Every 5 Minutes', 'cloudscale-devtools' ),
+        ];
         return $schedules;
     }
 
@@ -9050,18 +9184,32 @@ class CloudScale_DevTools {
                 }
                 break;
             case 'block_debug_log':
-                // Delete existing debug.log
-                $log_file = WP_CONTENT_DIR . '/debug.log';
-                if ( file_exists( $log_file ) ) {
-                    wp_delete_file( $log_file );
+                // Move debug.log outside web root so it stays readable but isn't HTTP-accessible.
+                $old_log  = WP_CONTENT_DIR . '/debug.log';
+                $new_log  = dirname( ABSPATH ) . '/wordpress-debug.log';
+                // Migrate existing content then remove from web root
+                if ( file_exists( $old_log ) ) {
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+                    $existing = file_get_contents( $old_log );
+                    if ( $existing !== false ) {
+                        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+                        file_put_contents( $new_log, $existing, FILE_APPEND );
+                    }
+                    wp_delete_file( $old_log );
                 }
-                // Block HTTP access via .htaccess
-                $htaccess   = ABSPATH . '.htaccess';
-                $deny_block = "\n# Block debug.log access\n<Files debug.log>\n    Order allow,deny\n    Deny from all\n</Files>\n";
-                if ( file_exists( $htaccess ) && strpos( (string) file_get_contents( $htaccess ), 'debug.log' ) === false ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-                    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-                    file_put_contents( $htaccess, $deny_block, FILE_APPEND );
-                }
+                // Store the new path so the Server Logs tab can find it
+                update_option( 'csdt_debug_log_path', $new_log, false );
+                // mu-plugin: redirect PHP error_log to new path on every request
+                // This runs after wp-settings.php sets up WP_DEBUG_LOG so it takes precedence
+                $mu_dir  = WP_CONTENT_DIR . '/mu-plugins';
+                if ( ! is_dir( $mu_dir ) ) { wp_mkdir_p( $mu_dir ); }
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+                file_put_contents(
+                    $mu_dir . '/csdt-secure-logs.php',
+                    '<?php' . "\n" .
+                    '// Redirects WP debug log outside web root — installed by CloudScale DevTools.' . "\n" .
+                    '@ini_set( \'error_log\', ' . var_export( $new_log, true ) . ' );' . "\n"
+                );
                 break;
             default:
                 wp_send_json_error( 'Unknown fix ID' );
@@ -10478,6 +10626,166 @@ PROMPT;
         }
 
         wp_send_json_success( [ 'status' => 'idle' ] );
+    }
+
+    /* ==================================================================
+       TEST ACCOUNT MANAGER
+       ================================================================== */
+
+    private static function get_active_test_accounts(): array {
+        $users = get_users( [
+            'meta_key'   => 'csdt_test_account',
+            'meta_value' => '1',
+            'fields'     => [ 'ID', 'user_login' ],
+        ] );
+
+        $accounts = [];
+        foreach ( $users as $u ) {
+            $expires_at  = (int) get_user_meta( $u->ID, 'csdt_test_expires_at', true );
+            $single_use  = (bool) get_user_meta( $u->ID, 'csdt_test_single_use', true );
+            $accounts[] = [
+                'user_id'    => $u->ID,
+                'username'   => $u->user_login,
+                'expires_at' => $expires_at,
+                'expires_in' => max( 0, $expires_at - time() ),
+                'single_use' => $single_use,
+            ];
+        }
+
+        return $accounts;
+    }
+
+    private static function create_test_account( int $ttl = 1800 ): array {
+        $username  = 'test-' . wp_generate_password( 8, false, false );
+        $password  = wp_generate_password( 20 );
+        $email     = $username . '@test.local';
+        $user_id   = wp_create_user( $username, $password, $email );
+
+        if ( is_wp_error( $user_id ) ) {
+            return [ 'error' => $user_id->get_error_message() ];
+        }
+
+        $user = new WP_User( $user_id );
+        $user->set_role( 'subscriber' );
+
+        $expires_at  = time() + $ttl;
+        $single_use  = get_option( 'csdt_test_account_single_use', '0' ) === '1';
+
+        update_user_meta( $user_id, 'csdt_test_account',    '1' );
+        update_user_meta( $user_id, 'csdt_test_expires_at', $expires_at );
+        update_user_meta( $user_id, 'csdt_test_single_use', $single_use ? '1' : '0' );
+
+        [ $app_password, $item ] = WP_Application_Passwords::create_new_application_password(
+            $user_id,
+            [ 'name' => 'playwright-ci' ]
+        );
+
+        if ( is_wp_error( $app_password ) ) {
+            wp_delete_user( $user_id );
+            return [ 'error' => $app_password->get_error_message() ];
+        }
+
+        $formatted_pw = implode( ' ', str_split( $app_password, 4 ) );
+
+        return [
+            'user_id'    => $user_id,
+            'username'   => $username,
+            'app_password' => $formatted_pw,
+            'rest_url'   => rest_url( 'wp/v2/users/me' ),
+            'expires_at' => $expires_at,
+            'accounts'   => self::get_active_test_accounts(),
+        ];
+    }
+
+    public static function ajax_create_test_account(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+        }
+        check_ajax_referer( 'csdt_devtools_login_nonce', 'nonce' );
+
+        $ttl    = (int) get_option( 'csdt_test_account_ttl', '1800' );
+        $result = self::create_test_account( $ttl );
+
+        if ( isset( $result['error'] ) ) {
+            wp_send_json_error( $result['error'] );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    public static function ajax_revoke_test_account(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+        }
+        check_ajax_referer( 'csdt_devtools_login_nonce', 'nonce' );
+
+        $user_id = (int) ( $_POST['user_id'] ?? 0 );
+        if ( ! $user_id ) {
+            wp_send_json_error( 'Missing user_id' );
+        }
+
+        if ( get_user_meta( $user_id, 'csdt_test_account', true ) !== '1' ) {
+            wp_send_json_error( 'Not a test account' );
+        }
+
+        wp_delete_user( $user_id );
+
+        wp_send_json_success( [ 'accounts' => self::get_active_test_accounts() ] );
+    }
+
+    public static function ajax_save_test_account_settings(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+        }
+        check_ajax_referer( 'csdt_devtools_login_nonce', 'nonce' );
+
+        $enabled     = ( $_POST['enabled']     ?? '0' ) === '1' ? '1' : '0';
+        $ttl         = in_array( (string) ( $_POST['ttl'] ?? '1800' ), [ '1800', '3600', '7200', '86400' ], true )
+                       ? (string) $_POST['ttl'] : '1800';
+        $single_use  = ( $_POST['single_use']  ?? '0' ) === '1' ? '1' : '0';
+
+        update_option( 'csdt_test_accounts_enabled',     $enabled );
+        update_option( 'csdt_test_account_ttl',          $ttl );
+        update_option( 'csdt_test_account_single_use',   $single_use );
+
+        if ( $enabled === '1' ) {
+            if ( ! wp_next_scheduled( 'csdt_cleanup_test_accounts' ) ) {
+                wp_schedule_event( time() + 300, 'csdt_every_5min', 'csdt_cleanup_test_accounts' );
+            }
+        } else {
+            wp_clear_scheduled_hook( 'csdt_cleanup_test_accounts' );
+        }
+
+        wp_send_json_success();
+    }
+
+    public static function cleanup_expired_test_accounts(): void {
+        $users = get_users( [
+            'meta_key'   => 'csdt_test_account',
+            'meta_value' => '1',
+            'fields'     => [ 'ID' ],
+        ] );
+
+        $now = time();
+        foreach ( $users as $u ) {
+            $expires_at = (int) get_user_meta( $u->ID, 'csdt_test_expires_at', true );
+            if ( $expires_at && $expires_at < $now ) {
+                wp_delete_user( $u->ID );
+            }
+        }
+    }
+
+    public static function filter_app_pw_for_user( $available, $user ): bool {
+        if ( get_user_meta( $user->ID, 'csdt_test_account', true ) === '1' ) {
+            return true;
+        }
+        return false;
+    }
+
+    public static function test_account_after_auth( $user, $app_password ): void {
+        if ( get_user_meta( $user->ID, 'csdt_test_single_use', true ) === '1' ) {
+            wp_delete_user( $user->ID );
+        }
     }
 
 }
