@@ -9,7 +9,7 @@ helpLib.run({
     docsDir:    process.env.WP_DOCS_DIR,
 
     pluginName: 'CloudScale Cyber and Devtools',
-    pluginDesc: 'AI-powered WordPress security auditing, one-click hardening, login security, server logs, syntax-highlighted code blocks, SQL tool, and a site performance monitor — completely free, everything runs on your server.',
+    pluginDesc: 'AI-powered WordPress security auditing using Claude and Gemini, one-click hardening, login security, server logs, syntax-highlighted code blocks, SQL tool, and a site performance monitor — completely free.',
     pageTitle:  'CloudScale Cyber and Devtools',
     pageSlug:   'cloudscale-cyber-devtools-help',
     downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
@@ -20,9 +20,9 @@ helpLib.run({
 
     pluginIntro: `
 <h2 style="font-size:1.6em;font-weight:800;color:#0f172a;margin:0 0 16px;">What is CloudScale Cyber and Devtools?</h2>
-<p style="font-size:1.05em;color:#374151;margin:0 0 20px;line-height:1.75;">CloudScale Cyber and Devtools is a <strong>free, zero-dependency WordPress plugin</strong> that brings together professional-grade security auditing and developer tools in a single install. There is no premium tier, no nag screens, and no external services required — everything runs on your own server.</p>
+<p style="font-size:1.05em;color:#374151;margin:0 0 20px;line-height:1.75;">CloudScale Cyber and Devtools is a <strong>free, open-source WordPress security and developer toolkit</strong> powered by the world's most capable AI models — <strong>Anthropic Claude</strong> (Sonnet and Opus 4) and <strong>Google Gemini</strong> (Flash and 2.5 Pro). These are the same frontier models used by enterprise security teams, now available for your WordPress site in a single free plugin. Built by the community, for the community — everything runs on your own server and you supply your own API key. No premium tier, no nag screens.</p>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:0 0 28px;">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin:0 0 28px;">
 <div style="background:#fff5f5;border-left:4px solid #e53e3e;border-radius:0 8px 8px 0;padding:18px 20px;">
 <h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🛡️ Security</h3>
 <ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
@@ -103,11 +103,18 @@ helpLib.run({
                 var wrap = btn.closest('div[style*="flex-shrink"]') || btn.parentElement;
                 if (wrap) wrap.innerHTML = '<span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed \u2713</span>';
             });
-            // Hide scan controls to show only the result
-            var ctrl = document.querySelector('.cs-sec-settings');
-            if (ctrl) ctrl.style.display = 'none';
-            var intro = document.querySelector('.cs-tab-intro');
-            if (intro) intro.style.display = 'none';
+            // Hide AI settings form (scope to security panel — .cs-sec-settings appears in other panels too)
+            var panel = document.getElementById('cs-panel-security');
+            if (panel) {
+                var ctrl = panel.querySelector('.cs-sec-settings');
+                if (ctrl) ctrl.style.display = 'none';
+                var intro = panel.querySelector('.cs-tab-intro');
+                if (intro) intro.style.display = 'none';
+            }
+            // Also scrub any API key inputs that might be visible anywhere
+            document.querySelectorAll('input[id*="key"], input[id*="api"], input[type="password"]').forEach(function(el) {
+                el.value = '';
+            });
           }
         },
         { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=logs"]', elementSelector: '#cs-panel-logs' },
@@ -123,7 +130,7 @@ helpLib.run({
         'security': `
 <div style="background:#fff5f5;border-left:4px solid #c0392b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
 <h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🛡️ AI Cyber Audit</h2>
-<p style="margin:0 0 10px;">The centrepiece of CloudScale Cyber and Devtools. Connects to <strong>Anthropic Claude</strong> or <strong>Google Gemini</strong> to analyse your WordPress installation and deliver a scored, prioritised security report in under 60 seconds — the kind of analysis that would normally cost hundreds of dollars from a security consultant.</p>
+<p style="margin:0 0 10px;">The centrepiece of CloudScale Cyber and Devtools. Powered by the world's most advanced AI — <strong>Anthropic Claude 4 (Sonnet &amp; Opus)</strong> and <strong>Google Gemini 2.5 Pro</strong> — these are the same frontier models used by enterprise security teams. Point them at your WordPress site and get a scored, prioritised security report in under 60 seconds: the kind of analysis that would cost hundreds of dollars from a consultant.</p>
 <p style="margin:0;"><strong>Completely free.</strong> You supply your own API key. A free Gemini tier is available with no credit card required.</p>
 </div>
 <p><strong>Standard Scan</strong> checks your WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php hardening constants. Results are sent to an AI model which prioritises findings by severity and gives you specific remediation steps.</p>
