@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.115
+ * Version: 1.9.116
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.115';
+    const VERSION      = '1.9.116';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -278,6 +278,7 @@ class CloudScale_DevTools {
         // Login security AJAX
         add_action( 'wp_ajax_csdt_devtools_login_save',          [ __CLASS__, 'ajax_login_save' ] );
         add_action( 'wp_ajax_csdt_devtools_bf_log_fetch',        [ __CLASS__, 'ajax_bf_log_fetch' ] );
+        add_action( 'wp_ajax_csdt_ssh_monitor_save',             [ __CLASS__, 'ajax_ssh_monitor_save' ] );
         add_action( 'wp_ajax_csdt_devtools_totp_setup_start',    [ __CLASS__, 'ajax_totp_setup_start' ] );
         add_action( 'wp_ajax_csdt_devtools_totp_setup_verify',   [ __CLASS__, 'ajax_totp_setup_verify' ] );
         add_action( 'wp_ajax_csdt_devtools_2fa_disable',         [ __CLASS__, 'ajax_2fa_disable' ] );
@@ -335,7 +336,17 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_test_account_settings_save',   [ __CLASS__, 'ajax_save_test_account_settings' ] );
         add_action( 'csdt_cleanup_test_accounts',                [ __CLASS__, 'cleanup_expired_test_accounts' ] );
         add_action( 'csdt_scheduled_scan',                      [ __CLASS__, 'run_scheduled_scan' ] );
+        add_action( 'csdt_ssh_monitor',                         [ __CLASS__, 'monitor_ssh_failures' ] );
         add_filter( 'cron_schedules',                           [ __CLASS__, 'add_cron_schedules' ] );
+
+        // Schedule SSH monitor (default on) — ensure cron is running if enabled
+        if ( get_option( 'csdt_ssh_monitor_enabled', '1' ) === '1' ) {
+            if ( ! wp_next_scheduled( 'csdt_ssh_monitor' ) ) {
+                wp_schedule_event( time() + 60, 'csdt_every_1min', 'csdt_ssh_monitor' );
+            }
+        } else {
+            wp_clear_scheduled_hook( 'csdt_ssh_monitor' );
+        }
 
         add_action( 'csdt_devtools_run_vuln_scan', [ __CLASS__, 'cron_vuln_scan' ] );
         add_action( 'csdt_devtools_run_deep_scan', [ __CLASS__, 'cron_deep_scan' ] );
@@ -1558,6 +1569,19 @@ class CloudScale_DevTools {
             }
         }
 
+        // SSH auth log — readable if www-data is in the adm group
+        $auth_log_candidates = [
+            '/var/log/auth.log',   // Debian/Ubuntu
+            '/var/log/secure',     // RHEL/CentOS/Fedora
+            '/var/log/messages',   // some RHEL variants
+        ];
+        foreach ( $auth_log_candidates as $path ) {
+            if ( is_readable( $path ) ) {
+                $sources['auth_ssh'] = [ 'label' => 'SSH Auth Log', 'path' => $path ];
+                break;
+            }
+        }
+
         // WP Cron log
         $cron_log = WP_CONTENT_DIR . '/cron.log';
         if ( file_exists( $cron_log ) ) {
@@ -2221,6 +2245,75 @@ class CloudScale_DevTools {
                     <div id="cs-bf-table-wrap" class="cs-bf-table-wrap">
                         <div class="cs-bf-loading"><?php esc_html_e( 'Loading…', 'cloudscale-devtools' ); ?></div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SSH Brute-Force Monitor ─────────────────── -->
+        <?php
+        $ssh_mon_enabled   = get_option( 'csdt_ssh_monitor_enabled', '1' ) === '1';
+        $ssh_mon_threshold = get_option( 'csdt_ssh_monitor_threshold', '10' );
+        $ssh_last_check    = get_option( 'csdt_ssh_monitor_last_check', null );
+        $ssh_last_alert    = (int) get_option( 'csdt_ssh_monitor_last_alert', 0 );
+        $auth_log_readable = false;
+        foreach ( [ '/var/log/auth.log', '/var/log/secure', '/var/log/messages' ] as $_p ) {
+            if ( is_readable( $_p ) ) { $auth_log_readable = true; break; }
+        }
+        ?>
+        <div class="cs-panel" id="cs-panel-ssh-monitor">
+            <div class="cs-section-header cs-section-header-red">
+                <span>🖥️ SSH BRUTE-FORCE MONITOR</span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Real-time SSH attack detection via auth.log — alerts via email and ntfy.sh', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div class="cs-panel-body">
+                <?php if ( ! $auth_log_readable ) : ?>
+                <div class="cs-notice cs-notice-warn" style="margin-bottom:16px;">
+                    ⚠️ <strong><?php esc_html_e( 'Auth log not readable.', 'cloudscale-devtools' ); ?></strong>
+                    <?php esc_html_e( 'To enable SSH monitoring, add the web server user to the adm group:', 'cloudscale-devtools' ); ?>
+                    <code style="display:block;margin:8px 0;padding:6px 10px;background:#f6f7f7;border-radius:4px;">sudo usermod -a -G adm www-data &amp;&amp; sudo systemctl restart php-fpm</code>
+                </div>
+                <?php endif; ?>
+
+                <div class="cs-field-row">
+                    <div class="cs-field">
+                        <label class="cs-label">
+                            <input type="checkbox" id="cs-ssh-mon-enabled" <?php checked( $ssh_mon_enabled ); ?>>
+                            <?php esc_html_e( 'Enable SSH brute-force monitor (checks every 60 seconds)', 'cloudscale-devtools' ); ?>
+                        </label>
+                        <span class="cs-hint"><?php esc_html_e( 'Reads /var/log/auth.log every minute and alerts if the failure threshold is crossed. On by default.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+                <div class="cs-field-row">
+                    <div class="cs-field">
+                        <label class="cs-label" for="cs-ssh-mon-threshold"><?php esc_html_e( 'Alert threshold (failures per 60 s):', 'cloudscale-devtools' ); ?></label>
+                        <input type="number" id="cs-ssh-mon-threshold" class="cs-input" min="1" max="1000"
+                               value="<?php echo esc_attr( $ssh_mon_threshold ); ?>" style="max-width:100px">
+                        <span class="cs-hint"><?php esc_html_e( 'Default: 10. Sends email + ntfy.sh alert when this many failures occur in the last 60 seconds. Alerts are throttled to once per 5 minutes.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+                <?php if ( $ssh_last_check ) : ?>
+                <div class="cs-field-row" style="padding:10px 0 0;">
+                    <div style="font-size:12px;color:#64748b;">
+                        <strong><?php esc_html_e( 'Last check:', 'cloudscale-devtools' ); ?></strong>
+                        <?php echo esc_html( human_time_diff( $ssh_last_check['ts'] ) . ' ago' ); ?> —
+                        <strong><?php echo (int) $ssh_last_check['count']; ?></strong> <?php esc_html_e( 'failure(s) in last 60 s', 'cloudscale-devtools' ); ?>
+                        <?php if ( $ssh_last_alert > 0 ) : ?>
+                        &nbsp;|&nbsp; <strong><?php esc_html_e( 'Last alert:', 'cloudscale-devtools' ); ?></strong>
+                        <?php echo esc_html( human_time_diff( $ssh_last_alert ) . ' ago' ); ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php if ( ! empty( $ssh_last_check['lines'] ) ) : ?>
+                <div style="margin-top:10px;background:#0f172a;border-radius:6px;padding:10px 14px;font-size:11px;color:#94a3b8;font-family:monospace;max-height:140px;overflow-y:auto;">
+                    <?php foreach ( array_reverse( $ssh_last_check['lines'] ) as $line ) : ?>
+                    <div><?php echo esc_html( $line ); ?></div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                <?php endif; ?>
+                <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
+                    <button type="button" class="cs-btn-primary" id="cs-ssh-mon-save">💾 <?php esc_html_e( 'Save SSH Monitor Settings', 'cloudscale-devtools' ); ?></button>
+                    <span class="cs-settings-saved" id="cs-ssh-mon-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 </div>
             </div>
         </div>
@@ -3599,6 +3692,7 @@ class CloudScale_DevTools {
                 'memory_peak_mb'     => round( memory_get_peak_usage( true ) / 1048576, 1 ),
                 'active_theme'       => wp_get_theme()->get( 'Name' ),
                 'is_multisite'       => is_multisite(),
+                'login_slug'         => get_option( 'csdt_devtools_login_slug', '' ),
             ],
             'request'    => self::perf_build_request_data(),
             'transients' => self::perf_build_transient_data(),
@@ -8790,6 +8884,7 @@ class CloudScale_DevTools {
             ],
             'exposed_files'    => $exposed,
             'security_headers' => $sec_headers,
+            'ssh_status'       => self::gather_ssh_status(),
         ];
     }
 
@@ -8910,6 +9005,31 @@ class CloudScale_DevTools {
                 'fix_label' => 'Fix Prefix…',
                 'fix_modal'  => 'csdt-db-prefix-modal',
             ],
+            ( function () {
+                $installed = false;
+                foreach ( [ '/usr/bin/fail2ban-client', '/usr/sbin/fail2ban-client', '/usr/local/bin/fail2ban-client' ] as $p ) {
+                    if ( file_exists( $p ) ) { $installed = true; break; }
+                }
+                $running    = $installed && ( file_exists( '/var/run/fail2ban/fail2ban.pid' ) || file_exists( '/run/fail2ban/fail2ban.pid' ) );
+                $last_check = get_option( 'csdt_ssh_monitor_last_check', null );
+                $recent     = ( is_array( $last_check ) && isset( $last_check['count'] ) ) ? (int) $last_check['count'] : null;
+                $age        = ( is_array( $last_check ) && isset( $last_check['ts'] ) ) ? (int) ( time() - $last_check['ts'] ) : null;
+                $count_note = ( $recent !== null && $age !== null && $age < 180 )
+                    ? sprintf( ' — %d failed attempt%s in the last 60 s', $recent, $recent === 1 ? '' : 's' )
+                    : '';
+                return [
+                    'id'        => 'ssh_brute_force',
+                    'title'     => 'SSH brute-force protection' . $count_note,
+                    'detail'    => $installed
+                        ? ( $running
+                            ? 'fail2ban is installed and the daemon is running — SSH brute-force attempts are being blocked automatically.'
+                            : 'fail2ban is installed but the daemon is not running. Start it: sudo systemctl start fail2ban && sudo systemctl enable fail2ban' )
+                        : 'CRITICAL: fail2ban is not installed. Unprotected SSH is scanned 24/7 — attackers attempt thousands of passwords per minute and compromised servers are immediately enlisted into DDoS botnets.',
+                    'fixed'     => $running,
+                    'fix_label' => 'Copy fail2ban config',
+                    'fix_modal' => 'csdt-fail2ban-modal',
+                ];
+            } )(),
         ];
     }
 
@@ -10036,6 +10156,43 @@ class CloudScale_DevTools {
                     </div>
                 </div>
 
+                <!-- fail2ban config modal -->
+                <div id="csdt-fail2ban-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
+                    <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:600px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+                        <button id="csdt-f2b-close" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">✕</button>
+                        <h3 style="margin:0 0 6px;font-size:16px;">SSH Brute-Force Protection — fail2ban</h3>
+                        <p style="margin:0 0 16px;font-size:13px;color:#50575e;">fail2ban monitors SSH login failures and automatically blocks offending IPs at the firewall level. Install it on your server, then use the config below.</p>
+                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">1. Install &amp; enable</p>
+                        <pre style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 16px;white-space:pre;">sudo apt install fail2ban -y
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban</pre>
+                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">2. Create jail config — <code style="font-size:11px;">/etc/fail2ban/jail.local</code></p>
+                        <pre id="csdt-f2b-config" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 12px;white-space:pre;">[DEFAULT]
+bantime  = 3600
+findtime = 600
+maxretry = 5
+
+[sshd]
+enabled  = true
+port     = ssh
+logpath  = %(sshd_log)s
+backend  = %(sshd_backend)s
+maxretry = 3
+bantime  = 86400</pre>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <button id="csdt-f2b-copy" class="cs-btn-primary cs-btn-sm" onclick="
+                                navigator.clipboard.writeText(document.getElementById('csdt-f2b-config').textContent).then(function(){
+                                    var b=document.getElementById('csdt-f2b-copy');
+                                    b.textContent='Copied!';
+                                    setTimeout(function(){b.textContent='Copy Config';},2000);
+                                });
+                            ">Copy Config</button>
+                            <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';">Close</button>
+                        </div>
+                        <p style="margin:16px 0 0;font-size:12px;color:#64748b;">After saving <code>/etc/fail2ban/jail.local</code> run: <code>sudo systemctl restart fail2ban</code> — verify with: <code>sudo fail2ban-client status sshd</code></p>
+                    </div>
+                </div>
+
                 <?php self::render_csp_panel(); ?>
 
                 <hr class="cs-sec-divider">
@@ -10141,6 +10298,14 @@ class CloudScale_DevTools {
         $schedules['csdt_monthly'] = [
             'interval' => 30 * DAY_IN_SECONDS,
             'display'  => __( 'Once Monthly', 'cloudscale-devtools' ),
+        ];
+        $schedules['csdt_every_1min'] = [
+            'interval' => MINUTE_IN_SECONDS,
+            'display'  => __( 'Every Minute', 'cloudscale-devtools' ),
+        ];
+        $schedules['csdt_every_2min'] = [
+            'interval' => 2 * MINUTE_IN_SECONDS,
+            'display'  => __( 'Every 2 Minutes', 'cloudscale-devtools' ),
         ];
         $schedules['csdt_every_5min'] = [
             'interval' => 5 * MINUTE_IN_SECONDS,
@@ -10751,6 +10916,9 @@ You are a WordPress security expert. Analyse the provided internal WordPress con
 
 Focus on: WordPress/PHP version currency, WP_DEBUG/WP_DEBUG_DISPLAY flags (exposed to public = critical), DISALLOW_FILE_EDIT/MODS, database prefix (wp_ default is a risk), user accounts (admin username exists, counts), active plugin list (outdated plugins), brute force protection, 2FA configuration (email/TOTP/passkey counts per admin), login URL obfuscation, wp-config.php file permissions, open user registration, pingbacks enabled (DDoS amplification), WordPress version in meta generator tag, default comment status.
 
+SSH hardening (ssh_status key): fail2ban_installed/fail2ban_running — whether fail2ban is present and active. ssh_port_open — whether SSH is on port 22. password_auth: yes=brute-forceable/no=key-only. root_login: yes=critical. If ssh_port_open=false omit SSH entirely.
+Rules: ssh_port_open=true + fail2ban_running=false = CRITICAL (unprotected SSH is actively recruited into DDoS botnets within hours). ssh_port_open=true + password_auth=yes + fail2ban_running=false = CRITICAL. ssh_port_open=true + root_login=yes = CRITICAL. ssh_port_open=true + fail2ban_running=true = good finding. ssh_port_open=true + password_auth=no = good finding.
+
 Return ONLY a JSON object (no markdown, no code fences) with this exact schema:
 {"score":0-100,"score_label":"Excellent|Good|Fair|Poor|Critical","summary":"1-2 sentences on internal config security posture","critical":[{"title":"...","detail":"...","fix":"..."}],"high":[...],"medium":[...],"low":[...],"good":[{"title":"...","detail":"..."}]}
 
@@ -11080,6 +11248,69 @@ PROMPT;
             'dmarc_pct'      => $dmarc_pct,
             'dkim_present'   => $dkim_found,
             'dkim_selector'  => $dkim_selector,
+        ];
+    }
+
+    private static function gather_ssh_status(): array {
+        // Detect fail2ban installation and running state
+        $fail2ban_paths = [
+            '/usr/bin/fail2ban-client',
+            '/usr/sbin/fail2ban-client',
+            '/usr/local/bin/fail2ban-client',
+        ];
+        $fail2ban_installed = false;
+        foreach ( $fail2ban_paths as $p ) {
+            if ( file_exists( $p ) ) { $fail2ban_installed = true; break; }
+        }
+        $fail2ban_running = file_exists( '/var/run/fail2ban/fail2ban.pid' )
+                         || file_exists( '/run/fail2ban/fail2ban.pid' );
+        $fail2ban_jail    = file_exists( '/etc/fail2ban/jail.conf' )
+                         || file_exists( '/etc/fail2ban/jail.local' );
+
+        // Detect SSH daemon on port 22 (1-second timeout; skip if fsockopen unavailable)
+        $ssh_port_open = false;
+        $ssh_banner    = '';
+        if ( function_exists( 'fsockopen' ) ) {
+            $fp = @fsockopen( '127.0.0.1', 22, $errno, $errstr, 1 );
+            if ( $fp !== false ) {
+                $ssh_port_open = true;
+                $banner        = @fgets( $fp, 128 );
+                $ssh_banner    = $banner !== false ? trim( (string) $banner ) : '';
+                fclose( $fp );
+            }
+        }
+
+        // Parse sshd_config for key hardening settings (read-only; usually readable by www-data)
+        $sshd_config       = '';
+        $sshd_config_paths = [ '/etc/ssh/sshd_config', '/etc/sshd_config' ];
+        foreach ( $sshd_config_paths as $cp ) {
+            if ( is_readable( $cp ) ) { $sshd_config = file_get_contents( $cp ); break; }
+        }
+        $password_auth  = 'unknown'; // yes | no | unknown
+        $root_login     = 'unknown'; // yes | no | prohibit-password | unknown
+        $pubkey_auth    = 'unknown';
+        if ( $sshd_config !== '' ) {
+            if ( preg_match( '/^\s*PasswordAuthentication\s+(yes|no)/im', $sshd_config, $m ) ) {
+                $password_auth = strtolower( $m[1] );
+            }
+            if ( preg_match( '/^\s*PermitRootLogin\s+(\S+)/im', $sshd_config, $m ) ) {
+                $root_login = strtolower( $m[1] );
+            }
+            if ( preg_match( '/^\s*PubkeyAuthentication\s+(yes|no)/im', $sshd_config, $m ) ) {
+                $pubkey_auth = strtolower( $m[1] );
+            }
+        }
+
+        return [
+            'fail2ban_installed' => $fail2ban_installed,
+            'fail2ban_running'   => $fail2ban_running,
+            'fail2ban_jail'      => $fail2ban_jail,
+            'ssh_port_open'      => $ssh_port_open,
+            'ssh_banner'         => $ssh_banner,
+            'password_auth'      => $password_auth,
+            'root_login'         => $root_login,
+            'pubkey_auth'        => $pubkey_auth,
+            'sshd_config_readable' => $sshd_config !== '',
         ];
     }
 
@@ -11966,6 +12197,7 @@ PROMPT;
         $malware        = self::scan_malware_indicators();
         $user_audit     = self::audit_users();
         $cron_audit     = self::audit_cron_events();
+        $ssh_status     = self::gather_ssh_status();
 
         // PHP end-of-life status
         $php_eol_dates = [
@@ -12035,6 +12267,7 @@ PROMPT;
             'auto_updates'       => $auto_updates,
             'display_errors'     => $display_errors,
             'inactive_plugins'   => $inactive_plugins,
+            'ssh_status'         => $ssh_status,
         ] );
     }
 
@@ -12057,6 +12290,7 @@ You will receive a JSON object with these categories:
 11. External checks — SSL validity/expiry, HTTP→HTTPS redirect, TLS weak protocols (tls_weak_protocols: checked, tls10_accepted, tls11_accepted — TLS 1.0/1.1 deprecated since 2021, susceptible to POODLE/BEAST attacks), wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum (rest_users: exposed, count, slugs), author enum, directory listings (uploads_listing, plugins_listing, themes_listing — plugins/themes listing reveals exact software versions to attackers), exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (email_dns: if email_configured=false the domain has no MX records — do NOT mention email DNS at all, it is irrelevant; otherwise spf_present, spf_strictness: hard_fail=good/soft_fail=weak/pass_all=dangerous; dmarc_present, dmarc_policy: none=monitoring-only-does-nothing/quarantine=acceptable/reject=best, dmarc_pct; dkim_present, dkim_selector — all three required with strong policies for full spoofing protection), security headers (csp_quality: grade good/weak/missing, issues: unsafe-inline/unsafe-eval/wildcard-source/no-default-src — any issue weakens XSS mitigation; hsts_quality: grade, max_age, includes_subdomains, issues — max-age < 31536000 means HTTPS not enforced for a full year; X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, access-control-allow-origin — wildcard "*" allows credential theft from any origin), server_version_leak: leaks_version=true means Server header discloses exact software version (e.g. nginx/1.18.0) aiding targeted CVE exploitation.
 12. Plugin code scan — raw static analysis findings (may include false positives): RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
 13. Code triage (code_triage) — AI-verified verdicts on the static scan findings. Each entry: plugin, file, line, verdict (confirmed|false_positive|needs_context), severity, type, explanation, fix. ONLY report confirmed findings as real vulnerabilities — ignore false_positives. Use triage severity for confirmed items. For needs_context, mention at low severity with explanation.
+14. SSH status (ssh_status) — server-level SSH hardening. fail2ban_installed/fail2ban_running/fail2ban_jail: whether the fail2ban daemon is present and active. ssh_port_open: whether SSH is listening on port 22 (standard port is a brute-force target). password_auth: yes=password login allowed (brute-forceable)/no=key-only (secure)/unknown=could not read config. root_login: yes=root can log in directly (critical)/no or prohibit-password=safer. pubkey_auth: yes=key auth enabled. sshd_config_readable: whether the config file was accessible at scan time. If ssh_port_open=false this is a container/managed environment — omit SSH findings entirely.
 
 Cross-correlate ALL categories for compound risks:
 - Known CVE (critical/high) = immediately critical regardless of other factors
@@ -12088,6 +12322,13 @@ Cross-correlate ALL categories for compound risks:
 - display_errors.display_errors_on=true = PHP stack traces with file paths and variable values visible to all visitors — mark high on production
 - auto_updates.core_disabled=true = WP core will not auto-patch security releases; combined with outdated WP version = high risk
 - inactive_plugins count > 0 = deactivated plugins on disk are unpatched attack surface; flag names and versions for awareness
+- ssh_port_open=true + fail2ban_running=false = CRITICAL: SSH exposed with no brute-force protection — unprotected SSH is actively recruited into botnets and DDoS amplification networks within hours of exposure; recommend fail2ban with sshd jail as immediate remediation
+- ssh_port_open=true + password_auth=yes + fail2ban_running=false = CRITICAL: password brute-force fully unblocked on SSH — automated credential-stuffing tools will attempt thousands of passwords per minute; server compromise leads directly to DDoS botnet enlistment
+- ssh_port_open=true + root_login=yes = CRITICAL: direct root SSH login permitted — successful brute-force gives immediate full server control with no privilege escalation required
+- ssh_port_open=true + fail2ban_running=true + password_auth=no = good finding: SSH hardened — brute-force protection active and key-only authentication enforced
+- ssh_port_open=true + fail2ban_running=true = good finding: SSH brute-force protection active via fail2ban
+- ssh_port_open=true + password_auth=no = good finding: SSH key-only authentication enforced, password attacks impossible
+- ssh_port_open=false = container/managed environment; omit all SSH findings entirely
 - csp_quality.grade=missing or weak + any XSS code finding = actively exploitable XSS without browser-side mitigation
 - hsts_quality.grade=missing or max_age < 31536000 = HTTPS not enforced long-term, HTTP downgrade / MITM possible
 - server_version_leak.leaks_version=true + unpatched software = version fingerprinting directly aids targeted exploitation — escalate severity
@@ -12420,6 +12661,142 @@ PROMPT;
         }
 
         wp_send_json_success();
+    }
+
+    // ── SSH Brute-Force Monitor ───────────────────────────────────────────────
+
+    public static function ajax_ssh_monitor_save(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $enabled   = ( $_POST['enabled']   ?? '0' ) === '1' ? '1' : '0';
+        $threshold = max( 1, min( 1000, (int) ( $_POST['threshold'] ?? 10 ) ) );
+        update_option( 'csdt_ssh_monitor_enabled',   $enabled,   false );
+        update_option( 'csdt_ssh_monitor_threshold', $threshold, false );
+
+        if ( $enabled === '1' ) {
+            if ( ! wp_next_scheduled( 'csdt_ssh_monitor' ) ) {
+                wp_schedule_event( time() + 60, 'csdt_every_1min', 'csdt_ssh_monitor' );
+            }
+        } else {
+            wp_clear_scheduled_hook( 'csdt_ssh_monitor' );
+        }
+        wp_send_json_success();
+    }
+
+    public static function monitor_ssh_failures(): void {
+        if ( get_option( 'csdt_ssh_monitor_enabled', '1' ) !== '1' ) {
+            return;
+        }
+
+        // Find a readable auth log
+        $auth_log = '';
+        foreach ( [ '/var/log/auth.log', '/var/log/secure', '/var/log/messages' ] as $p ) {
+            if ( is_readable( $p ) ) { $auth_log = $p; break; }
+        }
+        if ( ! $auth_log ) {
+            return; // log not accessible — silently skip
+        }
+
+        // Read the last 256 KB (enough for several minutes of auth activity)
+        $handle = @fopen( $auth_log, 'r' );
+        if ( ! $handle ) {
+            return;
+        }
+        fseek( $handle, 0, SEEK_END );
+        $size   = ftell( $handle );
+        $read   = min( 262144, $size );
+        fseek( $handle, $size - $read );
+        $chunk  = fread( $handle, $read );
+        fclose( $handle );
+
+        if ( ! $chunk ) {
+            return;
+        }
+
+        $window    = 60; // seconds — check the last 60 seconds on each 1-minute cron tick
+        $threshold = (int) get_option( 'csdt_ssh_monitor_threshold', '10' );
+        $now       = time();
+        $failures  = [];
+
+        // Match: "Failed password", "Invalid user", "Connection closed by invalid user", "authentication failure"
+        $pattern = '/^(\w{3}\s+\d+\s[\d:]+)\s+\S+\s+sshd\[\d+\]:\s+(?:Failed password|Invalid user|Connection closed by invalid user|authentication failure).*/m';
+
+        foreach ( explode( "\n", $chunk ) as $line ) {
+            if ( ! preg_match( $pattern, $line, $m ) ) {
+                continue;
+            }
+            // Parse syslog timestamp (no year — assume current year, roll back if in future)
+            $ts = strtotime( $m[1] );
+            if ( $ts === false ) {
+                continue;
+            }
+            // Syslog has no year — if timestamp is in the future, it's last year
+            if ( $ts > $now + 60 ) {
+                $ts = strtotime( $m[1] . ' ' . ( (int) gmdate( 'Y' ) - 1 ) );
+            }
+            if ( $ts !== false && ( $now - $ts ) <= $window ) {
+                $failures[] = trim( $line );
+            }
+        }
+
+        $count = count( $failures );
+
+        // Store recent failure data for the Quick Fixes panel display
+        update_option( 'csdt_ssh_monitor_last_check', [
+            'ts'    => $now,
+            'count' => $count,
+            'lines' => array_slice( $failures, -20 ), // keep last 20 for display
+        ], false );
+
+        if ( $count < $threshold ) {
+            return;
+        }
+
+        // Throttle: don't alert more than once per 5 minutes (attacks move fast)
+        $last_alert = (int) get_option( 'csdt_ssh_monitor_last_alert', 0 );
+        if ( ( $now - $last_alert ) < 300 ) {
+            return;
+        }
+        update_option( 'csdt_ssh_monitor_last_alert', $now, false );
+
+        // Build alert message
+        $site      = get_bloginfo( 'name' ) ?: home_url();
+        $admin_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        $subject   = sprintf( '[%s] 🚨 SSH Brute-Force Attack — %d failures in 60 seconds', $site, $count );
+        $body      = sprintf(
+            "SSH brute-force attack detected on %s\n\n%d failed SSH login attempts in the last 60 seconds.\n\nRecent failures:\n%s\n\nInstall fail2ban immediately to block attacking IPs automatically.\nQuick Fixes: %s",
+            $site,
+            $count,
+            implode( "\n", array_slice( $failures, -5 ) ),
+            $admin_url
+        );
+
+        // Email alert
+        if ( get_option( 'csdt_scan_schedule_email', '1' ) === '1' ) {
+            wp_mail( get_option( 'admin_email' ), $subject, $body );
+        }
+
+        // ntfy.sh push notification
+        $ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
+        if ( $ntfy_url ) {
+            $headers = [
+                'Title'    => $subject,
+                'Priority' => 'urgent',
+                'Tags'     => 'rotating_light,computer',
+                'Click'    => $admin_url,
+            ];
+            $ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
+            if ( $ntfy_tok ) {
+                $headers['Authorization'] = 'Bearer ' . $ntfy_tok;
+            }
+            wp_remote_post( $ntfy_url, [
+                'timeout' => 10,
+                'headers' => $headers,
+                'body'    => $body,
+            ] );
+        }
     }
 
     public static function cleanup_expired_test_accounts(): void {

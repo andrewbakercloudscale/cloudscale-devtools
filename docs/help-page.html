@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>CloudScale Cyber and Devtools — Help</title></head><body>
 <!-- wp:html -->
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"CloudScale Cyber and Devtools","applicationCategory":"SecurityApplication","operatingSystem":"WordPress","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Free WordPress security plugin powered by Anthropic Claude and Google Gemini AI. Features: AI cyber audit, two-factor authentication, passkeys (WebAuthn), hide login URL, brute-force protection, CSP builder, server logs, SQL tool, and syntax-highlighted code blocks.","url":"https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-cyber-devtools-help/","downloadUrl":"https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip","softwareVersion":"1.9.116","author":{"@type":"Person","name":"Andrew Baker","url":"https://your-wordpress-site.example.com"},"isAccessibleForFree":true,"license":"https://www.gnu.org/licenses/gpl-2.0.html"}</script>
+<!-- /wp:html -->
+
+<!-- wp:html -->
 <style>
 .cs-help-docs{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1a202c;line-height:1.7;max-width:900px;}
 .cs-help-docs a{color:#2563eb;}
@@ -18,7 +22,7 @@
 .cs-github-btn:hover{transform:translateY(-6px) scale(1.04);box-shadow:0 20px 48px rgba(0,0,0,.55);color:#fff!important;text-decoration:none!important;}
 .cs-toc{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:28px 36px;margin:32px 0;}
 .cs-toc-title{font-size:1em;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:0 0 16px;}
-.cs-toc ol{display:grid;grid-template-columns:1fr 1fr;gap:6px 32px;margin:0;padding-left:24px;}
+.cs-toc ol{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 32px;margin:0;padding-left:24px;}
 .cs-toc li a{color:#2563eb;text-decoration:none;font-weight:500;font-size:.97em;}
 .cs-tab-section{margin:56px 0 0;}
 .cs-tab-heading{font-size:2em;font-weight:800;color:#0f172a;padding:0 0 16px;border-bottom:3px solid #0e6b8f;margin:0 0 8px;}
@@ -40,7 +44,7 @@
 <a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-cyber-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
 
 <h1>CloudScale Cyber and Devtools</h1>
-<p>AI-powered WordPress security auditing using Claude and Gemini, one-click hardening, login security, server logs, syntax-highlighted code blocks, SQL tool, and a site performance monitor — completely free.</p>
+<p>Free WordPress security plugin — AI cyber audit using Claude &amp; Gemini, two-factor authentication, passkeys, login URL protection, one-click hardening, server logs, and code blocks.</p>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">⬇ Download Latest Version (.zip)</a><a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/cloudscale-cyber-devtools" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a></div>
 </div>
 
@@ -111,7 +115,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="hide-login">Hide Login URL</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-hide-login-14.jpg" alt="Hide Login URL" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-hide-login-16.jpg" alt="WordPress Hide Login URL settings — move wp-login.php to a secret URL to block bot attacks" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔐 Stop Bots Before They Even See Your Login Page</h2>
@@ -132,7 +136,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="2fa">Two-Factor Auth</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-2fa-14.jpg" alt="Two-Factor Auth" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-2fa-16.jpg" alt="WordPress two-factor authentication settings — email OTP, TOTP authenticator app, and passkeys" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fdf4ff;border-left:4px solid #9333ea;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔑 A Stolen Password Should Never Be Enough to Break In</h2>
@@ -153,7 +157,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="passkeys">Passkeys (WebAuthn)</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-passkeys-14.jpg" alt="Passkeys (WebAuthn)" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-passkeys-16.jpg" alt="WordPress passkeys WebAuthn registration — Face ID, Touch ID and hardware security key login" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fff7ed;border-left:4px solid #ea580c;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🪪 The Most Secure WordPress Login Method Available — and It's Free</h2>
@@ -174,7 +178,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="security">AI Cyber Audit</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-security-6.jpg" alt="AI Cyber Audit" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-security-8.jpg" alt="WordPress AI security audit result — score 100/100 with Claude 4 and Gemini 2.5 Pro, free security plugin" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fff5f5;border-left:4px solid #c0392b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🛡️ A Security Consultant in Your WordPress Dashboard — for Free</h2>
@@ -202,7 +206,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="code-block">Code Block</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-code-block-14.jpg" alt="Code Block" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-code-block-16.jpg" alt="WordPress syntax-highlighted code block settings — 190 languages, 14 themes, no CDN, completely free" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">💻 Beautiful Code Blocks — Without Paying $50/Year or Slowing Your Site Down</h2>
@@ -219,7 +223,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="migrator">Code Block Migrator</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-migrator-14.jpg" alt="Code Block Migrator" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-migrator-16.jpg" alt="WordPress code block migrator — batch convert from Enlighter, SyntaxHighlighter, and other plugins" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fefce8;border-left:4px solid #ca8a04;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔄 Switch Plugins Without Touching 100 Posts by Hand</h2>
@@ -245,7 +249,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="sql-tool">SQL Query Tool</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-sql-tool-14.jpg" alt="SQL Query Tool" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-sql-tool-16.jpg" alt="WordPress read-only SQL query tool — safe database inspection inside wp-admin without phpMyAdmin" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f8fafc;border-left:4px solid #64748b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🗄️ Query Your Live Database Safely — No phpMyAdmin, No SSH</h2>
@@ -266,7 +270,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="server-logs">Server Logs</h3>
-<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-server-logs-6.jpg" alt="Server Logs" /></figure>
+<figure class="cs-screenshot"><img src="https://your-wordpress-site.example.com/wp-content/uploads/2026/04/panel-server-logs-8.jpg" alt="WordPress server log viewer — PHP error logs, debug logs, and web server logs without SSH access" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0fdf4;border-left:4px solid #15803d;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">📋 Read Your Server Logs Without Leaving WordPress</h2>
