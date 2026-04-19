@@ -68,6 +68,13 @@ helpLib.run({
 
 <h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:0 0 14px;">Why the Existing Security Tools Fall Short</h2>
 
+<div style="background:#f1f5f9;border-radius:8px;padding:20px 24px;margin:0 0 24px;">
+<h3 style="margin:0 0 12px;font-size:1.02em;font-weight:700;color:#0f172a;">Understanding the Terminology</h3>
+<p style="margin:0 0 10px;color:#374151;line-height:1.7;"><strong>CVE (Common Vulnerabilities and Exposures)</strong> is a public database of known security flaws in software. Each one gets a unique ID like CVE-2024-1234. When a researcher discovers a bug in a WordPress plugin that could let an attacker take over a site, they file a CVE report. It gets added to the database. Security tools scan your plugins against this list.</p>
+<p style="margin:0 0 10px;color:#374151;line-height:1.7;"><strong>CVSS score</strong> (Common Vulnerability Scoring System) rates the severity of each CVE on a scale of 0–10. The four bands you'll see in CloudScale's reports: <strong>Critical (9–10):</strong> remote code execution, full site takeover, mass data theft possible with no user interaction. <strong>High (7–8.9):</strong> significant data exposure or privilege escalation. <strong>Medium (4–6.9):</strong> real risk but requires specific conditions. <strong>Low (0.1–3.9):</strong> minimal practical impact. Any Critical finding on a live site should be treated as a fire drill.</p>
+<p style="margin:0;color:#374151;line-height:1.7;"><strong>Zero-day</strong> refers to a vulnerability that is being actively exploited before a patch exists or before it has been added to any CVE database. The name comes from the fact that developers have had zero days to fix it. Zero-days are the most dangerous class of vulnerability because every signature-based scanner in the world is blind to them. The attacker knows about the flaw. The defenders don't. The only way to catch them is through code analysis and behavioural reasoning — which is exactly what CloudScale's AI Code Triage does.</p>
+</div>
+
 <p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;"><strong>Wordfence</strong> ($119/year for premium), <strong>Sucuri</strong> ($199/year), and <strong>WPScan</strong> ($25–$75/month) are the tools most security professionals will point you to. They are legitimate products that do real things: malware signature scanning, firewall rules, IP reputation blocking. But they share a fundamental architectural limitation. They are <em>signature-based</em>. They match what they see on your site against a database of known bad patterns. If the malware or misconfiguration isn't in their database yet, they don't flag it. They are inherently reactive; they require someone to be compromised first, for the attack pattern to be captured, analysed, and written into a rule. By definition they cannot identify novel threats, unusual configuration combinations, or the specific risk profile of your particular setup.</p>
 
 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:22px 24px;margin:0 0 20px;">
@@ -117,6 +124,68 @@ helpLib.run({
 <p style="margin:0;color:#374151;line-height:1.7;">When Anthropic releases Claude Opus 5 or Google ships Gemini 3, <strong>you get it immediately.</strong> No waiting for a plugin vendor to integrate it, no being held on an older model to protect their infrastructure margins. CloudScale ships support for the latest frontier models as soon as they launch. You choose your model, you own the key, you get the best intelligence available from day one.</p>
 </div>
 
+<h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:0 0 14px;">Installing the Plugin: Step by Step</h2>
+
+<p style="font-size:1.05em;color:#374151;margin:0 0 20px;line-height:1.75;">The plugin isn't in the WordPress.org directory yet, so installation takes one extra step compared to a typical plugin. It's still under five minutes from download to your first security scan.</p>
+
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:24px 28px;margin:0 0 12px;counter-reset:step;">
+
+<div style="display:flex;gap:16px;align-items:flex-start;margin:0 0 20px;">
+<div style="flex-shrink:0;width:36px;height:36px;background:#6366f1;color:#fff;font-weight:800;font-size:1em;border-radius:50%;display:flex;align-items:center;justify-content:center;">1</div>
+<div>
+<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:1.02em;">Download the plugin zip</p>
+<p style="margin:0;color:#374151;line-height:1.65;">Click the <strong>Download Free Plugin</strong> button at the top of this page. Your browser will save a file called <code>cloudscale-devtools.zip</code>. Leave it zipped; WordPress handles the extraction.</p>
+</div>
+</div>
+
+<div style="display:flex;gap:16px;align-items:flex-start;margin:0 0 20px;">
+<div style="flex-shrink:0;width:36px;height:36px;background:#6366f1;color:#fff;font-weight:800;font-size:1em;border-radius:50%;display:flex;align-items:center;justify-content:center;">2</div>
+<div>
+<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:1.02em;">Open your WordPress dashboard</p>
+<p style="margin:0;color:#374151;line-height:1.65;">Log in to your WordPress site and go to <strong>Plugins</strong> in the left sidebar. At the top of the page, click <strong>Add New Plugin</strong>, then click the <strong>Upload Plugin</strong> button that appears near the top of the screen.</p>
+</div>
+</div>
+
+<div style="display:flex;gap:16px;align-items:flex-start;margin:0 0 20px;">
+<div style="flex-shrink:0;width:36px;height:36px;background:#6366f1;color:#fff;font-weight:800;font-size:1em;border-radius:50%;display:flex;align-items:center;justify-content:center;">3</div>
+<div>
+<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:1.02em;">Upload and install</p>
+<p style="margin:0;color:#374151;line-height:1.65;">Click <strong>Choose File</strong>, select the <code>cloudscale-devtools.zip</code> file you just downloaded, then click <strong>Install Now</strong>. WordPress uploads and unpacks the plugin in a few seconds.</p>
+</div>
+</div>
+
+<div style="display:flex;gap:16px;align-items:flex-start;margin:0 0 20px;">
+<div style="flex-shrink:0;width:36px;height:36px;background:#6366f1;color:#fff;font-weight:800;font-size:1em;border-radius:50%;display:flex;align-items:center;justify-content:center;">4</div>
+<div>
+<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:1.02em;">Activate</p>
+<p style="margin:0;color:#374151;line-height:1.65;">After installation, WordPress shows you a success screen with an <strong>Activate Plugin</strong> button. Click it. The plugin is now running.</p>
+</div>
+</div>
+
+<div style="display:flex;gap:16px;align-items:flex-start;margin:0 0 20px;">
+<div style="flex-shrink:0;width:36px;height:36px;background:#6366f1;color:#fff;font-weight:800;font-size:1em;border-radius:50%;display:flex;align-items:center;justify-content:center;">5</div>
+<div>
+<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:1.02em;">Open the plugin</p>
+<p style="margin:0;color:#374151;line-height:1.65;">In the WordPress sidebar, go to <strong>Tools → Cyber and Devtools</strong>. You'll land on the Home dashboard showing your current security posture at a glance.</p>
+</div>
+</div>
+
+<div style="display:flex;gap:16px;align-items:flex-start;">
+<div style="flex-shrink:0;width:36px;height:36px;background:#16a34a;color:#fff;font-weight:800;font-size:1em;border-radius:50%;display:flex;align-items:center;justify-content:center;">6</div>
+<div>
+<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:1.02em;">Run your first security scan</p>
+<p style="margin:0;color:#374151;line-height:1.65;">Click the <strong>Security</strong> tab. If you don't have an API key yet, click the link to get a free Google Gemini key (see the AI setup guide in this page's Security section). Paste it in, click Save, then hit <strong>Run AI Cyber Audit</strong>. Your first report appears in about 30 seconds.</p>
+</div>
+</div>
+
+</div>
+
+<p style="font-size:.92em;color:#64748b;margin:0 0 16px;"><strong>Requirements:</strong> WordPress 6.0 or later, PHP 7.4 or later. Works on shared hosting, VPS, and managed WordPress hosting (WP Engine, Kinsta, Cloudways, etc.). Does not require SSH access or command-line tools.</p>
+
+<div style="background:#fff7ed;border-left:4px solid #ea580c;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 32px;">
+<p style="margin:0;color:#374151;font-size:.95em;line-height:1.65;"><strong>Before you start hardening anything: take a backup.</strong> The Quick Fixes in this plugin modify wp-config.php, database tables, and server configuration. In the unlikely event something goes wrong, you want a restore point. The free <a href="https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-backup-restore-help/" target="_blank" rel="noopener"><strong>CloudScale Backup and Restore plugin</strong></a> does one-click full-site backups (database + files) to local storage or cloud. Five minutes now saves hours later.</p>
+</div>
+
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin:0 0 32px;">
 <div style="background:#fff5f5;border-left:4px solid #e53e3e;border-radius:0 8px 8px 0;padding:18px 20px;">
 <h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🛡️ Security</h3>
@@ -152,15 +221,16 @@ helpLib.run({
 </ul>
 </div>
 <div style="background:#fafafa;border-left:4px solid #6366f1;border-radius:0 8px 8px 0;padding:18px 20px;">
-<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">⚡ Getting Started</h3>
-<ol style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
-<li>Download the zip using the button above</li>
-<li>In WordPress: <strong>Plugins → Add New → Upload Plugin</strong></li>
-<li>Upload, install, and activate</li>
-<li>Go to <strong>Tools → Cyber and Devtools</strong></li>
-<li>For the AI Cyber Audit: get a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> (no credit card) or <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic</a></li>
-</ol>
-<p style="margin:12px 0 0;font-size:.9em;color:#64748b;"><strong>Requirements:</strong> WordPress 6.0+, PHP 7.4+</p>
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">What's Covered Below</h3>
+<ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
+<li><a href="#cs-section-hide-login" style="color:#6366f1;">Hide Login URL</a> setup and how it works</li>
+<li><a href="#cs-section-2fa" style="color:#6366f1;">Two-Factor Authentication</a> and enforcement</li>
+<li><a href="#cs-section-passkeys" style="color:#6366f1;">Passkeys</a> registration and browser support</li>
+<li><a href="#cs-section-security" style="color:#6366f1;">AI Cyber Audit</a> with full API key setup guides</li>
+<li><a href="#cs-section-code-block" style="color:#6366f1;">Code Block</a> themes, languages, and usage</li>
+<li><a href="#cs-section-sql-tool" style="color:#6366f1;">SQL Query Tool</a> and built-in queries</li>
+<li><a href="#cs-section-server-logs" style="color:#6366f1;">Server Logs</a> viewer and tail mode</li>
+</ul>
 </div>
 </div>`,
 
