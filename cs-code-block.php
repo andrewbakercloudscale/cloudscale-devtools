@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.114
+ * Version: 1.9.115
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.114';
+    const VERSION      = '1.9.115';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -323,6 +323,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_scan_history',       [ __CLASS__, 'ajax_scan_history' ] );
         add_action( 'wp_ajax_csdt_devtools_save_schedule',      [ __CLASS__, 'ajax_save_schedule' ] );
         add_action( 'wp_ajax_csdt_devtools_quick_fix',          [ __CLASS__, 'ajax_apply_quick_fix' ] );
+        add_action( 'wp_ajax_csdt_db_prefix_preflight',         [ __CLASS__, 'ajax_db_prefix_preflight' ] );
+        add_action( 'wp_ajax_csdt_db_prefix_migrate',           [ __CLASS__, 'ajax_db_prefix_migrate' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_save',           [ __CLASS__, 'ajax_csp_save' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_rollback',       [ __CLASS__, 'ajax_csp_rollback' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_violations_get',  [ __CLASS__, 'ajax_csp_violations_get' ] );
@@ -8897,6 +8899,17 @@ class CloudScale_DevTools {
                 'fixed'     => ! file_exists( WP_CONTENT_DIR . '/debug.log' ),
                 'fix_label' => 'Move Outside Web Root',
             ],
+            [
+                'id'        => 'db_prefix_default',
+                'title'     => 'Default database table prefix (wp_)',
+                'detail'    => 'The default wp_ prefix is a well-known attack target. Renaming tables to a unique prefix reduces automated SQL injection and enumeration risk.',
+                'fixed'     => ( function () {
+                    global $wpdb;
+                    return $wpdb->prefix !== 'wp_';
+                } )(),
+                'fix_label' => 'Fix Prefix…',
+                'fix_modal'  => 'csdt-db-prefix-modal',
+            ],
         ];
     }
 
@@ -9956,19 +9969,71 @@ class CloudScale_DevTools {
                             <div style="font-size:13px;font-weight:600;color:<?php echo $is_fixed ? '#6b7280' : '#1d2327'; ?>;"><?php echo esc_html( $fix['title'] ); ?></div>
                             <div style="font-size:12px;color:#50575e;margin-top:2px;"><?php echo esc_html( $fix['detail'] ); ?></div>
                         </div>
-                        <div style="flex-shrink:0;">
+                        <div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">
                         <?php if ( $is_fixed ) : ?>
                             <span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed ✓</span>
+                        <?php elseif ( ! empty( $fix['fix_modal'] ) ) : ?>
+                            <button type="button" class="cs-btn-primary cs-btn-sm"
+                                    onclick="document.getElementById('<?php echo esc_attr( $fix['fix_modal'] ); ?>').style.display='flex';"
+                                    style="white-space:nowrap;">
+                                <?php echo esc_html( $fix['fix_label'] ); ?>
+                            </button>
                         <?php else : ?>
                             <button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn"
                                     data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>"
                                     style="white-space:nowrap;">
                                 <?php echo esc_html( $fix['fix_label'] ); ?>
                             </button>
+                            <?php if ( ! empty( $fix['dismiss_label'] ) && ! empty( $fix['dismiss_id'] ) ) : ?>
+                            <button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn"
+                                    data-fix-id="<?php echo esc_attr( $fix['dismiss_id'] ); ?>"
+                                    style="white-space:nowrap;font-size:11px;">
+                                <?php echo esc_html( $fix['dismiss_label'] ); ?>
+                            </button>
+                            <?php endif; ?>
                         <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
+                </div>
+
+                <!-- DB Prefix Migration Modal -->
+                <div id="csdt-db-prefix-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
+                    <div style="background:#fff;border-radius:8px;max-width:560px;width:92%;padding:24px 24px 20px;position:relative;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);">
+                        <button id="csdt-dbp-close" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">✕</button>
+                        <h3 style="margin:0 0 6px;font-size:16px;font-weight:700;">Fix Database Table Prefix</h3>
+                        <p style="font-size:13px;color:#50575e;margin:0 0 18px;">Renames all <code style="background:#f0f0f1;padding:1px 5px;border-radius:3px;">wp_</code> tables to a unique prefix and updates <code style="background:#f0f0f1;padding:1px 5px;border-radius:3px;">wp-config.php</code> automatically.</p>
+
+                        <!-- Step 1: Backup warning -->
+                        <div id="csdt-dbp-step1">
+                            <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:14px 16px;margin-bottom:16px;">
+                                <p style="margin:0 0 6px;font-weight:600;font-size:13px;color:#92400e;">⚠ Back up your database before continuing</p>
+                                <p style="margin:0 0 10px;font-size:13px;color:#78350f;">This operation renames tables directly in MySQL. If anything goes wrong mid-migration you will need a backup to recover.</p>
+                                <a href="https://andrewbaker.ninja/wordpress-plugin-help/backup-restore-help/" target="_blank" style="color:#b45309;font-weight:600;font-size:13px;text-decoration:underline;">→ CloudScale Backup &amp; Restore — install &amp; create a backup first</a>
+                            </div>
+                            <label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;line-height:1.6;">
+                                <input type="checkbox" id="csdt-dbp-backup-ok" style="margin-top:3px;flex-shrink:0;">
+                                I have a recent database backup and understand this action cannot be automatically reversed
+                            </label>
+                            <div style="margin-top:16px;">
+                                <button id="csdt-dbp-preflight-btn" class="cs-btn-primary" disabled style="opacity:.5;">Next: Pre-flight check →</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Preflight results -->
+                        <div id="csdt-dbp-step2" style="display:none;">
+                            <div id="csdt-dbp-preflight-out" style="background:#f6f7f7;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.6;margin-bottom:16px;"></div>
+                            <div style="display:flex;gap:8px;">
+                                <button id="csdt-dbp-back-btn" class="cs-btn-secondary">← Back</button>
+                                <button id="csdt-dbp-migrate-btn" class="cs-btn-primary">⚡ Rename Tables Now</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Result -->
+                        <div id="csdt-dbp-step3" style="display:none;">
+                            <div id="csdt-dbp-result-out" style="font-size:13px;line-height:1.6;"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <?php self::render_csp_panel(); ?>
@@ -10312,6 +10377,153 @@ class CloudScale_DevTools {
         }
 
         wp_send_json_success( [ 'fixes' => self::get_quick_fixes() ] );
+    }
+
+    public static function ajax_db_prefix_preflight(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        global $wpdb;
+        $current_prefix = $wpdb->prefix;
+
+        if ( $current_prefix !== 'wp_' ) {
+            wp_send_json_error( 'Database prefix is already "' . esc_html( $current_prefix ) . '" — nothing to migrate.' );
+            return;
+        }
+
+        $cfg_file    = ABSPATH . 'wp-config.php';
+        $cfg_writable = is_readable( $cfg_file ) && is_writable( $cfg_file );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $tables = $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $current_prefix ) . '%' ) );
+
+        // Generate a unique prefix and stash it for 5 minutes
+        $new_prefix = 'cs' . substr( md5( wp_generate_uuid4() ), 0, 6 ) . '_';
+        set_transient( 'csdt_db_prefix_proposed', $new_prefix, 300 );
+
+        wp_send_json_success( [
+            'current_prefix' => $current_prefix,
+            'new_prefix'     => $new_prefix,
+            'table_count'    => count( $tables ),
+            'tables'         => $tables,
+            'cfg_writable'   => $cfg_writable,
+        ] );
+    }
+
+    public static function ajax_db_prefix_migrate(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        global $wpdb;
+        $current_prefix = $wpdb->prefix;
+
+        if ( $current_prefix !== 'wp_' ) {
+            wp_send_json_error( 'Prefix is not wp_ — aborting.' );
+            return;
+        }
+
+        $new_prefix = get_transient( 'csdt_db_prefix_proposed' );
+        if ( ! $new_prefix || ! preg_match( '/^cs[a-f0-9]{6}_$/', $new_prefix ) ) {
+            wp_send_json_error( 'Pre-flight token expired. Please click "← Back" and run the pre-flight check again.' );
+            return;
+        }
+
+        $cfg_file = ABSPATH . 'wp-config.php';
+        if ( ! is_readable( $cfg_file ) || ! is_writable( $cfg_file ) ) {
+            wp_send_json_error( 'wp-config.php is not writable. Fix file permissions and try again.' );
+            return;
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $tables = $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $current_prefix ) . '%' ) );
+        if ( empty( $tables ) ) {
+            wp_send_json_error( 'No tables found with prefix "' . esc_html( $current_prefix ) . '".' );
+            return;
+        }
+
+        $renamed = [];
+        $errors  = [];
+
+        foreach ( $tables as $table ) {
+            $suffix    = substr( $table, strlen( $current_prefix ) );
+            $new_table = $new_prefix . $suffix;
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $result = $wpdb->query( 'RENAME TABLE `' . esc_sql( $table ) . '` TO `' . esc_sql( $new_table ) . '`' );
+            if ( $result === false ) {
+                $errors[] = $table;
+            } else {
+                $renamed[] = [ 'from' => $table, 'to' => $new_table ];
+            }
+        }
+
+        if ( ! empty( $errors ) ) {
+            foreach ( $renamed as $pair ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( 'RENAME TABLE `' . esc_sql( $pair['to'] ) . '` TO `' . esc_sql( $pair['from'] ) . '`' );
+            }
+            wp_send_json_error( 'Migration failed and was rolled back. Could not rename: ' . implode( ', ', $errors ) );
+            return;
+        }
+
+        // Update option_name keys that carried the old prefix (e.g. wp_user_roles)
+        $options_table = $new_prefix . 'options';
+        $wpdb->query( $wpdb->prepare(
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            'UPDATE `' . esc_sql( $options_table ) . '` SET option_name = REPLACE(option_name, %s, %s) WHERE option_name LIKE %s',
+            $current_prefix,
+            $new_prefix,
+            $wpdb->esc_like( $current_prefix ) . '%'
+        ) );
+
+        // Update meta_key entries that carried the old prefix (e.g. wp_capabilities)
+        $usermeta_table = $new_prefix . 'usermeta';
+        $wpdb->query( $wpdb->prepare(
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            'UPDATE `' . esc_sql( $usermeta_table ) . '` SET meta_key = REPLACE(meta_key, %s, %s) WHERE meta_key LIKE %s',
+            $current_prefix,
+            $new_prefix,
+            $wpdb->esc_like( $current_prefix ) . '%'
+        ) );
+
+        // Rewrite $table_prefix in wp-config.php
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+        $cfg     = file_get_contents( $cfg_file );
+        $new_cfg = preg_replace(
+            '/\$table_prefix\s*=\s*[\'"]wp_[\'"]\s*;/',
+            "\$table_prefix = '" . $new_prefix . "';",
+            $cfg
+        );
+
+        if ( $new_cfg === null || $new_cfg === $cfg ) {
+            foreach ( $renamed as $pair ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( 'RENAME TABLE `' . esc_sql( $pair['to'] ) . '` TO `' . esc_sql( $pair['from'] ) . '`' );
+            }
+            wp_send_json_error( 'Could not update $table_prefix in wp-config.php. Migration rolled back.' );
+            return;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+        if ( file_put_contents( $cfg_file, $new_cfg ) === false ) {
+            foreach ( $renamed as $pair ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( 'RENAME TABLE `' . esc_sql( $pair['to'] ) . '` TO `' . esc_sql( $pair['from'] ) . '`' );
+            }
+            wp_send_json_error( 'Could not write wp-config.php. Migration rolled back.' );
+            return;
+        }
+
+        delete_transient( 'csdt_db_prefix_proposed' );
+
+        wp_send_json_success( [
+            'new_prefix'     => $new_prefix,
+            'tables_renamed' => count( $renamed ),
+            'message'        => 'Success! Renamed ' . count( $renamed ) . ' tables to prefix "' . $new_prefix . '" and updated wp-config.php.',
+        ] );
     }
 
     public static function ajax_vuln_save_key(): void {

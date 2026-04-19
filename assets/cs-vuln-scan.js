@@ -620,6 +620,10 @@
             html += '</div>';
             if (isFixed) {
                 html += '<div style="flex-shrink:0;"><span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed ✓</span></div>';
+            } else if (fix.fix_modal) {
+                html += '<div style="flex-shrink:0;">';
+                html += '<button type="button" class="cs-btn-primary cs-btn-sm" onclick="document.getElementById(\'' + escHtml(fix.fix_modal) + '\').style.display=\'flex\';" style="white-space:nowrap;">' + escHtml(fix.fix_label) + '</button>';
+                html += '</div>';
             } else {
                 html += '<div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">';
                 html += '<button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.id) + '" style="white-space:nowrap;">' + escHtml(fix.fix_label) + '</button>';
@@ -837,4 +841,141 @@
             offset += ctx.measureText(item.label).width + 28;
         });
     }
+
+    // ── DB Prefix Migration Modal ────────────────────────────────────────
+
+    (function () {
+        var modal       = document.getElementById('csdt-db-prefix-modal');
+        if (!modal) { return; }
+
+        var step1       = document.getElementById('csdt-dbp-step1');
+        var step2       = document.getElementById('csdt-dbp-step2');
+        var step3       = document.getElementById('csdt-dbp-step3');
+        var backupOk    = document.getElementById('csdt-dbp-backup-ok');
+        var preflightBtn= document.getElementById('csdt-dbp-preflight-btn');
+        var preflightOut= document.getElementById('csdt-dbp-preflight-out');
+        var backBtn     = document.getElementById('csdt-dbp-back-btn');
+        var migrateBtn  = document.getElementById('csdt-dbp-migrate-btn');
+        var resultOut   = document.getElementById('csdt-dbp-result-out');
+        var closeBtn    = document.getElementById('csdt-dbp-close');
+
+        function closeModal() {
+            modal.style.display = 'none';
+            // Reset to step 1
+            step1.style.display = '';
+            step2.style.display = 'none';
+            step3.style.display = 'none';
+            backupOk.checked = false;
+            preflightBtn.disabled = true;
+            preflightBtn.style.opacity = '.5';
+            preflightOut.innerHTML = '';
+            resultOut.innerHTML = '';
+            migrateBtn.disabled = false;
+        }
+
+        closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) { closeModal(); }
+        });
+
+        backupOk.addEventListener('change', function () {
+            preflightBtn.disabled = !this.checked;
+            preflightBtn.style.opacity = this.checked ? '1' : '.5';
+        });
+
+        preflightBtn.addEventListener('click', function () {
+            preflightBtn.disabled = true;
+            preflightBtn.textContent = 'Checking…';
+            post('csdt_db_prefix_preflight', {})
+                .then(function (res) {
+                    preflightBtn.textContent = 'Next: Pre-flight check →';
+                    if (!res.success) {
+                        preflightOut.innerHTML = '<span style="color:#dc2626;">✕ ' + escHtml(res.data || 'Pre-flight failed.') + '</span>';
+                        step1.style.display = 'none';
+                        step2.style.display = '';
+                        migrateBtn.disabled = true;
+                        return;
+                    }
+                    var d = res.data;
+                    var html = '<strong>Pre-flight results:</strong><br><br>';
+                    html += '• Current prefix: <code style="background:#e4e6ea;padding:1px 4px;border-radius:3px;">' + escHtml(d.current_prefix) + '</code><br>';
+                    html += '• New prefix: <code style="background:#e4e6ea;padding:1px 4px;border-radius:3px;">' + escHtml(d.new_prefix) + '</code><br>';
+                    html += '• Tables to rename: <strong>' + d.table_count + '</strong><br>';
+                    html += '• wp-config.php writable: ' + (d.cfg_writable ? '<span style="color:#16a34a;">✓ Yes</span>' : '<span style="color:#dc2626;">✕ No — fix permissions first</span>') + '<br>';
+                    if (d.tables && d.tables.length) {
+                        html += '<details style="margin-top:8px;"><summary style="cursor:pointer;color:#1e6fd9;font-size:12px;">View ' + d.tables.length + ' tables</summary>';
+                        html += '<div style="margin-top:6px;font-size:11px;color:#50575e;max-height:120px;overflow-y:auto;">' + d.tables.map(function(t){ return escHtml(t); }).join('<br>') + '</div></details>';
+                    }
+                    preflightOut.innerHTML = html;
+                    step1.style.display = 'none';
+                    step2.style.display = '';
+                    migrateBtn.disabled = !d.cfg_writable;
+                })
+                .catch(function () {
+                    preflightBtn.disabled = false;
+                    preflightBtn.textContent = 'Next: Pre-flight check →';
+                    preflightOut.innerHTML = '<span style="color:#dc2626;">Request failed — please try again.</span>';
+                    step1.style.display = 'none';
+                    step2.style.display = '';
+                    migrateBtn.disabled = true;
+                });
+        });
+
+        backBtn.addEventListener('click', function () {
+            step2.style.display = 'none';
+            step1.style.display = '';
+            preflightBtn.disabled = !backupOk.checked;
+            preflightBtn.style.opacity = backupOk.checked ? '1' : '.5';
+            preflightBtn.textContent = 'Next: Pre-flight check →';
+        });
+
+        migrateBtn.addEventListener('click', function () {
+            if (!confirm('This will rename all wp_ tables to a new prefix. This cannot be automatically reversed. Proceed?')) {
+                return;
+            }
+            migrateBtn.disabled = true;
+            migrateBtn.textContent = 'Renaming tables…';
+            post('csdt_db_prefix_migrate', {})
+                .then(function (res) {
+                    step2.style.display = 'none';
+                    step3.style.display = '';
+                    if (res.success) {
+                        resultOut.innerHTML =
+                            '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:14px 16px;">' +
+                            '<p style="margin:0 0 6px;font-weight:700;color:#15803d;font-size:14px;">✓ Migration complete</p>' +
+                            '<p style="margin:0 0 8px;font-size:13px;color:#166534;">' + escHtml(res.data.message) + '</p>' +
+                            '<p style="margin:0;font-size:13px;color:#166534;font-weight:600;">⚠ Your session has been invalidated — please log in again.</p>' +
+                            '</div>' +
+                            '<div style="margin-top:12px;"><button class="cs-btn-primary" onclick="window.location.reload()">Reload page</button></div>';
+                    } else {
+                        resultOut.innerHTML =
+                            '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:14px 16px;">' +
+                            '<p style="margin:0 0 6px;font-weight:700;color:#dc2626;font-size:14px;">✕ Migration failed</p>' +
+                            '<p style="margin:0;font-size:13px;color:#991b1b;">' + escHtml(res.data || 'Unknown error') + '</p>' +
+                            '</div>' +
+                            '<div style="margin-top:12px;"><button class="cs-btn-secondary" id="csdt-dbp-retry-btn">← Go Back</button></div>';
+                        var retryBtn = document.getElementById('csdt-dbp-retry-btn');
+                        if (retryBtn) {
+                            retryBtn.addEventListener('click', function () {
+                                step3.style.display = 'none';
+                                step1.style.display = '';
+                                backupOk.checked = false;
+                                preflightBtn.disabled = true;
+                                preflightBtn.style.opacity = '.5';
+                            });
+                        }
+                    }
+                })
+                .catch(function () {
+                    step2.style.display = 'none';
+                    step3.style.display = '';
+                    resultOut.innerHTML =
+                        '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:14px 16px;">' +
+                        '<p style="margin:0 0 6px;font-weight:700;color:#dc2626;">✕ Request failed</p>' +
+                        '<p style="margin:0;font-size:13px;color:#991b1b;">Network error — please check your connection and try again.</p>' +
+                        '</div>';
+                });
+        });
+    }());
+
 })();
