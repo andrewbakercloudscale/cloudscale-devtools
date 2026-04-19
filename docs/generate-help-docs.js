@@ -35,6 +35,7 @@ helpLib.run({
     adminUrl:   `${process.env.WP_BASE_URL}/wp-admin/tools.php?page=cloudscale-devtools`,
 
     pluginFile: `${__dirname}/../cs-code-block.php`,
+    logoUrl:    'https://andrewbaker.ninja/wp-content/uploads/2026/04/CloudScaleCyber.jpeg',
 
     pluginIntro: `
 
