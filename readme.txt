@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.115
+Stable tag: 1.9.116
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,17 +12,20 @@ AI-powered WordPress security audit, one-click hardening fixes, server log viewe
 
 == Description ==
 
-CloudScale Cyber and Devtools is a free, zero-dependency WordPress developer and security toolkit. The centrepiece is an **AI Cyber Audit** that uses frontier AI models (Anthropic Claude or Google Gemini) to perform deep security analysis of your WordPress installation and deliver prioritised, actionable findings — the kind of analysis that would normally cost hundreds of dollars from a security consultant, in under 60 seconds.
+CloudScale Cyber and Devtools is a free, open-source WordPress developer and security toolkit. The centrepiece is an **AI Cyber Audit** powered by the world's most capable AI models — **Anthropic Claude (Sonnet and Opus 4)** and **Google Gemini (Flash and 2.5 Pro)** — performing deep security analysis of your WordPress installation and delivering prioritised, actionable findings — the kind of analysis that would normally cost hundreds of dollars from a security consultant, in under 60 seconds.
 
 = Security Features =
 
 * **AI Cyber Audit** — fast scan of WordPress config, plugins, users, file permissions, and wp-config.php hardening constants
 * **AI Deep Dive Cyber Audit** — extends the fast scan with live HTTP probes, DNS checks (SPF, DMARC, DKIM), weak TLS detection, PHP end-of-life status, directory listing checks, plugin code static analysis, and AI-powered code triage
-* **Quick Fixes** — one-click automated remediations: move debug.log outside the web root, disable XML-RPC, hide WP version, disable application passwords, disable directory browsing
+* **AI Cyber Audit** — fast scan of WordPress config, plugins, users, file permissions, and wp-config.php hardening constants; SSH brute-force protection detected and marked critical
+* **AI Deep Dive Cyber Audit** — extends the fast scan with live HTTP probes, DNS checks (SPF, DMARC, DKIM), weak TLS detection, PHP end-of-life status, directory listing checks, plugin code static analysis, and AI-powered code triage
+* **Quick Fixes** — one-click automated remediations: move debug.log outside the web root, disable XML-RPC, hide WP version, disable application passwords, disable directory browsing, rename database prefix, install fail2ban SSH protection
+* **SSH Brute-Force Monitor** — reads /var/log/auth.log every 60 seconds; alerts via email and ntfy.sh push if 10+ failures detected in 60 seconds; configurable threshold; on by default
 * **Scan History** — last 10 results saved automatically; click any entry to reload the full report
 * **Scheduled Scans** — daily or weekly background scans with email and ntfy.sh push notifications
 * **AI Code Triage** — static findings classified as Confirmed / False Positive / Needs Context before main AI analysis
-* **Server Logs** — read-only browser viewer for PHP error log, WordPress debug log, and web server logs with live search, level filter, and auto-refresh tail mode
+* **Server Logs** — read-only browser viewer for PHP error log, WordPress debug log, web server logs, and SSH auth log with live search, level filter, and auto-refresh tail mode
 * **Brute-Force Protection** — per-username account lockout after N failed logins
 * **Hide Login URL** — moves /wp-login.php to a custom slug
 * **Two-Factor Authentication** — email code, TOTP (authenticator app), and passkeys
@@ -81,6 +84,14 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 5. SQL Query Tool with quick queries and paginated results
 
 == Changelog ==
+
+= 1.9.116 =
+* feat: SSH Brute-Force Monitor — WP-Cron reads /var/log/auth.log every 60 seconds, alerts via email + ntfy.sh push when ≥10 failures detected in 60 seconds; throttled to one alert per 5 minutes; configurable threshold; enabled by default
+* feat: SSH auth log added as a source in the Server Logs tab (auto-detected at /var/log/auth.log and /var/log/secure)
+* feat: Quick Fixes — SSH brute-force protection row shows fail2ban install/running state and live failure count; "Copy fail2ban config" modal with ready-to-paste jail.local
+* feat: AI Cyber Audit (standard and deep dive) now probes SSH port, reads sshd_config, and marks unprotected SSH as CRITICAL — unprotected SSH is actively recruited into DDoS botnets
+* feat: Database prefix rename — Quick Fixes "Fix Prefix…" button opens a guided modal: backup warning → pre-flight check → rename all wp_ tables and rewrite wp-config.php; rollback on failure
+* fix: login slug removed from hardcoded references in cs-perf-monitor.js and tests — now read dynamically from settings; help page screenshot scrubbed of real slug
 
 = 1.9.107 =
 * feat: Home dashboard tab — security summary cards showing AI setup status, last scan score (critical/high counts), quick fixes resolved, and login security posture

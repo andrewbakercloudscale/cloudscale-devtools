@@ -1411,7 +1411,7 @@
             steps: [
                 'Identify the attacking IP: check Cloudflare → Security → Events, or your server access log.',
                 'Block the IP in Cloudflare: Security → WAF → Tools → IP Access Rules → Block.',
-                'Add a Cloudflare rate-limit rule: more than 5 POST requests to <code>/cleanshirt</code> within 60 seconds → Block.',
+                'Add a Cloudflare rate-limit rule: more than 5 POST requests to <code>' + ( data.meta && data.meta.login_slug ? '/' + data.meta.login_slug : '/wp-login.php' ) + '</code> within 60 seconds → Block.',
                 'Enable 2FA on all admin accounts — this plugin\'s 2FA makes stolen passwords useless.',
                 'The counter shown resets every hour — high 24h counts with a low 1h count means a slow, spread-out attack.'
             ]

@@ -11,7 +11,8 @@ const { execSync: exec } = require('child_process');
 const path = require('path');
 const fs   = require('fs');
 
-const SITE       = process.env.WP_SITE       || 'https://andrewbaker.ninja';
+const SITE       = process.env.WP_SITE        || 'https://andrewbaker.ninja';
+const LOGIN_SLUG = process.env.WP_LOGIN_SLUG  || 'wp-login.php';
 const AUTH_FILE  = path.join(__dirname, '.auth', 'dw-test-admin.json');
 
 // Placeholder so test.use({ storageState }) doesn't fail before beforeAll runs
@@ -43,7 +44,7 @@ test.describe('Dashboard security widget', () => {
         fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
         const ctx  = await browser.newContext();
         const page = await ctx.newPage();
-        await page.goto(`${SITE}/cleanshirt`);
+        await page.goto(`${SITE}/${LOGIN_SLUG}`);
         await page.fill('#user_login', 'dw_test_admin');
         await page.fill('#user_pass',  'DWTest2026!');
         await page.click('#wp-submit');

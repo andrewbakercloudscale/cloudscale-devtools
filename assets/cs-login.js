@@ -478,6 +478,31 @@
         } );
     }
 
+    // ── SSH Monitor save ─────────────────────────────────────────────────
+
+    const sshMonSaveBtn = document.getElementById( 'cs-ssh-mon-save' );
+    const sshMonSaved   = document.getElementById( 'cs-ssh-mon-saved' );
+
+    if ( sshMonSaveBtn ) {
+        sshMonSaveBtn.addEventListener( 'click', () => {
+            sshMonSaveBtn.disabled = true;
+            post( 'csdt_ssh_monitor_save', {
+                enabled:   document.getElementById( 'cs-ssh-mon-enabled' )?.checked ? '1' : '0',
+                threshold: document.getElementById( 'cs-ssh-mon-threshold' )?.value || '10',
+            } ).then( res => {
+                sshMonSaveBtn.disabled = false;
+                if ( res.success ) {
+                    flash( sshMonSaved, true );
+                } else {
+                    alert( res.data || 'Save failed.' );
+                }
+            } ).catch( () => {
+                sshMonSaveBtn.disabled = false;
+                alert( 'Save failed. Check your connection.' );
+            } );
+        } );
+    }
+
     // ── Slug live preview ─────────────────────────────────────────────────
 
     const slugInput = document.getElementById( 'cs-login-slug' );

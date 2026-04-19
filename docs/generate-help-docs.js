@@ -9,7 +9,25 @@ helpLib.run({
     docsDir:    process.env.WP_DOCS_DIR,
 
     pluginName: 'CloudScale Cyber and Devtools',
-    pluginDesc: 'AI-powered WordPress security auditing using Claude and Gemini, one-click hardening, login security, server logs, syntax-highlighted code blocks, SQL tool, and a site performance monitor — completely free.',
+    pluginDesc: 'Free WordPress security plugin — AI cyber audit using Claude &amp; Gemini, two-factor authentication, passkeys, login URL protection, one-click hardening, server logs, and code blocks.',
+    seoTitle:  'CloudScale Cyber & Devtools | Free WordPress Security Plugin',
+    seoDesc:   'Free WordPress security plugin with AI cyber audit (Claude & Gemini), 2FA, passkeys, one-click hardening, server logs, and code blocks. No subscription.',
+
+    schema: {
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        'name': 'CloudScale Cyber and Devtools',
+        'applicationCategory': 'SecurityApplication',
+        'operatingSystem': 'WordPress',
+        'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        'description': 'Free WordPress security plugin powered by Anthropic Claude and Google Gemini AI. Features: AI cyber audit, two-factor authentication, passkeys (WebAuthn), hide login URL, brute-force protection, CSP builder, server logs, SQL tool, and syntax-highlighted code blocks.',
+        'url': 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-cyber-devtools-help/',
+        'downloadUrl': 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
+        'softwareVersion': '1.9.116',
+        'author': { '@type': 'Person', 'name': 'Andrew Baker', 'url': 'https://andrewbaker.ninja' },
+        'isAccessibleForFree': true,
+        'license': 'https://www.gnu.org/licenses/gpl-2.0.html',
+    },
     pageTitle:  'CloudScale Cyber and Devtools',
     pageSlug:   'cloudscale-cyber-devtools-help',
     downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
@@ -70,10 +88,20 @@ helpLib.run({
 </div>`,
 
     sections: [
-        { id: 'hide-login', label: 'Hide Login URL',        file: 'panel-hide-login.png',  tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-hide-login' },
-        { id: '2fa',        label: 'Two-Factor Auth',       file: 'panel-2fa.png',         tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-2fa' },
-        { id: 'passkeys',   label: 'Passkeys (WebAuthn)',   file: 'panel-passkeys.png',    tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-passkeys' },
+        { id: 'hide-login', label: 'Hide Login URL',        file: 'panel-hide-login.png',  tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-hide-login',
+          altText: 'WordPress Hide Login URL settings — move wp-login.php to a secret URL to block bot attacks',
+          jsBeforeShot: () => {
+            var s = document.getElementById('cs-login-slug');
+            if (s) s.value = 'your-secret-slug';
+            var u = document.getElementById('cs-current-login-url');
+            if (u) u.textContent = window.location.origin + '/your-secret-slug/';
+          } },
+        { id: '2fa',        label: 'Two-Factor Auth',       file: 'panel-2fa.png',         tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-2fa',
+          altText: 'WordPress two-factor authentication settings — email OTP, TOTP authenticator app, and passkeys' },
+        { id: 'passkeys',   label: 'Passkeys (WebAuthn)',   file: 'panel-passkeys.png',    tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-passkeys',
+          altText: 'WordPress passkeys WebAuthn registration — Face ID, Touch ID and hardware security key login' },
         { id: 'security',   label: 'AI Cyber Audit',        file: 'panel-security.png',    tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-vuln-results',
+          altText: 'WordPress AI security audit result — score 100/100 with Claude 4 and Gemini 2.5 Pro, free security plugin',
           jsBeforeShot: () => {
             // Inject demo data: score 100, no real findings
             var r = document.getElementById('cs-vuln-results');
@@ -120,10 +148,14 @@ helpLib.run({
             });
           }
         },
-        { id: 'code-block', label: 'Code Block',             file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings' },
-        { id: 'migrator',   label: 'Code Block Migrator',   file: 'panel-migrator.png',    tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-migrator' },
-        { id: 'sql-tool',   label: 'SQL Query Tool',        file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=sql"]',     elementSelector: '#cs-panel-sql' },
-        { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=logs"]',    elementSelector: '#cs-panel-logs' },
+        { id: 'code-block', label: 'Code Block',             file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings',
+          altText: 'WordPress syntax-highlighted code block settings — 190 languages, 14 themes, no CDN, completely free' },
+        { id: 'migrator',   label: 'Code Block Migrator',   file: 'panel-migrator.png',    tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-migrator',
+          altText: 'WordPress code block migrator — batch convert from Enlighter, SyntaxHighlighter, and other plugins' },
+        { id: 'sql-tool',   label: 'SQL Query Tool',        file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=sql"]',     elementSelector: '#cs-panel-sql',
+          altText: 'WordPress read-only SQL query tool — safe database inspection inside wp-admin without phpMyAdmin' },
+        { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=logs"]',    elementSelector: '#cs-panel-logs',
+          altText: 'WordPress server log viewer — PHP error logs, debug logs, and web server logs without SSH access' },
     ],
 
     docs: {
