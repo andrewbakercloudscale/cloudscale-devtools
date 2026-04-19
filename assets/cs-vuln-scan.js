@@ -612,9 +612,9 @@
             var isFixed = !!fix.fixed;
             var bg     = isFixed ? 'rgba(0,0,0,0.02)' : '#fff';
             var border = isFixed ? 'rgba(0,0,0,0.07)'  : 'rgba(0,0,0,0.12)';
-            html += '<div class="cs-quick-fix-row" data-fix-id="' + escHtml(fix.id) + '" style="display:flex;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px;background:' + bg + ';border-radius:6px;border:1px solid ' + border + ';">';
-            html += '<div style="flex-shrink:0;font-size:16px;line-height:1;">' + (isFixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>') + '</div>';
-            html += '<div style="flex:1;min-width:0;">';
+            html += '<div class="cs-quick-fix-row" data-fix-id="' + escHtml(fix.id) + '" style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 12px;padding:10px 14px;margin-bottom:6px;background:' + bg + ';border-radius:6px;border:1px solid ' + border + ';">';
+            html += '<div style="flex-shrink:0;font-size:16px;line-height:1.6;">' + (isFixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>') + '</div>';
+            html += '<div style="flex:1;min-width:120px;">';
             html += '<div style="font-size:13px;font-weight:600;color:' + (isFixed ? '#6b7280' : '#1d2327') + ';">' + escHtml(fix.title) + '</div>';
             html += '<div style="font-size:12px;color:#50575e;margin-top:2px;">' + escHtml(fix.detail) + '</div>';
             html += '</div>';
@@ -625,7 +625,7 @@
                 html += '<button type="button" class="cs-btn-primary cs-btn-sm" onclick="document.getElementById(\'' + escHtml(fix.fix_modal) + '\').style.display=\'flex\';" style="white-space:nowrap;">' + escHtml(fix.fix_label) + '</button>';
                 html += '</div>';
             } else {
-                html += '<div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">';
+                html += '<div style="flex-shrink:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto;">';
                 html += '<button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.id) + '" style="white-space:nowrap;">' + escHtml(fix.fix_label) + '</button>';
                 if (fix.dismiss_label && fix.dismiss_id) {
                     html += '<button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.dismiss_id) + '" style="white-space:nowrap;font-size:11px;">' + escHtml(fix.dismiss_label) + '</button>';
