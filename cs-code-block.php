@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.120
+ * Version: 1.9.121
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -10310,13 +10310,13 @@ class CloudScale_DevTools {
                 <?php foreach ( self::get_quick_fixes() as $fix ) :
                     $is_fixed = (bool) $fix['fixed'];
                 ?>
-                    <div class="cs-quick-fix-row" data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>" style="display:flex;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px;background:<?php echo $is_fixed ? 'rgba(0,0,0,0.02)' : '#fff'; ?>;border-radius:6px;border:1px solid <?php echo $is_fixed ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.12)'; ?>;">
-                        <div style="flex-shrink:0;font-size:16px;line-height:1;"><?php echo $is_fixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>'; ?></div>
-                        <div style="flex:1;min-width:0;">
+                    <div class="cs-quick-fix-row" data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>" style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 12px;padding:10px 14px;margin-bottom:6px;background:<?php echo $is_fixed ? 'rgba(0,0,0,0.02)' : '#fff'; ?>;border-radius:6px;border:1px solid <?php echo $is_fixed ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.12)'; ?>;">
+                        <div style="flex-shrink:0;font-size:16px;line-height:1.6;"><?php echo $is_fixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>'; ?></div>
+                        <div style="flex:1;min-width:120px;">
                             <div style="font-size:13px;font-weight:600;color:<?php echo $is_fixed ? '#6b7280' : '#1d2327'; ?>;"><?php echo esc_html( $fix['title'] ); ?></div>
                             <div style="font-size:12px;color:#50575e;margin-top:2px;"><?php echo esc_html( $fix['detail'] ); ?></div>
                         </div>
-                        <div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">
+                        <div style="flex-shrink:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto;">
                         <?php if ( $is_fixed ) : ?>
                             <span style="font-size:12px;color:#16a34a;font-weight:600;">Fixed ✓</span>
                         <?php elseif ( ! empty( $fix['fix_modal'] ) ) : ?>
