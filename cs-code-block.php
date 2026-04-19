@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.112
+ * Version: 1.9.113
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.112';
+    const VERSION      = '1.9.113';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9178,7 +9178,7 @@ class CloudScale_DevTools {
                         .then(function(resp){
                         saveBtn.disabled = false;
                         if (savedMsg) { savedMsg.style.display = 'inline'; setTimeout(function(){ savedMsg.style.display = 'none'; }, 2500); }
-                        // Show rollback button if one wasn't already visible.
+                        // Create or update rollback button with fresh timestamp.
                         if (resp && resp.data && resp.data.has_backup) {
                             var rb = document.getElementById('cs-csp-rollback-btn');
                             if (!rb) {
@@ -9187,10 +9187,10 @@ class CloudScale_DevTools {
                                 rb.type = 'button';
                                 rb.className = 'cs-btn-secondary cs-btn-sm';
                                 rb.style.cssText = 'border-color:#f87171;color:#dc2626;';
-                                rb.textContent = '↩ Rollback to previous settings';
                                 saveBtn.parentNode.insertBefore(rb, saveBtn.nextSibling);
                                 wireRollback(rb);
                             }
+                            rb.innerHTML = '↩ <?php echo esc_js( __( 'Rollback to previous settings', 'cloudscale-devtools' ) ); ?> <span style="font-weight:400;font-size:11px;opacity:.8;">(just now)</span>';
                         }
                     })
                     .catch(function(){ saveBtn.disabled = false; });
