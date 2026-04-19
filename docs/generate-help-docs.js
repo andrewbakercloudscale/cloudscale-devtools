@@ -127,154 +127,137 @@ helpLib.run({
     ],
 
     docs: {
-        'security': `
-<div style="background:#fff5f5;border-left:4px solid #c0392b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
-<h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🛡️ AI Cyber Audit</h2>
-<p style="margin:0 0 10px;">The centrepiece of CloudScale Cyber and Devtools. Powered by the world's most advanced AI — <strong>Anthropic Claude 4 (Sonnet &amp; Opus)</strong> and <strong>Google Gemini 2.5 Pro</strong> — these are the same frontier models used by enterprise security teams. Point them at your WordPress site and get a scored, prioritised security report in under 60 seconds: the kind of analysis that would cost hundreds of dollars from a consultant.</p>
-<p style="margin:0;"><strong>Completely free.</strong> You supply your own API key. A free Gemini tier is available with no credit card required.</p>
-</div>
-<p><strong>Standard Scan</strong> checks your WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php hardening constants. Results are sent to an AI model which prioritises findings by severity and gives you specific remediation steps.</p>
-<p><strong>Deep Dive Scan</strong> extends the standard scan with:</p>
-<ul>
-<li>Static PHP code analysis of all active plugins — flags <code>eval</code>, shell functions, obfuscation patterns, and suspicious code</li>
-<li>Live HTTP probes — open directory listing, weak TLS protocols, CORS headers, server version header leaks</li>
-<li>DNS checks — SPF strictness, DMARC policy strength, DKIM selector probes (all gated on MX record presence so non-email domains don't get false positives)</li>
-<li>CSP quality analysis — flags <code>unsafe-inline</code>, <code>unsafe-eval</code>, wildcard sources, missing <code>default-src</code></li>
-<li>HSTS quality — validates <code>max-age ≥ 31536000</code> and <code>includeSubDomains</code></li>
-<li>PHP end-of-life status, inactive plugins on disk, WordPress auto-update settings, and <code>display_errors</code> exposure</li>
-<li>AI Code Triage — the top 10 highest-risk static findings are sent to AI with surrounding code context; each is classified as Confirmed / False Positive / Needs Context before the main audit</li>
-</ul>
-<p><strong>Quick Fixes</strong> are one-click automated remediations shown at the top of the panel. Each fix shows its current status — green tick means done, grey means it still needs attention.</p>
-<p><strong>Scan History</strong> saves the last 10 results automatically. Click any entry to reload the full report — useful for tracking your security posture over time.</p>
-<p><strong>Scheduled Scans</strong> run automatically on a daily or weekly schedule. Enable email alerts to receive the AI summary in your inbox when a scan completes.</p>
-<p><strong>AI Providers:</strong></p>
-<ul>
-<li><strong>Anthropic Claude</strong> (recommended) — get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>. Models: claude-sonnet-4-6 (fast) · claude-opus-4-7 (most capable)</li>
-<li><strong>Google Gemini</strong> (free tier available) — get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a>. Models: gemini-2.0-flash (free tier) · gemini-2.5-pro (most capable)</li>
-</ul>`,
-
-        'server-logs': `
-<p>The <strong>Server Logs</strong> viewer lets you read PHP error logs, WordPress debug logs, and web server access/error logs directly in the browser — no SSH access required.</p>
-<p><strong>Features:</strong></p>
-<ul>
-<li><strong>Source picker</strong> — lists all available log sources with availability indicators: readable, not found, permission denied, or empty. Switch between sources with a single click.</li>
-<li><strong>Live search</strong> — filter log entries in real time as you type. Matches are highlighted.</li>
-<li><strong>Severity filter</strong> — filter by log level from Emergency down to Debug. Useful for cutting through noise on busy sites.</li>
-<li><strong>Configurable line count</strong> — choose how many lines to load (50 to 5,000).</li>
-<li><strong>Auto-refresh tail mode</strong> — refreshes the log every 30 seconds, showing new entries at the bottom. Useful for watching errors in real time while reproducing a bug.</li>
-<li><strong>Custom log paths</strong> — add any additional log file paths (e.g. Nginx error log, custom application log). Custom paths persist across sessions.</li>
-<li><strong>One-click PHP error log setup</strong> — if PHP error logging is not configured, a button appears to enable it automatically by writing the required <code>php.ini</code> directives.</li>
-</ul>
-<p><strong>Access:</strong> Restricted to users with the <code>manage_options</code> capability (Administrators only). Log content is read-only — no write operations are possible from this panel.</p>`,
-
         'hide-login': `
-<p>The <strong>Hide Login URL</strong> feature moves your WordPress login page away from the default <code>/wp-login.php</code> address to a secret URL of your choosing. Bots and automated scanners that probe <code>/wp-login.php</code> receive a 404 response — they never see the login form, which eliminates the vast majority of brute-force and credential-stuffing traffic.</p>
-<p><strong>How it works:</strong></p>
-<ul>
-<li>When enabled, a custom WordPress <code>init</code> hook (priority 1) intercepts requests to your chosen slug and serves <code>wp-login.php</code> transparently, so the login form loads correctly at the new URL without any redirect.</li>
-<li>Direct requests to <code>/wp-login.php</code> are blocked by a <code>login_init</code> hook and return a 404.</li>
-<li>The <code>wp_login_url()</code>, <code>logout_url()</code>, and <code>lostpassword_url()</code> filters are overridden to always produce your custom URL, so all internal WordPress links (password reset emails, "Back to login" links) continue to work correctly.</li>
-</ul>
-<p><strong>Setup:</strong></p>
+<div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔐 Stop Bots Before They Even See Your Login Page</h2>
+<p style="margin:0 0 10px;color:#374151;">Every WordPress site on the internet is hammered by bots probing <code>/wp-login.php</code> every hour. These aren't targeted attacks — they're automated scanners running 24/7, trying thousands of password combinations. If they can reach your login page, they will keep trying. Hide Login URL makes your login page invisible to them: bots get a 404 and move on. No login form means no brute-force attack.</p>
+<p style="margin:0;color:#374151;"><strong>Competing plugins charge $49–$99/year</strong> for this feature (iThemes Security Pro, All-in-One Security Premium). CloudScale includes it free, bundled with 2FA and Passkeys in the same plugin — no juggling three separate security plugins.</p>
+</div>
+<p>When enabled, a WordPress <code>init</code> hook (priority 1) intercepts requests to your chosen secret slug and serves the login form transparently — no redirect, no URL change, the form just loads. Direct requests to <code>/wp-login.php</code> return a clean 404. All internal WordPress links (password reset emails, logout URLs) automatically update to use your secret URL.</p>
+<p><strong>Setup takes 30 seconds:</strong></p>
 <ol>
 <li>Toggle <em>Enable Hide Login</em> on.</li>
-<li>Enter a slug in <em>Custom Login Path</em> — letters, numbers, and hyphens only (e.g. <code>my-secret-login</code>). Avoid obvious words like <code>login</code>, <code>admin</code>, or <code>dashboard</code>.</li>
-<li>Click <em>Save Hide Login Settings</em>.</li>
-<li><strong>Immediately note the new URL</strong> shown after saving. If you lose it, you can recover access via WP-CLI: <code>wp option get csdt_devtools_login_slug</code>.</li>
+<li>Enter your secret slug (e.g. <code>team-portal</code>). Avoid <code>login</code>, <code>admin</code>, or <code>dashboard</code> — bots know those too.</li>
+<li>Click <em>Save</em> and bookmark the new URL immediately.</li>
+<li>If you ever lose the URL: <code>wp option get csdt_devtools_login_slug</code> via WP-CLI will retrieve it.</li>
 </ol>
-<p><strong>Compatibility:</strong> WP-CLI, XMLRPC, REST API, and WP Cron are unaffected — they bypass the login URL check entirely.</p>`,
+<p><strong>What stays unaffected:</strong> WP-CLI, XML-RPC, REST API, and WP Cron all bypass the login URL check entirely — nothing breaks.</p>`,
 
         '2fa': `
-<p><strong>Two-Factor Authentication (2FA)</strong> requires users to prove their identity with a second factor — a one-time code — in addition to their password. Even if a password is compromised, an attacker cannot log in without also having access to the second factor.</p>
-<p><strong>Available methods:</strong></p>
+<div style="background:#fdf4ff;border-left:4px solid #9333ea;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔑 A Stolen Password Should Never Be Enough to Break In</h2>
+<p style="margin:0 0 10px;color:#374151;">Passwords get leaked in data breaches, reused across sites, and phished out of users. Two-factor authentication (2FA) means an attacker who has your password still cannot log in — they also need physical access to your phone, email inbox, or hardware key. For WordPress admins, 2FA is the single most effective account protection you can add.</p>
+<p style="margin:0;color:#374151;"><strong>WP 2FA Pro charges $79/year.</strong> Wordfence Premium (which includes 2FA) charges $119/year. CloudScale gives you email OTP, TOTP authenticator apps, and Passkeys — all three methods — completely free, in the same plugin you use for everything else.</p>
+</div>
+<p><strong>Three methods, one plugin:</strong></p>
 <ul>
-<li><strong>Email code</strong> — after a successful password login, a 6-digit code is emailed to the user's account address. The code expires after 10 minutes. No app required.</li>
-<li><strong>Authenticator app (TOTP)</strong> — uses the industry-standard Time-based One-Time Password algorithm (RFC 6238). Users scan a QR code with Google Authenticator, Authy, 1Password, or any compatible app. Works completely offline.</li>
-<li><strong>Passkey</strong> — replaces the code prompt with a biometric check (Face ID, Touch ID, Windows Hello) or hardware security key. The fastest and most phishing-resistant method.</li>
+<li><strong>Email OTP</strong> — a 6-digit code sent to the user's email after login. No app needed. Code expires in 10 minutes. Best for non-technical users.</li>
+<li><strong>Authenticator app (TOTP)</strong> — standard RFC 6238 algorithm. Works with Google Authenticator, Authy, 1Password, Bitwarden, or any TOTP app. Generates a new code every 30 seconds, works offline, immune to email interception.</li>
+<li><strong>Passkey (WebAuthn)</strong> — replaces the code prompt with Face ID, Touch ID, Windows Hello, or a hardware security key. The fastest and most phishing-resistant option available. See the Passkeys section below.</li>
 </ul>
-<p><strong>Site-wide settings:</strong></p>
-<ul>
-<li><em>2FA Method</em> — sets which method is available to users. "Off" disables 2FA entirely.</li>
-<li><em>Force 2FA for all administrators</em> — any administrator who has not configured 2FA will be blocked from the dashboard after login until they complete setup.</li>
-<li><em>Grace logins</em> — configurable number of logins allowed before 2FA is enforced, giving admins time to set up their second factor.</li>
-</ul>
-<p><strong>Brute-Force Protection</strong> locks accounts after N failed login attempts (default: 5 attempts, 5-minute lock). Both thresholds are configurable.</p>
-<p><strong>Session Duration</strong> overrides the WordPress default session length. When set, persistent cookies are used so sessions survive browser close.</p>
-<p><strong>Test Account Manager</strong> creates temporary subscriber accounts with app passwords for Playwright / CI pipelines. Accounts auto-delete on expiry or first use. App passwords are blocked for all non-test accounts.</p>`,
+<p><strong>Admin enforcement:</strong> Enable <em>Force 2FA for administrators</em> and any admin who hasn't configured their second factor gets blocked at the dashboard until they do — they can't skip it. A configurable grace period lets existing admins set up 2FA before enforcement kicks in.</p>
+<p><strong>Brute-Force Protection</strong> is built into the same tab: lock accounts after N failed attempts (default: 5 attempts, 5-minute lockout). Both thresholds are yours to configure.</p>
+<p><strong>Session Duration</strong> lets you override WordPress's default session length. When set, persistent cookies keep sessions alive across browser closes — useful for teams who find constant re-authentication disruptive.</p>`,
 
         'passkeys': `
-<p><strong>Passkeys</strong> are FIDO2/WebAuthn credentials that replace password-based 2FA codes with a biometric or hardware-key verification. When you log in, instead of typing a 6-digit code, you authenticate with Face ID, Touch ID, Windows Hello, or a physical security key (YubiKey, etc.).</p>
-<p><strong>How passkeys work:</strong></p>
-<ul>
-<li>Registration generates a public/private key pair on your device. The private key never leaves your device — only the public key is stored on the server (in WordPress user meta).</li>
-<li>At login, the server sends a random challenge. Your device signs it with the private key. The server verifies the signature against the stored public key. No secret is transmitted over the network.</li>
-<li>Passkeys are bound to the site's domain (Relying Party ID), making them inherently phishing-resistant — a fake domain cannot trigger your real passkey.</li>
-</ul>
+<div style="background:#fff7ed;border-left:4px solid #ea580c;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🪪 The Most Secure WordPress Login Method Available — and It's Free</h2>
+<p style="margin:0 0 10px;color:#374151;">Even TOTP codes can be phished: a fake login page captures your password and OTP code in real time and replays them instantly. Passkeys cannot be phished this way. They are cryptographically bound to your site's exact domain — a fake domain simply cannot trigger your passkey. This is the authentication standard used by Apple, Google, and Microsoft for their own products, now available for your WordPress site at no cost.</p>
+<p style="margin:0;color:#374151;"><strong>Most WordPress passkey plugins don't exist as free products.</strong> The handful that do charge $50–$100/year for a commercial FIDO2 implementation. CloudScale's passkey support is a full WebAuthn/FIDO2 implementation, open-source, and completely free.</p>
+</div>
+<p><strong>How it works:</strong> When you register a passkey, your device generates a public/private key pair. The private key never leaves your device. At login, your server sends a random challenge; your device signs it with the private key; the server verifies the signature against your stored public key. No secret is ever transmitted over the network.</p>
+<p><strong>Supported authenticators:</strong> Face ID (iPhone, iPad, Mac), Touch ID (MacBook), Windows Hello (fingerprint, face, PIN), Android biometrics, and hardware security keys (YubiKey 5 series, Google Titan, etc.).</p>
 <p><strong>Registering a passkey:</strong></p>
 <ol>
-<li>In the <em>Passkeys (WebAuthn)</em> panel, click <em>+ Add Passkey</em>.</li>
-<li>Give the passkey a recognisable label (e.g. "MacBook Pro", "iPhone 16", "YubiKey 5").</li>
-<li>Click <em>Register</em> — your browser will prompt you for biometric verification or to insert a hardware key.</li>
-<li>On success, the passkey appears in the list. Register one passkey per device you want to use for login.</li>
+<li>Click <em>+ Add Passkey</em> and give it a label (e.g. "iPhone 16 Pro", "YubiKey").</li>
+<li>Click <em>Register</em> — your browser prompts for biometric confirmation or hardware key tap.</li>
+<li>The passkey is saved to your account. Register one per device you log in from.</li>
 </ol>
-<p><strong>Using passkeys for login:</strong> In the <em>Two-Factor Authentication</em> settings, set the 2FA method to <em>Passkey</em>. After a successful password login, you will be prompted to verify with your passkey instead of typing a code.</p>
-<p><strong>Browser support:</strong> Chrome 108+, Safari 16+, Edge 108+, Firefox 122+. Older browsers fall back to an email OTP code automatically.</p>
-<p><strong>Testing:</strong> Use the <em>Test</em> button next to each registered passkey to verify it is working correctly without logging out.</p>`,
+<p><strong>Browser support:</strong> Chrome 108+, Safari 16+, Edge 108+, Firefox 122+. If a browser doesn't support passkeys, the login flow falls back to email OTP automatically — no user is ever locked out.</p>`,
 
-        'code-block': `
-<div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
-<h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Why CloudScale Devtools?</h2>
-<p style="margin:0 0 10px;">Popular code highlighting plugins like Enlighter and SyntaxHighlighter load external CDN scripts that add 100–300ms to your page load time. Others charge $30–$50/year for features that should come included.</p>
-<p style="margin:0 0 10px;">CloudScale Devtools bundles everything locally — zero external requests, zero impact on your CDN cache hit rate. Auto language detection, clipboard copy button, dark and light theme toggle, and line numbers all work out of the box.</p>
-<p style="margin:0;"><strong>Completely free.</strong> No premium version, no nag screens, no feature gating.</p>
+        'security': `
+<div style="background:#fff5f5;border-left:4px solid #c0392b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🛡️ A Security Consultant in Your WordPress Dashboard — for Free</h2>
+<p style="margin:0 0 10px;color:#374151;">A professional WordPress security audit costs $500–$5,000 and takes days to schedule. Generic security checklists from free plugins tell you what to check but not what it means for your specific site. CloudScale connects directly to the world's most capable AI models — <strong>Anthropic Claude 4</strong> and <strong>Google Gemini 2.5 Pro</strong> — analyses your entire WordPress installation, and delivers a scored, prioritised report with specific remediation steps in under 60 seconds. The same class of AI used by enterprise security teams, working on your site.</p>
+<p style="margin:0;color:#374151;"><strong>Wordfence Premium costs $119/year. Sucuri costs $199/year. WPScan costs $25–$75/month.</strong> These tools run signature-based scans — they match known patterns against a database. CloudScale's AI audit understands context: it reads your configuration, your plugins, and your code and reasons about what's actually risky for your specific setup. You supply your own API key (free Gemini tier available, no credit card). The plugin itself costs nothing.</p>
 </div>
-<p>The <strong>Code Block</strong> feature is a registered Gutenberg block (<code>cloudscale/code</code>) and a <code>[cs_code]</code> shortcode for displaying syntax-highlighted code in WordPress posts and pages. Syntax highlighting is powered by <strong>highlight.js 11.11.1</strong> bundled locally — no CDN requests.</p>
-<p><strong>Block and shortcode usage:</strong></p>
+<p><strong>Standard Scan</strong> audits WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php hardening constants. The AI scores each finding Critical / High / Medium / Low and gives you specific steps to fix it — not generic advice, but instructions for your exact configuration.</p>
+<p><strong>Deep Dive Scan</strong> adds live probes your site's security team would run manually:</p>
 <ul>
-<li><strong>Gutenberg block</strong> — search for "CloudScale" in the block inserter. Language, theme override, title, and line numbers are configurable in the block sidebar.</li>
-<li><strong>Shortcode:</strong> <code>[cs_code lang="php" title="functions.php"]your code here[/cs_code]</code></li>
+<li><strong>Static PHP code analysis</strong> of every active plugin — flags <code>eval()</code>, shell execution functions, code obfuscation, and suspicious patterns that malware authors use</li>
+<li><strong>Live HTTP probes</strong> — open directory listing, weak TLS (SSLv3, TLS 1.0), CORS misconfigurations, server version header leaks</li>
+<li><strong>DNS security checks</strong> — SPF strictness, DMARC policy strength, DKIM probes (skipped entirely for domains with no MX records — no false positives for non-email sites)</li>
+<li><strong>CSP quality analysis</strong> — flags <code>unsafe-inline</code>, <code>unsafe-eval</code>, wildcard sources, and missing directives in your Content Security Policy</li>
+<li><strong>AI Code Triage</strong> — the 10 highest-risk static findings are sent to the AI with surrounding code context; each is classified as Confirmed Threat / False Positive / Needs Review before the main audit runs</li>
 </ul>
-<p><strong>Features:</strong></p>
+<p><strong>Quick Fixes</strong> appear above the scan results — one-click remediations for the most common misconfigurations. Each shows green (done) or amber (needs attention) at a glance.</p>
+<p><strong>Scheduled Scans</strong> run automatically on a daily or weekly schedule with email alerts when new issues are found — so you know about problems before your users or Google do.</p>
+<p><strong>AI Providers — your choice:</strong></p>
 <ul>
-<li><strong>190+ languages</strong> with auto-detection — override manually via the block sidebar when detection is wrong.</li>
-<li><strong>14 colour themes</strong> — Atom One, GitHub, Monokai, Nord, Dracula, Tokyo Night, VS 2015, VS Code, Stack Overflow, Night Owl, Gruvbox, Solarized, Panda, Shades of Purple. Each theme has dark and light variants; the toggle button switches between them and stores the preference in <code>localStorage</code>.</li>
-<li><strong>Copy to clipboard</strong> — uses the Clipboard API with a fallback for older browsers.</li>
-<li><strong>Line numbers</strong> — rendered via CSS counter so line numbers are not copied when a reader clicks Copy.</li>
-<li><strong>Automatic INI/TOML fragment repair</strong> — Gutenberg splits INI/TOML blocks at bare <code>[section]</code> headers. CloudScale silently merges them back and shows a brief toast notification.</li>
+<li><strong>Anthropic Claude</strong> (recommended for depth) — <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>. Models: claude-sonnet-4-6 (fast) · claude-opus-4-7 (most thorough)</li>
+<li><strong>Google Gemini</strong> (free tier, no credit card) — <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a>. Models: gemini-2.0-flash (free) · gemini-2.5-pro (most capable)</li>
 </ul>`,
 
+        'code-block': `
+<div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">💻 Beautiful Code Blocks — Without Paying $50/Year or Slowing Your Site Down</h2>
+<p style="margin:0 0 10px;color:#374151;">Most WordPress code highlighting plugins have one of two problems: they load scripts from an external CDN (adding 100–300ms to every page load, hurting your Core Web Vitals score, and breaking if the CDN goes down), or they charge $30–$50/year for features that should be free. <strong>Enlighter</strong> loads from their own servers. <strong>SyntaxHighlighter Evolved</strong> loads from WordPress.com's CDN. <strong>Prismatic</strong> charges $29/year for a theme switcher.</p>
+<p style="margin:0;color:#374151;">CloudScale bundles highlight.js 11.11.1 <strong>entirely on your own server</strong> — zero external HTTP requests, zero CDN dependency, zero annual fee. Your pages load faster, your cache hit rates improve, and your syntax highlighting works even when third-party services are down.</p>
+</div>
+<p>The Code Block is a native Gutenberg block (<code>cloudscale/code</code>) and a <code>[cs_code]</code> shortcode. It works everywhere WordPress renders content.</p>
+<p><strong>190+ languages with auto-detection.</strong> CloudScale detects the language automatically from the code content. Override it manually in the block sidebar when detection picks the wrong one.</p>
+<p><strong>14 professional colour themes</strong> — Atom One Dark/Light, GitHub, Monokai, Nord, Dracula, Tokyo Night, VS Code, VS 2015, Stack Overflow, Night Owl, Gruvbox, Solarized, Panda, Shades of Purple. A toggle button switches between dark and light variants, storing the preference in <code>localStorage</code> so it follows the reader across pages.</p>
+<p><strong>Copy to clipboard</strong> — one click. Line numbers are rendered via CSS counter so they are never included when someone copies the code.</p>
+<p><strong>INI/TOML auto-repair</strong> — Gutenberg breaks INI and TOML files at bare <code>[section]</code> headers by treating them as block delimiters. CloudScale detects this silently and reassembles the fragments, showing a brief toast so you know it happened.</p>`,
+
         'migrator': `
-<p>The <strong>Code Block Migrator</strong> converts legacy code block shortcodes and HTML from other WordPress syntax highlighting plugins to CloudScale Devtools blocks in a single batch operation.</p>
+<div style="background:#fefce8;border-left:4px solid #ca8a04;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔄 Switch Plugins Without Touching 100 Posts by Hand</h2>
+<p style="margin:0 0 10px;color:#374151;">Switching code highlighting plugins normally means opening every post, finding the old block or shortcode, deleting it, re-inserting the new one, and republishing — for every single post on your site. On a blog with 100 posts, that's hours of tedious work with plenty of room for mistakes.</p>
+<p style="margin:0;color:#374151;">No other free WordPress plugin offers automated batch migration from multiple source formats with a preview step before committing. CloudScale does it in three clicks: Scan → Preview → Migrate All.</p>
+</div>
+<p>The Migrator scans your database for posts and pages using any supported legacy format, shows you a precise before/after diff, and converts them all to CloudScale blocks in a single operation.</p>
 <p><strong>Supported source formats:</strong></p>
 <ul>
-<li>WordPress core <code>&lt;!-- wp:code --&gt;</code> blocks</li>
-<li>WordPress core <code>&lt;!-- wp:preformatted --&gt;</code> blocks</li>
-<li><code>&lt;!-- wp:code-syntax-block/code --&gt;</code> blocks from Code Syntax Block plugin</li>
-<li>Legacy <code>[code]</code>, <code>[sourcecode]</code>, and similar shortcodes</li>
+<li>WordPress core <code>&lt;!-- wp:code --&gt;</code> and <code>&lt;!-- wp:preformatted --&gt;</code> blocks</li>
+<li>Code Syntax Block plugin (<code>&lt;!-- wp:code-syntax-block/code --&gt;</code>)</li>
+<li>Legacy shortcodes: <code>[code]</code>, <code>[sourcecode]</code>, and common variants</li>
 </ul>
-<p><strong>Migration workflow:</strong></p>
+<p><strong>Workflow:</strong></p>
 <ol>
-<li><strong>Scan</strong> — queries <code>wp_posts</code> for all posts and pages containing supported block patterns. Results show post title, status, date, and block count.</li>
-<li><strong>Preview</strong> — shows a before/after diff of the exact content changes for each post. No database writes at this stage.</li>
-<li><strong>Migrate single</strong> — converts one post at a time.</li>
-<li><strong>Migrate all</strong> — processes every remaining post in a single AJAX request.</li>
+<li><strong>Scan</strong> — finds every post and page with supported blocks. Shows title, status, date, and block count.</li>
+<li><strong>Preview</strong> — shows the exact before/after content diff per post. Nothing is written to the database at this stage.</li>
+<li><strong>Migrate</strong> — convert one post at a time, or migrate everything in a single click.</li>
 </ol>
-<p><strong>Always take a backup before running the migrator.</strong> The conversion modifies <code>post_content</code> directly in the database. There is no undo button.</p>`,
+<p>⚠ The migrator writes directly to <code>post_content</code>. Always take a database backup first — use the CloudScale Backup &amp; Restore plugin for a one-click snapshot before you begin.</p>`,
 
         'sql-tool': `
-<p>The <strong>SQL Query Tool</strong> lets WordPress administrators run read-only SELECT queries against the live database from within wp-admin — without needing phpMyAdmin, Adminer, or SSH access.</p>
-<p><strong>Security model:</strong></p>
+<div style="background:#f8fafc;border-left:4px solid #64748b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🗄️ Query Your Live Database Safely — No phpMyAdmin, No SSH</h2>
+<p style="margin:0 0 10px;color:#374151;">phpMyAdmin is powerful but complex to install securely, and leaving it exposed is a serious vulnerability. Adminer is a single PHP file that attackers actively scan for. Desktop tools like TablePlus require you to open a database port to your laptop. For WordPress administrators who just need to check table sizes, find orphaned data, or troubleshoot a slow query, those options are overkill — or a security liability.</p>
+<p style="margin:0;color:#374151;">CloudScale's SQL tool lives inside wp-admin, accessible only to administrators, and is <strong>read-only by design</strong> — it is architecturally impossible to delete or modify data through it. No separate installation, no open ports, no exposed files.</p>
+</div>
+<p><strong>Read-only enforcement:</strong> Every query passes through <code>is_safe_query()</code> which strips comments, rejects semicolons (blocking statement stacking), blocks <code>INTO OUTFILE</code> and <code>LOAD_FILE</code>, and only permits <code>SELECT</code>, <code>SHOW</code>, <code>DESCRIBE</code>, <code>EXPLAIN</code>. Even if an administrator tries to run a destructive query, it is rejected before reaching the database.</p>
+<p><strong>14 built-in quick queries</strong> cover the most common diagnostic tasks without writing a single line of SQL:</p>
 <ul>
-<li>Access restricted to users with the <code>manage_options</code> capability (Administrators only).</li>
-<li>Every query is validated by <code>is_safe_query()</code>: strips all comments, rejects semicolons (prevents statement stacking), blocks <code>INTO OUTFILE</code> / <code>LOAD_FILE</code>, and only allows <code>SELECT</code>, <code>SHOW</code>, <code>DESCRIBE</code>, <code>DESC</code>, <code>EXPLAIN</code>.</li>
+<li><em>Health &amp; Diagnostics</em> — database status, site options, table sizes and row counts</li>
+<li><em>Content Summary</em> — posts by type and status, latest published content</li>
+<li><em>Bloat &amp; Cleanup</em> — orphaned postmeta, expired transients, revisions, largest autoloaded options (the most common cause of slow WordPress admin)</li>
+<li><em>URL &amp; Migration Helpers</em> — HTTP references (for HTTP→HTTPS migrations), posts with old IP references, posts missing meta descriptions</li>
 </ul>
-<p><strong>14 built-in quick queries</strong> organised into four groups:</p>
-<ul>
-<li><em>Health &amp; Diagnostics</em>: database health check, site identity options, table sizes and row counts.</li>
-<li><em>Content Summary</em>: posts by type and status, site stats, latest 20 published posts.</li>
-<li><em>Bloat &amp; Cleanup</em>: orphaned postmeta, expired transients, revisions/drafts/trash, largest autoloaded options.</li>
-<li><em>URL &amp; Migration Helpers</em>: HTTP references, posts with HTTP GUIDs, old IP references, posts missing meta descriptions.</li>
-</ul>
-<p><strong>Keyboard shortcuts:</strong> <kbd>Enter</kbd> or <kbd>Ctrl+Enter</kbd> runs the query. <kbd>Shift+Enter</kbd> inserts a newline.</p>`,
+<p><strong>Keyboard shortcuts:</strong> <kbd>Enter</kbd> or <kbd>Ctrl+Enter</kbd> runs the query. <kbd>Shift+Enter</kbd> inserts a newline for multi-line queries.</p>`,
+
+        'server-logs': `
+<div style="background:#f0fdf4;border-left:4px solid #15803d;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">📋 Read Your Server Logs Without Leaving WordPress</h2>
+<p style="margin:0 0 10px;color:#374151;">When something breaks on a WordPress site, the answer is almost always in a log file. But accessing logs normally means SSH access (which many hosting plans don't provide), navigating a cPanel file manager, or asking your hosting provider to email you a file. For agency developers, that means waiting. For site owners on shared hosting, that means never seeing the logs at all.</p>
+<p style="margin:0;color:#374151;"><strong>Query Monitor</strong> shows database queries and hooks but not server-level PHP or Nginx/Apache logs. <strong>Debug Bar</strong> only surfaces WP_DEBUG output. Neither replaces direct log access. CloudScale gives you the actual log files — PHP errors, WordPress debug output, and web server logs — in a clean, searchable interface inside wp-admin, with no SSH required.</p>
+</div>
+<p><strong>All your log sources in one place:</strong> The source picker lists every available log file with a live status indicator (readable, not found, permission denied, or empty). Switch between PHP error log, WordPress debug log, and web server access/error logs with a single click.</p>
+<p><strong>Live search</strong> filters entries as you type with highlighted matches — essential for finding a specific error in a log with thousands of lines.</p>
+<p><strong>Severity filter</strong> narrows results to Emergency, Alert, Critical, Error, Warning, Notice, Info, or Debug. Cuts through noise on busy production sites where Info and Debug lines dominate.</p>
+<p><strong>Auto-refresh tail mode</strong> polls for new entries every 30 seconds. Reproduce a bug in one browser tab while watching the log update in real time in another — the fastest way to trace an intermittent error.</p>
+<p><strong>Custom log paths</strong> — add any file path (Nginx error log, a custom application log, a cron output file). Paths persist across sessions.</p>
+<p><strong>One-click PHP error logging setup</strong> — if PHP error logging isn't configured on the server, a button writes the required <code>php.ini</code> directives automatically. No server configuration knowledge required.</p>`,
     },
 }).catch(err => { console.error('ERROR:', err.message); process.exit(1); });
