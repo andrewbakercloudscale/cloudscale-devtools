@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.111
+ * Version: 1.9.112
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.111';
+    const VERSION      = '1.9.112';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9016,17 +9016,32 @@ class CloudScale_DevTools {
             <span>🛡️ <?php esc_html_e( 'Content Security Policy (CSP)', 'cloudscale-devtools' ); ?></span>
             <span class="cs-header-hint"><?php esc_html_e( 'Block unauthorised scripts and resources. Select the services your site uses before enabling.', 'cloudscale-devtools' ); ?></span>
             <?php self::render_explain_btn( 'csp', 'Content Security Policy (CSP)', [
-                [ 'name' => 'What is a CSP?',              'rec' => 'Recommended',  'html' => 'A Content Security Policy is an HTTP header that tells the browser which origins are allowed to load scripts, styles, images, and other resources on your site. If an attacker injects a malicious script (XSS), a strong CSP stops the browser from running it — even if the HTML is compromised. Without a CSP, any injected script executes freely.' ],
-                [ 'name' => 'Enforce vs Report-Only',      'rec' => 'Info',         'html' => '<strong>Enforce</strong> mode sends a <code>Content-Security-Policy</code> header — the browser actively blocks anything not on the allowlist. <strong>Report-Only</strong> sends <code>Content-Security-Policy-Report-Only</code> — the browser still loads everything but logs violations to the console. Use Report-Only first to check nothing breaks, then switch to Enforce.' ],
-                [ 'name' => 'Third-Party Services',        'rec' => 'Critical',     'html' => 'Tick every service your site actually uses. Each checkbox adds the service\'s domains to the relevant CSP directives. <strong>If you enable CSP in Enforce mode without ticking a service you use, the browser will block it</strong> — Google Analytics stops tracking, AdSense ads disappear, Cloudflare scripts fail. Only tick what you genuinely use.' ],
-                [ 'name' => 'Additional Directives',       'rec' => 'Optional',     'html' => 'Advanced field. Any text entered here is appended verbatim to the generated CSP header. Useful for adding directives the UI doesn\'t cover — for example: <code>upgrade-insecure-requests</code> (auto-upgrade HTTP sub-resources to HTTPS) or <code>block-all-mixed-content</code> (block HTTP content on HTTPS pages). Leave blank unless you know what you need.' ],
-                [ 'name' => 'Preview',                     'rec' => 'Info',         'html' => 'Shows the exact CSP header value that will be sent, built from your selections in real time. Review this before saving — copy it into <a href="https://csp-evaluator.withgoogle.com/" target="_blank" rel="noopener">CSP Evaluator</a> to check for weaknesses.' ],
-                [ 'name' => 'Rollback',                    'rec' => 'Info',         'html' => 'Every time you save, the previous configuration is stored. If enabling CSP breaks your site, click <strong>Restore Previous CSP</strong> to revert instantly without needing to disable the plugin or edit the database.' ],
-                [ 'name' => '\'unsafe-inline\' warning',   'rec' => 'Info',         'html' => 'If the AI Cyber Audit flags <code>\'unsafe-inline\'</code> in your CSP, it\'s because some services (including Google Analytics and AdSense) require inline scripts. This is a known trade-off — having <em>any</em> CSP is significantly better than none, even if <code>\'unsafe-inline\'</code> is present. The long-term fix is to refactor those inline scripts to use nonces, but that requires changes to each service\'s embed code.' ],
+                [ 'name' => 'How to set this up (start here)',  'rec' => 'Critical', 'html' => '<ol style="margin:0;padding-left:18px;line-height:2;"><li>Tick every third-party service your site uses (Google Analytics, AdSense, etc.).</li><li>Select <strong>Report-Only</strong> mode.</li><li>Tick <strong>Enable CSP</strong> and click <strong>Save CSP Settings</strong>.</li><li>Browse your site for a few minutes — visit your homepage, a post, and any page with ads or analytics.</li><li>Come back here and check the <strong>Violation Log</strong> that appears below. It will list anything that <em>would</em> have been blocked.</li><li>If the log shows violations for a service you use, tick that service\'s checkbox and save again. Repeat until the log is clean.</li><li>Once the log is empty (or only shows items you don\'t care about), switch to <strong>Enforce</strong> mode and save. Your CSP is now active.</li></ol><p style="margin:10px 0 0;padding:8px 12px;background:#fef9c3;border-radius:4px;font-size:13px;">⚠️ <strong>Never start in Enforce mode</strong> — you may accidentally block your own scripts and break the site.</p>' ],
+                [ 'name' => 'What is a CSP?',               'rec' => 'Info',     'html' => 'A Content Security Policy is an HTTP header that tells the browser which origins are allowed to load scripts, styles, images, and other resources. If an attacker injects a malicious script into your page (XSS), a strong CSP stops the browser from running it. Without a CSP, any injected script executes freely.' ],
+                [ 'name' => 'Report-Only vs Enforce',       'rec' => 'Info',     'html' => '<strong>Report-Only</strong> — the browser loads everything normally but logs what <em>would</em> have been blocked. The Violation Log below captures these reports automatically. Safe to enable immediately.<br><br><strong>Enforce</strong> — the browser actively blocks anything not on the allowlist. Switch to this only after the Violation Log is clean.' ],
+                [ 'name' => 'Third-Party Services',         'rec' => 'Info',     'html' => 'Each checkbox adds that service\'s domains to the CSP allowlist. <strong>Only tick services you actually use.</strong> In Enforce mode, any unticked service will be blocked — Google Analytics stops recording, AdSense ads disappear, Cloudflare scripts fail silently. If you\'re unsure whether you use something, leave it unticked and check the Violation Log.' ],
+                [ 'name' => 'Violation Log',                'rec' => 'Info',     'html' => 'Visible when Report-Only is active. Shows exactly what the browser would block: the blocked resource URL, which CSP directive triggered, and which page of your site caused it. Use this to identify missing services before switching to Enforce. Auto-refreshes every 30 seconds. Click <strong>Clear Log</strong> to reset between test sessions.' ],
+                [ 'name' => 'What if Enforce breaks my site?', 'rec' => 'Info',  'html' => 'Click <strong>Rollback to previous settings</strong> — it appears next to Save after every save. This instantly restores your previous configuration. You can also switch back to Report-Only at any time without any side effects.' ],
+                [ 'name' => 'Additional Directives',        'rec' => 'Optional', 'html' => 'Advanced — leave blank unless you need it. Appended verbatim to the generated CSP. Common examples: <code>upgrade-insecure-requests</code> (force HTTP sub-resources to load over HTTPS) or <code>block-all-mixed-content</code> (block HTTP content on HTTPS pages).' ],
+                [ 'name' => '\'unsafe-inline\' in the AI report', 'rec' => 'Info', 'html' => 'If the AI Cyber Audit flags <code>\'unsafe-inline\'</code>, it\'s because services like Google Analytics and AdSense inject inline scripts that require it. This is a known trade-off — having any CSP is significantly better than none, even with <code>\'unsafe-inline\'</code> present. You can safely ignore this finding if you use those services.' ],
             ],
-            'A Content Security Policy (CSP) is one of the most effective browser-level defences against Cross-Site Scripting (XSS) attacks. It instructs the browser to refuse scripts, styles, and other resources that don\'t come from an approved list of origins — so even if an attacker manages to inject HTML into your page, the browser won\'t execute the injected code.' ); ?>
+            'Protects your site against XSS attacks by telling the browser which scripts, styles, and resources are allowed to load. Always start in Report-Only mode to check nothing breaks before switching to Enforce.' ); ?>
         </div>
         <div style="padding:16px 0 8px;" id="cs-csp-panel">
+
+            <!-- Quick-start guide — hidden once CSP is enabled -->
+            <?php if ( ! $csp_on ) : ?>
+            <div id="cs-csp-quickstart" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+                <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#0369a1;">⚡ Quick setup — do these steps in order:</p>
+                <ol style="margin:0;padding-left:20px;font-size:13px;color:#374151;line-height:1.9;">
+                    <li>Tick every service your site uses below (Google Analytics, AdSense, etc.)</li>
+                    <li>Select <strong>Report-Only</strong> <em>(not Enforce)</em></li>
+                    <li>Tick <strong>Enable CSP</strong> → click <strong>Save CSP Settings</strong></li>
+                    <li>Browse your site for a few minutes, then come back and check the <strong>Violation Log</strong></li>
+                    <li>Once the log is clean, switch to <strong>Enforce</strong> and save again</li>
+                </ol>
+            </div>
+            <?php endif; ?>
 
             <!-- Enable + Mode -->
             <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:0 2px 14px;border-bottom:1px solid #f1f5f9;margin-bottom:14px;">
