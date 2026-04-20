@@ -37,6 +37,15 @@
             .then(function (r) { return r.json(); });
     }
 
+    function secPost(action, params) {
+        var fd = new FormData();
+        fd.append('action', action);
+        fd.append('nonce', csdtSiteAudit.secNonce || '');
+        if (params) Object.keys(params).forEach(function (k) { fd.append(k, params[k]); });
+        return fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); });
+    }
+
     function renderScorecard(counts) {
         var total = Object.values(counts).reduce(function (s, n) { return s + n; }, 0);
         if (total === 0) return '';
@@ -68,6 +77,20 @@
                 escHtml(f.cta.label) + '</a>' +
                 '</div>';
         }
+        var fixActionHtml = '';
+        if (f.fix_action) {
+            var seoFixActions = { seo_ai_desc: 1, seo_ai_title: 1 };
+            var quickFixActions = { cron_health: 'cron_health', expired_transients: 'expired_transients' };
+            if (seoFixActions[f.fix_action]) {
+                fixActionHtml = '<div style="margin-top:8px;"><a href="' + escHtml(csdtSiteAudit.seoAiUrl || '') +
+                    '" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;">⚡ Fix It — Open SEO AI</a></div>';
+            } else if (quickFixActions[f.fix_action]) {
+                fixActionHtml = '<div style="margin-top:8px;">' +
+                    '<button class="csdt-fix-it-btn" data-fix-id="' + escHtml(quickFixActions[f.fix_action]) +
+                    '" style="background:#10b981;color:#fff;border:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;cursor:pointer;">⚡ Fix It</button>' +
+                    '<span class="csdt-fix-it-status" style="display:none;margin-left:8px;font-size:.82em;"></span></div>';
+            }
+        }
         return '<div style="background:' + col.bg + ';border:1px solid ' + col.border +
             ';border-radius:8px;padding:16px 20px;margin-bottom:12px;">' +
             '<div style="display:flex;align-items:flex-start;gap:12px;">' +
@@ -83,11 +106,12 @@
             '<div style="background:rgba(255,255,255,.7);border-left:2px solid ' + col.badge + ';padding:8px 12px;border-radius:0 4px 4px 0;font-size:.85em;color:#374151;line-height:1.5;">' +
             '<strong style="color:' + col.text + ';">Fix: </strong>' + escHtml(f.fix || '') +
             '</div>' +
+            fixActionHtml +
             ctaHtml +
             '</div></div></div>';
     }
 
-    function renderResults(data) {
+    function renderResults(data, runAt) {
         var findings  = (data.findings || []).slice().sort(function (a, b) {
             return (SEV_ORDER[a.severity] || 4) - (SEV_ORDER[b.severity] || 4);
         });
@@ -98,12 +122,17 @@
         var html = '';
 
         // Header bar
+        var runLabel = runAt
+            ? '<span style="color:#6b7280;font-size:.8em;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:2px 8px;">Last run: ' + escHtml(new Date(runAt * 1000).toLocaleString()) + '</span>'
+            : '';
         html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">' +
             '<h3 style="margin:0;color:#0f172a;font-size:1em;font-weight:700;">Site Audit Results</h3>' +
             '<span style="color:#6b7280;font-size:.85em;">— ' + postCount + ' posts/pages scanned</span>' +
             ( aiUsed
                 ? '<span style="background:#f0fdf4;border:1px solid #86efac;color:#15803d;font-size:.75em;font-weight:600;padding:2px 8px;border-radius:20px;">🤖 AI analysis</span>'
                 : '<span style="background:#f0f9ff;border:1px solid #7dd3fc;color:#0369a1;font-size:.75em;font-weight:600;padding:2px 8px;border-radius:20px;">Rule-based</span>' ) +
+            runLabel +
+            '<button id="csdt-audit-pdf-btn" style="margin-left:auto;background:#0f172a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78em;font-weight:600;cursor:pointer;">⬇ Download PDF</button>' +
             '</div>';
 
         // Scorecard
@@ -158,11 +187,90 @@
                 });
             });
         });
+
+        // Wire Fix It buttons
+        resultsDiv.addEventListener('click', function (e) {
+            var btn = e.target.closest('.csdt-fix-it-btn');
+            if (!btn) return;
+            var fixId  = btn.getAttribute('data-fix-id');
+            var status = btn.parentNode.querySelector('.csdt-fix-it-status');
+            btn.disabled = true;
+            btn.textContent = '⏳ Fixing…';
+            if (status) { status.style.display = 'none'; }
+            secPost('csdt_devtools_quick_fix', { fix_action: 'apply', fix_id: fixId })
+                .then(function (res) {
+                    if (res && res.success) {
+                        btn.textContent = '✅ Fixed';
+                        btn.style.background = '#6b7280';
+                        if (status) { status.style.display = 'inline'; status.style.color = '#16a34a'; status.textContent = res.data && res.data.message ? res.data.message : 'Done'; }
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = '⚡ Fix It';
+                        if (status) { status.style.display = 'inline'; status.style.color = '#dc2626'; status.textContent = (res && res.data) || 'Error'; }
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.textContent = '⚡ Fix It';
+                    if (status) { status.style.display = 'inline'; status.style.color = '#dc2626'; status.textContent = 'Request failed'; }
+                });
+        });
+
+        // Wire PDF button
+        var pdfBtn = document.getElementById('csdt-audit-pdf-btn');
+        if (pdfBtn) {
+            pdfBtn.addEventListener('click', function () { exportAuditPDF(findings, postCount, aiUsed); });
+        }
+    }
+
+    function exportAuditPDF(findings, postCount, aiUsed) {
+        var now  = new Date().toLocaleString();
+        var site = window.location.hostname;
+        var SEV_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' };
+        var SEV_BG    = { critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a', info: '#0284c7' };
+
+        function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        var cardsHtml = '';
+        ['critical','high','medium','low','info'].forEach(function (sev) {
+            var group = findings.filter(function (f) { return (f.severity || 'info').toLowerCase() === sev; });
+            if (!group.length) return;
+            cardsHtml += '<div style="margin:0 0 18px">' +
+                '<div style="background:' + SEV_BG[sev] + ';color:#fff;font-weight:700;font-size:11px;padding:5px 10px;border-radius:4px 4px 0 0;letter-spacing:.05em;">' +
+                SEV_LABEL[sev].toUpperCase() + ' (' + group.length + ')</div>';
+            group.forEach(function (f) {
+                cardsHtml += '<div style="border:1px solid #e5e7eb;border-top:none;padding:10px 12px;">' +
+                    '<div style="font-weight:600;font-size:13px;color:#111;margin-bottom:3px;">' + esc(f.title) + '</div>' +
+                    ( f.affected ? '<div style="font-size:11px;color:#6b7280;margin-bottom:3px;">→ ' + esc(f.affected) + '</div>' : '' ) +
+                    '<div style="font-size:12px;color:#374151;margin-bottom:3px;">' + esc(f.detail) + '</div>' +
+                    '<div style="font-size:11px;color:#4b5563;font-style:italic;">Fix: ' + esc(f.fix) + '</div>' +
+                    '</div>';
+            });
+            cardsHtml += '</div>';
+        });
+
+        var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Site Audit Report — ' + esc(site) + '</title>' +
+            '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;margin:0;padding:32px 40px;max-width:900px;}' +
+            'h1{font-size:22px;font-weight:800;color:#0f172a;margin:0 0 4px;}' +
+            '.meta{font-size:12px;color:#6b7280;margin-bottom:24px;}' +
+            '@media print{body{padding:0;}@page{margin:20mm 18mm;}.no-print{display:none;}}</style></head><body>' +
+            '<h1>Site Audit Report</h1>' +
+            '<div class="meta">' + esc(site) + ' &nbsp;·&nbsp; ' + esc(now) +
+            ' &nbsp;·&nbsp; ' + postCount + ' posts/pages' +
+            ' &nbsp;·&nbsp; ' + ( aiUsed ? '🤖 AI analysis' : 'Rule-based' ) + '</div>' +
+            cardsHtml + '</body></html>';
+
+        var win = window.open('', '_blank');
+        if (!win) { alert('Please allow pop-ups for this page to export the PDF.'); return; }
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(function () { win.print(); }, 400);
     }
 
     if (auditBtn) {
         auditBtn.addEventListener('click', function () {
-            auditBtn.disabled   = true;
+            auditBtn.disabled    = true;
             auditBtn.textContent = '⏳ Running…';
             if (progressWrap) progressWrap.style.display = '';
             if (progressText) progressText.textContent  = 'Gathering site data…';
@@ -183,7 +291,7 @@
 
             post('csdt_site_audit').then(function (res) {
                 auditBtn.disabled    = false;
-                auditBtn.textContent = '🚀 Run Site Audit';
+                auditBtn.textContent = '🔄 Re-run Audit';
                 if (progressWrap) progressWrap.style.display = 'none';
 
                 if (!res.success) {
@@ -191,14 +299,20 @@
                     resultsDiv.style.display = '';
                     return;
                 }
-                renderResults(res.data);
+                renderResults(res.data, Math.floor(Date.now() / 1000));
             }).catch(function () {
                 auditBtn.disabled    = false;
-                auditBtn.textContent = '🚀 Run Site Audit';
+                auditBtn.textContent = '🔄 Re-run Audit';
                 if (progressWrap) progressWrap.style.display = 'none';
                 resultsDiv.innerHTML = '<p style="color:#dc2626;font-size:.9em;">Request failed — please reload and try again.</p>';
                 resultsDiv.style.display = '';
             });
         });
+    }
+
+    // Load cached results on page open
+    if (csdtSiteAudit.cached && csdtSiteAudit.cachedAt) {
+        renderResults(csdtSiteAudit.cached, csdtSiteAudit.cachedAt);
+        if (auditBtn) { auditBtn.textContent = '🔄 Re-run Audit'; }
     }
 }());

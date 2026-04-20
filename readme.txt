@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.124
+Stable tag: 1.9.157
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,53 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 5. SQL Query Tool with quick queries and paginated results
 
 == Changelog ==
+
+= 1.9.157 =
+* fix: Test Account Manager — replace single-use checkbox with Max Logins number input (0 = unlimited, 1 = single-use, N = N logins)
+* fix: Test Account Manager — reduce gap between Save Settings and Create Account divider
+
+= 1.9.152 =
+* feat: Admin Bar Badge — shows worst audit severity (Critical/High/Medium/OK) + uptime status in WP toolbar on every admin page
+* feat: Uptime Monitor — Cloudflare Worker auto-deploy (one-click); pings every 60s from the edge; 3h raw + 7d hourly history; response-time chart; ntfy.sh + email alerts when site is down
+
+= 1.9.150 =
+* feat: Database Intelligence Engine — new Optimizer panel; scans autoload size, expired transients, revisions, orphaned postmeta, and table fragmentation with one-click Fix It buttons for each issue
+
+= 1.9.148 =
+* feat: Site Audit — Fix It buttons on cron health and expired transient findings; SEO AI link-out buttons on missing title/desc findings
+* feat: Plugin Stack Scanner — now shows inactive redundant plugins in a separate "safe to delete" section
+* feat: Update Risk Scorer — new panel scans for available plugin updates and AI-assesses each as Patch / Minor / Breaking
+
+= 1.9.146 =
+* feat: Site Audit — all rule-based findings (thin content, featured images, duplicate titles, SEO) now always appear even when AI is used
+* fix: Featured image, thin content, duplicate title findings now include example post URLs
+* fix: AI guard blocks AI from generating duplicate thin content, featured image, word count, and duplicate title findings
+* fix: Duplicate title severity lowered from high → medium
+
+= 1.9.143 =
+* feat: Default Featured Image merged from standalone plugin — Media Library picker in Thumbnails tab; post_thumbnail_html and has_post_thumbnail filters; AJAX save
+* feat: Site Audit checks for missing or broken (404) default featured image
+* fix: VERSION constant now matches plugin header (was stuck at 1.9.119)
+
+= 1.9.127 =
+* feat: Site Audit — SSH monitor, login BF protection, login hide, 2FA enforcement findings (info/high based on state)
+* feat: Site Audit — disk space check (critical/high/medium/info thresholds)
+* feat: Site Audit — WordPress core update available (critical if 2+ minor versions behind)
+* feat: Site Audit — admin username "admin" exists (high)
+* feat: Site Audit — writable wp-config.php check (high)
+* feat: Site Audit PDF export — "Download PDF" button opens print-to-PDF in new window
+* feat: Site Audit tab moved to immediately after Home (Home → Site Audit → Login Security → Security Scan)
+* fix: URL Social Preview Checker now defaults to most recent published post instead of homepage
+* feat: Expired transients and orphaned postmeta findings now include CloudScale Cleanup CTA
+
+= 1.9.126 =
+* fix: Site Audit meta description and title tag checks now recognise CloudScale SEO AI (_cs_seo_desc / _cs_seo_title) — posts were falsely reported as missing meta when using CloudScale SEO
+* fix: Replace all Yoast SEO / Rank Math recommendations in Site Audit fix text with CloudScale SEO AI
+* feat: Rule-based title tag finding added (was AI-generated); both meta desc and title tag findings now include CloudScale SEO AI CTA
+* feat: AI guarded from generating meta desc, title tag, backup, SEO plugin, or revision findings independently
+
+= 1.9.125 =
+* feat: Site Audit revisions finding now fires at >20 revisions (was >500), includes cross-sell CTA for CloudScale Cleanup, and AI is told not to generate duplicate revision findings
 
 = 1.9.124 =
 * fix: Site Audit no longer flags template-rendered pages (custom theme templates, page builders with empty post_content) as thin/zero-word content; such pages are excluded from word count analysis and AI is instructed to ignore them

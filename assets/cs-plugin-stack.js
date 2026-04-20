@@ -90,11 +90,14 @@
     }
 
     function renderScanResults(data) {
-        var matched = data.matched  || [];
-        var saving  = data.total_saving || 0;
-        var html    = '';
+        var matched  = data.matched  || [];
+        var saving   = data.total_saving || 0;
+        var html     = '';
 
-        if (matched.length === 0) {
+        var activePlugins   = matched.filter(function (p) { return p.active !== false; });
+        var inactivePlugins = matched.filter(function (p) { return p.active === false; });
+
+        if (activePlugins.length === 0 && inactivePlugins.length === 0) {
             html =
                 '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:20px 24px;display:flex;gap:14px;align-items:flex-start;">' +
                 '<span style="font-size:1.8em;line-height:1;">✅</span>' +
@@ -103,67 +106,542 @@
                 '<p style="margin:0;color:#374151;font-size:.92em;line-height:1.6;">None of your ' + (data.active_count || 'active') + ' active plugins overlap with CloudScale features. You\'re running a lean stack.</p>' +
                 '</div></div>';
         } else {
-            // Summary banner
-            var savingHtml = saving > 0
-                ? ' Removing them could save you <strong>$' + saving + '/year</strong> in premium license fees.'
-                : '';
-            html +=
-                '<div style="background:linear-gradient(135deg,#fff7ed,#fefce8);border:1px solid #fed7aa;border-radius:8px;padding:16px 20px;margin-bottom:20px;display:flex;gap:14px;align-items:flex-start;">' +
-                '<span style="font-size:1.8em;line-height:1;">🎯</span>' +
-                '<div>' +
-                '<p style="margin:0 0 5px;font-weight:700;color:#0f172a;font-size:1.05em;">' +
-                matched.length + ' plugin' + (matched.length !== 1 ? 's' : '') + ' found that CloudScale already replaces.' +
-                '</p>' +
-                '<p style="margin:0;color:#64748b;font-size:.9em;line-height:1.6;">' + savingHtml + ' Safe to deactivate once you\'ve confirmed the CloudScale equivalent is working.</p>' +
-                '</div></div>';
-
-            // Results table
-            html +=
-                '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:16px;">' +
-                '<table style="width:100%;border-collapse:collapse;font-size:.88em;">' +
-                '<thead>' +
-                '<tr style="background:#f8fafc;">' +
-                '<th style="padding:10px 14px;text-align:left;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">Plugin</th>' +
-                '<th style="padding:10px 14px;text-align:left;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">CloudScale replaces it with</th>' +
-                '<th style="padding:10px 14px;text-align:right;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Saved/yr</th>' +
-                '<th style="padding:10px 14px;text-align:center;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">Go to</th>' +
-                '</tr>' +
-                '</thead><tbody>';
-
-            matched.forEach(function (p, i) {
-                var bg      = i % 2 === 0 ? '#fff' : '#f8fafc';
-                var tabUrl  = baseUrl + '&tab=' + encodeURIComponent(p.tab || 'home');
-                var tabName = TAB_LABELS[p.tab] || p.tab;
-                var costStr = p.cost > 0
-                    ? '<span style="color:#dc2626;font-weight:600;">$' + p.cost + '</span>'
-                    : '<span style="color:#6b7280;">—</span>';
-                var vStr    = p.version ? ' <span style="font-weight:400;color:#9ca3af;font-size:.82em;">v' + escHtml(p.version) + '</span>' : '';
+            if (activePlugins.length > 0) {
+                var savingHtml = saving > 0
+                    ? ' Removing them could save you <strong>$' + saving + '/year</strong> in premium license fees.'
+                    : '';
                 html +=
-                    '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;">' +
-                    '<td style="padding:10px 14px;font-weight:600;color:#0f172a;">' + escHtml(p.name) + vStr + '</td>' +
-                    '<td style="padding:10px 14px;color:#374151;line-height:1.5;">' + escHtml(p.feature) + '</td>' +
-                    '<td style="padding:10px 14px;text-align:right;">' + costStr + '</td>' +
-                    '<td style="padding:10px 14px;text-align:center;">' +
-                    '<a href="' + tabUrl + '" style="color:#6366f1;font-weight:600;font-size:.85em;text-decoration:none;white-space:nowrap;">→ ' + escHtml(tabName) + '</a>' +
-                    '</td>' +
-                    '</tr>';
-            });
+                    '<div style="background:linear-gradient(135deg,#fff7ed,#fefce8);border:1px solid #fed7aa;border-radius:8px;padding:16px 20px;margin-bottom:20px;display:flex;gap:14px;align-items:flex-start;">' +
+                    '<span style="font-size:1.8em;line-height:1;">🎯</span>' +
+                    '<div>' +
+                    '<p style="margin:0 0 5px;font-weight:700;color:#0f172a;font-size:1.05em;">' +
+                    activePlugins.length + ' active plugin' + (activePlugins.length !== 1 ? 's' : '') + ' found that CloudScale already replaces.' +
+                    '</p>' +
+                    '<p style="margin:0;color:#64748b;font-size:.9em;line-height:1.6;">' + savingHtml + ' Safe to deactivate once you\'ve confirmed the CloudScale equivalent is working.</p>' +
+                    '</div></div>';
 
-            html += '</tbody></table></div>';
+                html += renderPluginTable(activePlugins);
 
-            // Safety note
-            html +=
-                '<div style="background:#f0f9ff;border-left:3px solid #0ea5e9;padding:11px 16px;border-radius:0 6px 6px 0;font-size:.87em;color:#0c4a6e;line-height:1.6;">' +
-                '<strong>Before deactivating:</strong> set up and test the CloudScale equivalent first. Take a backup — the free ' +
-                '<a href="https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-backup-restore-help/" target="_blank" rel="noopener" style="color:#0369a1;">CloudScale Backup plugin</a>' +
-                ' does a one-click full-site snapshot.' +
-                '</div>';
+                html +=
+                    '<div style="background:#f0f9ff;border-left:3px solid #0ea5e9;padding:11px 16px;border-radius:0 6px 6px 0;font-size:.87em;color:#0c4a6e;line-height:1.6;margin-bottom:' + (inactivePlugins.length > 0 ? '24' : '0') + 'px;">' +
+                    '<strong>Before deactivating:</strong> set up and test the CloudScale equivalent first. Take a backup — the free ' +
+                    '<a href="https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-backup-restore-help/" target="_blank" rel="noopener" style="color:#0369a1;">CloudScale Backup plugin</a>' +
+                    ' does a one-click full-site snapshot.' +
+                    '</div>';
+            }
+
+            if (inactivePlugins.length > 0) {
+                html +=
+                    '<div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:16px;">' +
+                    '<p style="margin:0 0 12px;font-weight:700;color:#374151;font-size:.95em;">🗑️ Also installed but inactive — safe to delete</p>' +
+                    '<p style="margin:0 0 14px;color:#6b7280;font-size:.87em;line-height:1.5;">These plugins are deactivated and covered by CloudScale. You can delete them to reduce attack surface and keep your dashboard tidy.</p>';
+                html += renderPluginTable(inactivePlugins, true);
+                html += '</div>';
+            }
         }
 
         if (resultsDiv) {
             resultsDiv.innerHTML = html;
             resultsDiv.style.display = '';
         }
+    }
+
+    function renderPluginTable(plugins, muted) {
+        var html =
+            '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:16px;">' +
+            '<table style="width:100%;border-collapse:collapse;font-size:.88em;">' +
+            '<thead>' +
+            '<tr style="background:#f8fafc;">' +
+            '<th style="padding:10px 14px;text-align:left;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">Plugin</th>' +
+            '<th style="padding:10px 14px;text-align:left;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">CloudScale replaces it with</th>' +
+            ( !muted ? '<th style="padding:10px 14px;text-align:right;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Saved/yr</th>' : '' ) +
+            '<th style="padding:10px 14px;text-align:center;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">Go to</th>' +
+            '</tr>' +
+            '</thead><tbody>';
+
+        plugins.forEach(function (p, i) {
+            var bg      = i % 2 === 0 ? '#fff' : '#f8fafc';
+            var tabUrl  = baseUrl + '&tab=' + encodeURIComponent(p.tab || 'home');
+            var tabName = TAB_LABELS[p.tab] || p.tab;
+            var vStr    = p.version ? ' <span style="font-weight:400;color:#9ca3af;font-size:.82em;">v' + escHtml(p.version) + '</span>' : '';
+            html +=
+                '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;">' +
+                '<td style="padding:10px 14px;font-weight:600;color:' + (muted ? '#6b7280' : '#0f172a') + ';">' + escHtml(p.name) + vStr + '</td>' +
+                '<td style="padding:10px 14px;color:#374151;line-height:1.5;">' + escHtml(p.feature) + '</td>';
+            if (!muted) {
+                var costStr = p.cost > 0
+                    ? '<span style="color:#dc2626;font-weight:600;">$' + p.cost + '</span>'
+                    : '<span style="color:#6b7280;">—</span>';
+                html += '<td style="padding:10px 14px;text-align:right;">' + costStr + '</td>';
+            }
+            html +=
+                '<td style="padding:10px 14px;text-align:center;">' +
+                '<a href="' + tabUrl + '" style="color:#6366f1;font-weight:600;font-size:.85em;text-decoration:none;white-space:nowrap;">→ ' + escHtml(tabName) + '</a>' +
+                '</td>' +
+                '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        return html;
+    }
+
+    // ── Uptime Monitor ───────────────────────────────────────────────────────
+
+    var uptimeSetupWrap   = document.getElementById('csdt-uptime-setup-wrap');
+    var uptimeStatusWrap  = document.getElementById('csdt-uptime-status-wrap');
+    var uptimeStatusInner = document.getElementById('csdt-uptime-status-inner');
+    var uptimeDeployBtn   = document.getElementById('csdt-uptime-deploy-btn');
+    var uptimeDeploying   = document.getElementById('csdt-uptime-deploying');
+    var uptimeDeployRes   = document.getElementById('csdt-uptime-deploy-result');
+    var uptimeGenBtn      = document.getElementById('csdt-uptime-generate-token-btn');
+    var uptimeTokenWrap   = document.getElementById('csdt-uptime-token-wrap');
+    var uptimeTokenDisplay= document.getElementById('csdt-uptime-token-display');
+    var uptimeManualWrap  = document.getElementById('csdt-uptime-manual-wrap');
+    var uptimeNtfyInput   = document.getElementById('csdt-uptime-ntfy-url');
+    var uptimeRefreshBtn  = document.getElementById('csdt-uptime-refresh-btn');
+
+    if (uptimeGenBtn) {
+        uptimeGenBtn.addEventListener('click', function () {
+            uptimeGenBtn.disabled = true;
+            uptimeGenBtn.textContent = '⏳ Generating…';
+            post('csdt_uptime_setup').then(function (res) {
+                uptimeGenBtn.disabled = false;
+                uptimeGenBtn.textContent = '🔄 Regenerate Token';
+                if (!res.success) return;
+                var d = res.data;
+                if (uptimeTokenWrap)   { uptimeTokenWrap.style.display = 'flex'; }
+                if (uptimeTokenDisplay){ uptimeTokenDisplay.value = d.token; }
+                renderManualDeploy(d.worker_js, d.wrangler_toml);
+            }).catch(function () {
+                uptimeGenBtn.disabled = false;
+                uptimeGenBtn.textContent = '🔑 Generate Token';
+            });
+        });
+    }
+
+    function renderManualDeploy(workerJs, wranglerToml) {
+        if (!uptimeManualWrap) return;
+        uptimeManualWrap.innerHTML =
+            '<p style="font-size:.85em;color:#374151;margin:0 0 10px;">1. Go to <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create" target="_blank" rel="noopener" style="color:#6366f1;">dash.cloudflare.com → Workers → Create</a>. Choose "Hello World" then replace the entire script with the code below.</p>' +
+            '<p style="font-size:.85em;color:#374151;margin:0 0 6px;">2. Click <strong>Deploy</strong>, then go to <strong>Settings → Variables</strong> and add: <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">SITE_URL</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">PING_URL</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">PING_TOKEN</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">NTFY_URL</code> from the wrangler.toml below.</p>' +
+            '<p style="font-size:.85em;color:#374151;margin:0 0 6px;">3. Go to <strong>Triggers → Cron Triggers → Add Cron</strong> and enter <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">* * * * *</code> (every minute).</p>' +
+            '<p style="font-size:.85em;font-weight:700;color:#374151;margin:8px 0 4px;">worker.js</p>' +
+            '<textarea readonly style="width:100%;height:160px;font-family:monospace;font-size:.78em;border:1px solid #e5e7eb;border-radius:6px;padding:10px;resize:vertical;background:#f8fafc;">' + escHtml(workerJs) + '</textarea>' +
+            '<p style="font-size:.85em;font-weight:700;color:#374151;margin:10px 0 4px;">wrangler.toml (CLI users)</p>' +
+            '<textarea readonly style="width:100%;height:120px;font-family:monospace;font-size:.78em;border:1px solid #e5e7eb;border-radius:6px;padding:10px;resize:vertical;background:#f8fafc;">' + escHtml(wranglerToml) + '</textarea>';
+    }
+
+    if (uptimeDeployBtn) {
+        uptimeDeployBtn.addEventListener('click', function () {
+            var ntfy = uptimeNtfyInput ? uptimeNtfyInput.value.trim() : '';
+            uptimeDeployBtn.disabled = true;
+            uptimeDeployBtn.textContent = '⏳ Deploying…';
+            if (uptimeDeploying) uptimeDeploying.style.display = '';
+            if (uptimeDeployRes) uptimeDeployRes.innerHTML = '';
+
+            post('csdt_uptime_deploy_worker', { ntfy_url: ntfy }).then(function (res) {
+                uptimeDeployBtn.disabled = false;
+                uptimeDeployBtn.textContent = '🚀 Deploy Worker to Cloudflare';
+                if (uptimeDeploying) uptimeDeploying.style.display = 'none';
+
+                if (!res.success) {
+                    if (uptimeDeployRes) {
+                        uptimeDeployRes.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:10px 14px;border-radius:0 6px 6px 0;font-size:.87em;color:#7f1d1d;">' +
+                            '⚠ ' + escHtml((res.data && res.data.message) || 'Deploy failed') + '</div>';
+                    }
+                    // Show manual fallback
+                    post('csdt_uptime_setup').then(function (sr) {
+                        if (sr.success) renderManualDeploy(sr.data.worker_js, sr.data.wrangler_toml);
+                    });
+                    return;
+                }
+
+                if (uptimeDeployRes) {
+                    var d = res.data;
+                    uptimeDeployRes.innerHTML =
+                        '<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 14px;border-radius:0 6px 6px 0;font-size:.87em;color:#166534;">' +
+                        '✅ ' + escHtml(d.message) +
+                        (d.worker_url ? ' <a href="' + escHtml(d.worker_url) + '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:600;">View Worker →</a>' : '') +
+                        (!d.cron_ok ? '<br><span style="color:#ca8a04;">⚠ Cron trigger could not be set automatically — go to the Worker dashboard → Triggers → Add Cron → <code>* * * * *</code></span>' : '') +
+                        '</div>';
+                }
+                if (uptimeTokenDisplay && res.data && res.data.token) { uptimeTokenDisplay.value = res.data.token; if (uptimeTokenWrap) uptimeTokenWrap.style.display = 'flex'; }
+                loadUptimeHistory();
+            }).catch(function () {
+                uptimeDeployBtn.disabled = false;
+                uptimeDeployBtn.textContent = '🚀 Deploy Worker to Cloudflare';
+                if (uptimeDeploying) uptimeDeploying.style.display = 'none';
+                if (uptimeDeployRes) uptimeDeployRes.innerHTML = '<p style="color:#dc2626;font-size:.9em;">Request failed — please reload.</p>';
+            });
+        });
+    }
+
+    if (uptimeRefreshBtn) {
+        uptimeRefreshBtn.addEventListener('click', loadUptimeHistory);
+    }
+
+    function loadUptimeHistory() {
+        post('csdt_uptime_history').then(function (res) {
+            if (!res.success || !uptimeStatusInner) return;
+            renderUptimeStatus(res.data);
+            if (uptimeStatusWrap) uptimeStatusWrap.style.display = '';
+        }).catch(function () {});
+    }
+
+    function renderUptimeStatus(d) {
+        if (!uptimeStatusInner) return;
+        var lp     = d.last_ping;
+        var isUp   = lp && lp.up;
+        var age    = lp ? lp.age_seconds : null;
+        var ageStr = age != null ? (age < 60 ? age + 's ago' : Math.round(age / 60) + 'm ago') : '—';
+
+        var statusColor = !lp ? '#6b7280' : (isUp ? '#16a34a' : '#dc2626');
+        var statusLabel = !lp ? 'No pings yet' : (isUp ? '✅ UP' : '🔴 DOWN');
+        var msLabel     = lp  ? lp.ms + 'ms' : '';
+
+        var html =
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">' +
+            uptimeStatCard(statusLabel, msLabel, statusColor) +
+            (d.uptime_24h != null ? uptimeStatCard(d.uptime_24h + '%', '24h uptime', d.uptime_24h >= 99 ? '#16a34a' : d.uptime_24h >= 95 ? '#ca8a04' : '#dc2626') : '') +
+            (d.uptime_7d  != null ? uptimeStatCard(d.uptime_7d  + '%', '7d uptime',  d.uptime_7d  >= 99 ? '#16a34a' : d.uptime_7d  >= 95 ? '#ca8a04' : '#dc2626') : '') +
+            (d.avg_ms_24h != null ? uptimeStatCard(d.avg_ms_24h + 'ms', 'avg resp', d.avg_ms_24h < 500 ? '#16a34a' : d.avg_ms_24h < 1500 ? '#ca8a04' : '#dc2626') : '') +
+            '</div>';
+
+        // Last-ping age
+        if (lp) {
+            html += '<p style="font-size:.82em;color:#6b7280;margin:0 0 14px;">Last ping: ' + escHtml(ageStr) + '</p>';
+        }
+
+        // Response-time chart (raw — last 60 pings)
+        var raw = d.raw || [];
+        if (raw.length > 0) {
+            var recent = raw.slice(-60);
+            var maxMs  = Math.max.apply(null, recent.map(function(r){ return r.ms; })) || 1;
+            html += '<p style="font-size:.82em;font-weight:700;color:#374151;margin:0 0 6px;">Response time — last ' + recent.length + ' pings</p>';
+            html += '<div style="display:flex;align-items:flex-end;gap:1px;height:48px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:4px 6px;overflow:hidden;">';
+            recent.forEach(function (r) {
+                var h   = Math.max(4, Math.round((r.ms / maxMs) * 40));
+                var col = r.up ? '#34d399' : '#f87171';
+                html += '<div style="flex:1;min-width:2px;height:' + h + 'px;background:' + col + ';border-radius:1px;" title="' + (r.up ? 'UP' : 'DOWN') + ' ' + r.ms + 'ms"></div>';
+            });
+            html += '</div>';
+            html += '<p style="font-size:.75em;color:#9ca3af;margin:4px 0 0;">Green = up · Red = down · Height = response time</p>';
+        }
+
+        uptimeStatusInner.innerHTML = html;
+    }
+
+    function uptimeStatCard(value, label, color) {
+        return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;text-align:center;">' +
+            '<div style="font-size:1.3em;font-weight:800;color:' + color + ';line-height:1.2;">' + escHtml(String(value)) + '</div>' +
+            '<div style="font-size:.75em;color:#6b7280;font-weight:600;margin-top:4px;">' + escHtml(label) + '</div>' +
+            '</div>';
+    }
+
+    // Auto-load history if already enabled
+    (function () {
+        post('csdt_uptime_history').then(function (res) {
+            if (!res.success) return;
+            var d = res.data;
+            if (d.enabled || d.last_ping) {
+                renderUptimeStatus(d);
+                if (uptimeStatusWrap) uptimeStatusWrap.style.display = '';
+            }
+        }).catch(function () {});
+    }());
+
+    // ── Update Risk Scorer ───────────────────────────────────────────────────
+
+    var riskScanBtn     = document.getElementById('csdt-update-risk-scan-btn');
+    var riskScanningMsg = document.getElementById('csdt-update-risk-scanning');
+    var riskResultsDiv  = document.getElementById('csdt-update-risk-results');
+
+    if (riskScanBtn) {
+        riskScanBtn.addEventListener('click', function () {
+            riskScanBtn.disabled  = true;
+            riskScanBtn.textContent = '⏳ Scanning…';
+            if (riskScanningMsg) riskScanningMsg.style.display = '';
+            if (riskResultsDiv)  riskResultsDiv.style.display  = 'none';
+
+            post('csdt_update_risk_scan').then(function (res) {
+                riskScanBtn.disabled  = false;
+                riskScanBtn.innerHTML = '🔍 Scan for Available Updates';
+                if (riskScanningMsg) riskScanningMsg.style.display = 'none';
+
+                if (!res.success) {
+                    if (riskResultsDiv) {
+                        riskResultsDiv.innerHTML = '<p style="color:#dc2626;font-size:.9em;">Scan failed — please reload and try again.</p>';
+                        riskResultsDiv.style.display = '';
+                    }
+                    return;
+                }
+                renderUpdateRiskResults(res.data.plugins || []);
+            }).catch(function () {
+                riskScanBtn.disabled  = false;
+                riskScanBtn.innerHTML = '🔍 Scan for Available Updates';
+                if (riskScanningMsg) riskScanningMsg.style.display = 'none';
+                if (riskResultsDiv) {
+                    riskResultsDiv.innerHTML = '<p style="color:#dc2626;font-size:.9em;">Request failed — please reload and try again.</p>';
+                    riskResultsDiv.style.display = '';
+                }
+            });
+        });
+    }
+
+    var RISK_BADGE = {
+        patch:    { bg: '#f0fdf4', border: '#86efac', badge: '#16a34a', label: '🟢 Patch',    text: 'Low risk — bug fixes only.' },
+        minor:    { bg: '#fefce8', border: '#fde68a', badge: '#ca8a04', label: '🟡 Minor',    text: 'Review changelog — new features, possible deprecations.' },
+        breaking: { bg: '#fef2f2', border: '#fca5a5', badge: '#dc2626', label: '🔴 Breaking', text: 'High risk — major version change. Test in staging first.' },
+    };
+
+    function renderUpdateRiskResults(plugins) {
+        if (!riskResultsDiv) return;
+        if (plugins.length === 0) {
+            riskResultsDiv.innerHTML =
+                '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:16px 20px;">' +
+                '<p style="margin:0;font-weight:600;color:#166534;">✅ All plugins are up to date — nothing to assess.</p></div>';
+            riskResultsDiv.style.display = '';
+            return;
+        }
+
+        var html =
+            '<p style="margin:0 0 14px;color:#6b7280;font-size:.87em;">' + plugins.length + ' update' + (plugins.length !== 1 ? 's' : '') + ' available. Click <strong>Assess Risk</strong> on each row to get an AI risk score before updating.</p>' +
+            '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">' +
+            '<table style="width:100%;border-collapse:collapse;font-size:.88em;" id="csdt-risk-table">' +
+            '<thead><tr style="background:#f8fafc;">' +
+            '<th style="padding:10px 14px;text-align:left;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">Plugin</th>' +
+            '<th style="padding:10px 14px;text-align:center;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">Current</th>' +
+            '<th style="padding:10px 14px;text-align:center;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">New</th>' +
+            '<th style="padding:10px 14px;text-align:center;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;">Risk</th>' +
+            '<th style="padding:10px 14px;text-align:center;font-weight:700;color:#374151;border-bottom:1px solid #e5e7eb;"></th>' +
+            '</tr></thead><tbody>';
+
+        plugins.forEach(function (p, i) {
+            var bg  = i % 2 === 0 ? '#fff' : '#f8fafc';
+            var rid = 'risk-row-' + i;
+            html +=
+                '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;" id="' + rid + '">' +
+                '<td style="padding:10px 14px;font-weight:600;color:#0f172a;">' + escHtml(p.name) + '</td>' +
+                '<td style="padding:10px 14px;text-align:center;color:#6b7280;font-size:.85em;">' + escHtml(p.current_version) + '</td>' +
+                '<td style="padding:10px 14px;text-align:center;color:#0ea5e9;font-weight:600;font-size:.85em;">' + escHtml(p.new_version) + '</td>' +
+                '<td style="padding:10px 14px;text-align:center;" class="risk-badge-cell-' + i + '"><span style="color:#9ca3af;font-size:.82em;">—</span></td>' +
+                '<td style="padding:10px 14px;text-align:center;">' +
+                '<button class="csdt-assess-risk-btn" ' +
+                'data-idx="' + i + '" ' +
+                'data-slug="' + escHtml(p.slug) + '" ' +
+                'data-name="' + escHtml(p.name) + '" ' +
+                'data-current="' + escHtml(p.current_version) + '" ' +
+                'data-new="' + escHtml(p.new_version) + '" ' +
+                'style="background:#6366f1;color:#fff;border:none;font-size:.8em;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer;white-space:nowrap;">Assess Risk</button>' +
+                '</td>' +
+                '</tr>' +
+                '<tr class="risk-reason-row-' + i + '" style="display:none;"><td colspan="5" style="padding:0 14px 10px 42px;font-size:.84em;color:#374151;line-height:1.5;" class="risk-reason-cell-' + i + '"></td></tr>';
+        });
+
+        html += '</tbody></table></div>';
+        riskResultsDiv.innerHTML = html;
+        riskResultsDiv.style.display = '';
+
+        riskResultsDiv.addEventListener('click', function (e) {
+            var btn = e.target.closest('.csdt-assess-risk-btn');
+            if (!btn || btn.disabled) return;
+            var idx     = btn.getAttribute('data-idx');
+            var slug    = btn.getAttribute('data-slug');
+            var name    = btn.getAttribute('data-name');
+            var current = btn.getAttribute('data-current');
+            var newVer  = btn.getAttribute('data-new');
+
+            btn.disabled    = true;
+            btn.textContent = '⏳…';
+
+            post('csdt_update_risk_assess', { slug: slug, name: name, current_version: current, new_version: newVer })
+                .then(function (res) {
+                    var risk   = (res.success && res.data && res.data.risk) ? res.data.risk : 'minor';
+                    var reason = (res.success && res.data && res.data.reason) ? res.data.reason : '';
+                    var rb     = RISK_BADGE[risk] || RISK_BADGE.minor;
+
+                    var badgeCell  = riskResultsDiv.querySelector('.risk-badge-cell-' + idx);
+                    var reasonRow  = riskResultsDiv.querySelector('.risk-reason-row-' + idx);
+                    var reasonCell = riskResultsDiv.querySelector('.risk-reason-cell-' + idx);
+
+                    if (badgeCell) {
+                        badgeCell.innerHTML =
+                            '<span style="background:' + rb.bg + ';border:1px solid ' + rb.border + ';color:' + rb.badge + ';font-weight:700;font-size:.78em;padding:3px 10px;border-radius:20px;white-space:nowrap;">' +
+                            escHtml(rb.label) + '</span>';
+                    }
+                    if (reasonCell) {
+                        reasonCell.innerHTML = '<em style="color:#6b7280;">' + escHtml(rb.text) + '</em>' + ( reason ? ' ' + escHtml(reason) : '' );
+                    }
+                    if (reasonRow) reasonRow.style.display = '';
+
+                    btn.textContent = 'Re-assess';
+                    btn.disabled    = false;
+                })
+                .catch(function () {
+                    btn.textContent = 'Assess Risk';
+                    btn.disabled    = false;
+                });
+        });
+    }
+
+    // ── Database Intelligence Engine ─────────────────────────────────────────
+
+    var dbScanBtn     = document.getElementById('csdt-db-intelligence-scan-btn');
+    var dbScanningMsg = document.getElementById('csdt-db-intelligence-scanning');
+    var dbResultsDiv  = document.getElementById('csdt-db-intelligence-results');
+
+    if (dbScanBtn) {
+        dbScanBtn.addEventListener('click', function () {
+            dbScanBtn.disabled    = true;
+            dbScanBtn.textContent = '⏳ Scanning…';
+            if (dbScanningMsg) dbScanningMsg.style.display = '';
+            if (dbResultsDiv)  dbResultsDiv.style.display  = 'none';
+
+            post('csdt_db_intelligence_scan').then(function (res) {
+                dbScanBtn.disabled  = false;
+                dbScanBtn.innerHTML = '🔍 Analyse Database';
+                if (dbScanningMsg) dbScanningMsg.style.display = 'none';
+
+                if (!res.success) {
+                    if (dbResultsDiv) {
+                        dbResultsDiv.innerHTML = '<p style="color:#dc2626;font-size:.9em;">Scan failed — please reload and try again.</p>';
+                        dbResultsDiv.style.display = '';
+                    }
+                    return;
+                }
+                renderDbIntelligence(res.data);
+            }).catch(function () {
+                dbScanBtn.disabled  = false;
+                dbScanBtn.innerHTML = '🔍 Analyse Database';
+                if (dbScanningMsg) dbScanningMsg.style.display = 'none';
+                if (dbResultsDiv) {
+                    dbResultsDiv.innerHTML = '<p style="color:#dc2626;font-size:.9em;">Request failed — please reload and try again.</p>';
+                    dbResultsDiv.style.display = '';
+                }
+            });
+        });
+    }
+
+    var DB_SEV_COLOR = {
+        high:   { bg: '#fff7ed', border: '#fed7aa', badge: '#ea580c', text: '#7c2d12' },
+        medium: { bg: '#fefce8', border: '#fde68a', badge: '#ca8a04', text: '#713f12' },
+        low:    { bg: '#f0fdf4', border: '#86efac', badge: '#16a34a', text: '#14532d' },
+        info:   { bg: '#f0f9ff', border: '#7dd3fc', badge: '#0284c7', text: '#0c4a6e' },
+    };
+
+    function renderDbIntelligence(data) {
+        if (!dbResultsDiv) return;
+        var stats    = data.stats    || {};
+        var findings = data.findings || [];
+
+        // Stats cards
+        var totalMb     = stats.total_db_kb     ? (stats.total_db_kb / 1024).toFixed(1)     : '—';
+        var autoloadKb  = stats.autoload_total_kb != null ? stats.autoload_total_kb  : '—';
+        var revisionsK  = stats.revisions_count  != null ? stats.revisions_count.toLocaleString() : '—';
+        var orphansN    = stats.orphaned_postmeta != null ? stats.orphaned_postmeta.toLocaleString() : '—';
+
+        var statsHtml =
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px;">' +
+            dbStatCard('Total DB', totalMb + ' MB', '#0f172a') +
+            dbStatCard('Autoload', autoloadKb + ' KB', autoloadKb > 500 ? '#dc2626' : '#16a34a') +
+            dbStatCard('Revisions', revisionsK, stats.revisions_count > 500 ? '#ea580c' : '#374151') +
+            dbStatCard('Orphan Meta', orphansN, stats.orphaned_postmeta > 50 ? '#ea580c' : '#374151') +
+            '</div>';
+
+        // Top autoloaded table
+        var topHtml = '';
+        if (stats.top_autoloaded && stats.top_autoloaded.length) {
+            topHtml =
+                '<details style="margin-bottom:20px;">' +
+                '<summary style="cursor:pointer;font-size:.88em;font-weight:600;color:#374151;padding:8px 0;">📋 Top ' + stats.top_autoloaded.length + ' autoloaded options by size</summary>' +
+                '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-top:8px;">' +
+                '<table style="width:100%;border-collapse:collapse;font-size:.84em;">' +
+                '<thead><tr style="background:#f8fafc;"><th style="padding:7px 12px;text-align:left;color:#374151;border-bottom:1px solid #e5e7eb;">Option name</th><th style="padding:7px 12px;text-align:right;color:#374151;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Size (KB)</th></tr></thead><tbody>';
+            stats.top_autoloaded.forEach(function (r, i) {
+                var bg = i % 2 === 0 ? '#fff' : '#f8fafc';
+                topHtml += '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;">' +
+                    '<td style="padding:7px 12px;color:#374151;word-break:break-all;">' + escHtml(r.option_name) + '</td>' +
+                    '<td style="padding:7px 12px;text-align:right;font-weight:600;color:#0f172a;">' + escHtml(String(r.size_kb)) + '</td>' +
+                    '</tr>';
+            });
+            topHtml += '</tbody></table></div></details>';
+        }
+
+        // Findings
+        var findingsHtml = '<div style="display:flex;flex-direction:column;gap:12px;" id="csdt-db-findings">';
+        findings.forEach(function (f, i) {
+            var sev = (f.severity || 'info').toLowerCase();
+            var col = DB_SEV_COLOR[sev] || DB_SEV_COLOR.info;
+            var fixBtn = '';
+            if (f.fix_action) {
+                fixBtn = '<button class="csdt-db-fix-btn" data-fix-id="' + escHtml(f.fix_action) + '" data-idx="' + i + '" ' +
+                    'style="background:#10b981;color:#fff;border:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;cursor:pointer;margin-top:8px;">⚡ Fix It</button>' +
+                    '<span class="csdt-db-fix-status-' + i + '" style="display:none;margin-left:8px;font-size:.82em;"></span>';
+            }
+            findingsHtml +=
+                '<div style="background:' + col.bg + ';border:1px solid ' + col.border + ';border-radius:8px;padding:14px 18px;">' +
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+                '<span style="background:' + col.badge + ';color:#fff;font-size:.7em;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">' + escHtml(sev) + '</span>' +
+                '<span style="font-weight:700;color:#0f172a;font-size:.93em;">' + escHtml(f.title) + '</span>' +
+                '</div>' +
+                '<p style="margin:0 0 6px;color:#4b5563;font-size:.87em;line-height:1.6;">' + escHtml(f.detail) + '</p>' +
+                '<div style="background:rgba(255,255,255,.7);border-left:2px solid ' + col.badge + ';padding:7px 11px;border-radius:0 4px 4px 0;font-size:.84em;color:#374151;">' +
+                '<strong style="color:' + col.text + ';">Fix: </strong>' + escHtml(f.fix) +
+                '</div>' +
+                fixBtn +
+                '</div>';
+        });
+        findingsHtml += '</div>';
+
+        dbResultsDiv.innerHTML = statsHtml + topHtml + findingsHtml;
+        dbResultsDiv.style.display = '';
+
+        // Fix button delegation
+        dbResultsDiv.addEventListener('click', function (e) {
+            var btn = e.target.closest('.csdt-db-fix-btn');
+            if (!btn || btn.disabled) return;
+            var fixId = btn.getAttribute('data-fix-id');
+            var idx   = btn.getAttribute('data-idx');
+            var statusEl = dbResultsDiv.querySelector('.csdt-db-fix-status-' + idx);
+            btn.disabled    = true;
+            btn.textContent = '⏳ Fixing…';
+            if (statusEl) statusEl.style.display = 'none';
+
+            post('csdt_db_intelligence_fix', { fix_id: fixId }).then(function (res) {
+                if (res && res.success) {
+                    btn.textContent    = '✅ Done';
+                    btn.style.background = '#6b7280';
+                    if (statusEl) {
+                        statusEl.style.display = 'inline';
+                        statusEl.style.color   = '#16a34a';
+                        statusEl.textContent   = res.data && res.data.message ? res.data.message : 'Done';
+                    }
+                } else {
+                    btn.disabled    = false;
+                    btn.textContent = '⚡ Fix It';
+                    if (statusEl) {
+                        statusEl.style.display = 'inline';
+                        statusEl.style.color   = '#dc2626';
+                        statusEl.textContent   = (res && res.data) || 'Error';
+                    }
+                }
+            }).catch(function () {
+                btn.disabled    = false;
+                btn.textContent = '⚡ Fix It';
+                if (statusEl) {
+                    statusEl.style.display = 'inline';
+                    statusEl.style.color   = '#dc2626';
+                    statusEl.textContent   = 'Request failed';
+                }
+            });
+        });
+    }
+
+    function dbStatCard(label, value, color) {
+        return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;text-align:center;">' +
+            '<div style="font-size:1.4em;font-weight:800;color:' + color + ';line-height:1.2;">' + escHtml(String(value)) + '</div>' +
+            '<div style="font-size:.75em;color:#6b7280;font-weight:600;margin-top:4px;">' + escHtml(label) + '</div>' +
+            '</div>';
     }
 
     // ── AI Debugging Assistant ───────────────────────────────────────────────

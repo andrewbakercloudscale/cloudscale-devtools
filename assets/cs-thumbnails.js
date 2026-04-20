@@ -786,3 +786,78 @@
     }
 
 } )();
+
+/* ── Default Featured Image picker ──────────────────────────────────────────
+   Uses wp.media (loaded via wp_enqueue_media on the thumbnails tab).
+ */
+( function () {
+    'use strict';
+
+    const cfg      = window.csdtDevtoolsThumbs || {};
+    const ajaxUrl  = cfg.ajaxUrl || '';
+    const defNonce = cfg.defimgNonce || '';
+
+    function saveDefImg( id ) {
+        const body = new URLSearchParams( { action: 'csdt_save_default_image', nonce: defNonce, image_id: id } );
+        fetch( ajaxUrl, { method: 'POST', body } )
+            .then( r => r.json() )
+            .then( res => {
+                const status = document.getElementById( 'csdt-defimg-status' );
+                if ( ! status ) return;
+                status.textContent = res.success ? 'Saved.' : 'Save failed.';
+                status.style.color = res.success ? '#16a34a' : '#dc2626';
+            } );
+    }
+
+    function init() {
+        const btnSelect = document.getElementById( 'csdt-defimg-select' );
+        const btnRemove = document.getElementById( 'csdt-defimg-remove' );
+        if ( ! btnSelect ) return;
+
+        if ( typeof window.wp === 'undefined' || typeof window.wp.media !== 'function' ) {
+            btnSelect.addEventListener( 'click', () => alert( 'Media library not available — try reloading the page.' ) );
+            return;
+        }
+
+        var mediaFrame;
+        btnSelect.addEventListener( 'click', function () {
+            if ( mediaFrame ) { mediaFrame.open(); return; }
+            mediaFrame = window.wp.media( {
+                title: 'Select Default Featured Image',
+                button: { text: 'Use this image' },
+                multiple: false,
+                library: { type: 'image' },
+            } );
+            mediaFrame.on( 'select', function () {
+                const att     = mediaFrame.state().get( 'selection' ).first().toJSON();
+                const preview = document.getElementById( 'csdt-defimg-preview' );
+                const hiddenId = document.getElementById( 'csdt-defimg-id' );
+                const src     = ( att.sizes && att.sizes.medium ) ? att.sizes.medium.url : att.url;
+                if ( preview ) preview.innerHTML = '<img src="' + src + '" style="max-width:240px;height:auto;border:1px solid #ddd;border-radius:4px;display:block;" />';
+                if ( hiddenId ) hiddenId.value = att.id;
+                btnSelect.textContent = 'Change Image';
+                if ( btnRemove ) btnRemove.style.display = '';
+                saveDefImg( att.id );
+            } );
+            mediaFrame.open();
+        } );
+
+        if ( btnRemove ) {
+            btnRemove.addEventListener( 'click', function () {
+                const preview  = document.getElementById( 'csdt-defimg-preview' );
+                const hiddenId = document.getElementById( 'csdt-defimg-id' );
+                if ( preview ) preview.innerHTML = '<div style="width:240px;height:126px;background:#f0f0f0;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;">No image selected</div>';
+                if ( hiddenId ) hiddenId.value = '0';
+                btnSelect.textContent = 'Select Image';
+                btnRemove.style.display = 'none';
+                saveDefImg( 0 );
+            } );
+        }
+    }
+
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', init );
+    } else {
+        init();
+    }
+} )();

@@ -35,10 +35,13 @@
 
         list.innerHTML = accounts.map(function (a) {
             var mins = Math.max(0, Math.ceil(a.expires_in / 60));
-            var su   = a.single_use ? ' · single-use' : '';
+            var loginInfo = '';
+            if (a.max_logins > 0) {
+                loginInfo = ' · ' + a.login_count + '/' + a.max_logins + ' logins';
+            }
             return '<div class="cs-ta-account-row" style="display:flex;align-items:center;gap:12px;padding:8px 12px;margin-bottom:4px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;">' +
                 '<div style="flex:1;font-family:monospace;font-size:13px;">' + escHtml(a.username) + '</div>' +
-                '<div style="font-size:12px;color:#6b7280;">expires in ' + mins + 'm' + escHtml(su) + '</div>' +
+                '<div style="font-size:12px;color:#6b7280;">expires in ' + mins + 'm' + escHtml(loginInfo) + '</div>' +
                 '<button type="button" class="cs-btn-secondary cs-btn-sm cs-ta-revoke" data-user-id="' + a.user_id + '" style="color:#dc2626;border-color:#fca5a5;">Revoke</button>' +
                 '</div>';
         }).join('');
@@ -97,7 +100,7 @@
         var options    = el('cs-ta-options');
         if (chkEnabled && options) {
             chkEnabled.addEventListener('change', function () {
-                options.style.display = chkEnabled.checked ? '' : 'none';
+                options.style.display = chkEnabled.checked ? 'flex' : 'none';
             });
         }
 
@@ -107,16 +110,17 @@
         if (btnSave) {
             btnSave.addEventListener('click', function () {
                 btnSave.disabled = true;
+                var maxLoginsEl = el('cs-ta-max-logins');
                 var payload = {
-                    enabled:     chkEnabled && chkEnabled.checked ? '1' : '0',
-                    ttl:         (el('cs-ta-ttl') || {}).value || '1800',
-                    single_use:  (el('cs-ta-single-use') || {}).checked ? '1' : '0',
+                    enabled:    chkEnabled && chkEnabled.checked ? '1' : '0',
+                    ttl:        (el('cs-ta-ttl') || {}).value || '1800',
+                    max_logins: maxLoginsEl ? (parseInt(maxLoginsEl.value, 10) || 0) : 0,
                 };
                 post('csdt_test_account_settings_save', payload, function (res) {
                     btnSave.disabled = false;
                     if (res.success && savedMsg) {
-                        savedMsg.style.display = 'inline';
-                        setTimeout(function () { savedMsg.style.display = 'none'; }, 2000);
+                        savedMsg.classList.add('visible');
+                        setTimeout(function () { savedMsg.classList.remove('visible'); }, 3000);
                     }
                 });
             });
