@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.157
+ * Version: 1.9.159
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.157';
+    const VERSION      = '1.9.159';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2680,13 +2680,13 @@ class CloudScale_DevTools {
 
                         <div class="cs-sec-row">
                             <span class="cs-sec-label"></span>
-                            <div class="cs-sec-control" style="display:flex;align-items:center;gap:8px;">
+                            <div class="cs-sec-control" style="display:flex;flex-direction:row;align-items:center;gap:10px;">
                                 <button type="button" class="cs-btn-primary" id="cs-ta-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                                 <span class="cs-settings-saved" id="cs-ta-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                             </div>
                         </div>
 
-                        <hr class="cs-sec-divider" style="margin:4px 0;">
+                        <hr class="cs-sec-divider" style="margin:0;">
 
                         <div class="cs-sec-row">
                             <span class="cs-sec-label"><?php esc_html_e( 'Create account:', 'cloudscale-devtools' ); ?></span>
