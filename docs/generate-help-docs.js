@@ -437,6 +437,8 @@ helpLib.run({
             });
           }
         },
+        { id: 'site-audit', label: 'AI Site Auditor',        file: 'panel-site-audit.png',  tabSelector: 'a[href*="tab=site-audit"]', elementSelector: '#cs-panel-site-audit',
+          altText: 'WordPress AI site auditor scanning SEO, content, performance, and database health with prioritised findings' },
         { id: 'code-block', label: 'Code Block',             file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings',
           altText: 'WordPress syntax-highlighted code block settings with 190 languages, 14 themes, no CDN, completely free' },
         { id: 'migrator',   label: 'Code Block Migrator',   file: 'panel-migrator.png',    tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-migrator',
@@ -447,8 +449,6 @@ helpLib.run({
           altText: 'WordPress server log viewer for PHP error logs, debug logs, and web server logs without SSH access' },
         { id: 'optimizer',  label: 'Plugin Optimizer',      file: 'panel-optimizer.png',   tabSelector: 'a[href*="tab=optimizer"]',
           altText: 'WordPress plugin stack scanner showing which plugins CloudScale replaces with AI debugging assistant' },
-        { id: 'site-audit', label: 'AI Site Auditor',        file: 'panel-site-audit.png',  tabSelector: 'a[href*="tab=site-audit"]', elementSelector: '#cs-panel-site-audit',
-          altText: 'WordPress AI site auditor scanning SEO, content, performance, and database health with prioritised findings' },
     ],
 
     docs: {
