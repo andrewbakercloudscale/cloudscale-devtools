@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.185
+ * Version: 1.9.187
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.185';
+    const VERSION      = '1.9.187';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9458,69 +9458,103 @@ class CloudScale_DevTools {
                 ];
             } )(),
             ( function () {
-                $ack = get_option( 'csdt_devtools_dismissed_checks', [] );
-                if ( in_array( 'fail2ban_external', (array) $ack, true ) ) {
-                    return [
-                        'id'     => 'ssh_brute_force',
-                        'title'  => 'SSH brute-force protection (externally managed)',
-                        'detail' => 'fail2ban is marked as managed outside this server — e.g. on the host OS, a firewall appliance, or Cloudflare.',
-                        'fixed'  => true,
-                    ];
-                }
-                $bin_paths = [
-                    '/usr/bin/fail2ban-client',
-                    '/usr/sbin/fail2ban-client',
-                    '/usr/local/bin/fail2ban-client',
-                    '/usr/local/sbin/fail2ban-client',
-                    '/opt/fail2ban/bin/fail2ban-client',
-                ];
-                $installed = false;
-                foreach ( $bin_paths as $p ) {
-                    if ( file_exists( $p ) ) { $installed = true; break; }
-                }
-                // Fallback: exec-based detection (works even if binary is outside standard paths)
-                if ( ! $installed && function_exists( 'exec' ) ) {
-                    $out = [];
-                    @exec( 'which fail2ban-client 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-                    $installed = ! empty( $out[0] ) && trim( $out[0] ) !== '';
-                }
-                $pid_paths = [
-                    '/var/run/fail2ban/fail2ban.pid',
-                    '/run/fail2ban/fail2ban.pid',
-                    '/var/run/fail2ban/fail2ban.sock',
-                    '/run/fail2ban/fail2ban.sock',
-                ];
-                $running = false;
-                if ( $installed ) {
-                    foreach ( $pid_paths as $p ) {
-                        if ( file_exists( $p ) ) { $running = true; break; }
+                // ── Detection strategy ─────────────────────────────────────────
+                // Three possible states: RUNNING (proved), NOT_INSTALLED (proved), UNDETECTABLE.
+                // "Undetectable" happens when PHP runs inside a container with no access to host
+                // binaries, PID files, or log files — we must not lie and say "not installed".
+                //
+                // Detection order (most reliable first):
+                //   1. /var/log/fail2ban.log readable → definitive (only exists if f2b installed)
+                //   2. Binary present in known paths → installed; PID/socket → running
+                //   3. exec('which fail2ban-client') → installed; exec('systemctl is-active') → running
+                //   4. All methods exhausted + /.dockerenv present → UNDETECTABLE
+
+                $state = 'unknown'; // 'running' | 'installed_stopped' | 'not_installed' | 'undetectable'
+
+                // Method 1: log file (most reliable in containerised environments if mounted)
+                $f2b_log = '/var/log/fail2ban.log';
+                if ( is_readable( $f2b_log ) ) {
+                    $state = 'installed_stopped'; // file exists = installed; assume stopped until proved
+                    $mtime = @filemtime( $f2b_log );
+                    if ( $mtime && ( time() - $mtime ) < 7200 ) {
+                        // File touched in last 2 h — read tail to find last lifecycle event
+                        $tail = '';
+                        if ( function_exists( 'exec' ) ) {
+                            $out = [];
+                            @exec( 'tail -20 ' . escapeshellarg( $f2b_log ) . ' 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+                            $tail = implode( "\n", $out );
+                        } elseif ( ( $fh = @fopen( $f2b_log, 'r' ) ) ) {
+                            $sz = (int) @filesize( $f2b_log );
+                            if ( $sz > 2048 ) { @fseek( $fh, -2048, SEEK_END ); }
+                            $tail = (string) @fread( $fh, 2048 );
+                            @fclose( $fh );
+                        }
+                        preg_match_all( '/(?:started successfully|Stopping all jails)/i', $tail, $m );
+                        $last = ! empty( $m[0] ) ? strtolower( end( $m[0] ) ) : '';
+                        if ( $last !== 'stopping all jails' ) {
+                            $state = 'running';
+                        }
+                    } else {
+                        // Log not touched in 2 h — fail2ban may have been stopped; treat as installed_stopped
+                        $state = 'installed_stopped';
                     }
-                    // Fallback: service status check via exec
-                    if ( ! $running && function_exists( 'exec' ) ) {
+                }
+
+                // Method 2 + 3: binary / PID / exec (works on bare metal or with docker-in-docker)
+                if ( $state === 'unknown' ) {
+                    $installed = false;
+                    foreach ( [ '/usr/bin/fail2ban-client', '/usr/sbin/fail2ban-client',
+                                 '/usr/local/bin/fail2ban-client', '/usr/local/sbin/fail2ban-client',
+                                 '/opt/fail2ban/bin/fail2ban-client' ] as $p ) {
+                        if ( file_exists( $p ) ) { $installed = true; break; }
+                    }
+                    if ( ! $installed && function_exists( 'exec' ) ) {
                         $out = [];
-                        @exec( 'systemctl is-active fail2ban 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-                        $running = isset( $out[0] ) && trim( $out[0] ) === 'active';
+                        @exec( 'which fail2ban-client 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+                        $installed = ! empty( trim( $out[0] ?? '' ) );
+                    }
+
+                    if ( $installed ) {
+                        $running = false;
+                        foreach ( [ '/var/run/fail2ban/fail2ban.pid', '/run/fail2ban/fail2ban.pid',
+                                     '/var/run/fail2ban/fail2ban.sock', '/run/fail2ban/fail2ban.sock' ] as $p ) {
+                            if ( file_exists( $p ) ) { $running = true; break; }
+                        }
+                        if ( ! $running && function_exists( 'exec' ) ) {
+                            $out = [];
+                            @exec( 'systemctl is-active fail2ban 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+                            $running = ( trim( $out[0] ?? '' ) === 'active' );
+                        }
+                        $state = $running ? 'running' : 'installed_stopped';
+                    } else {
+                        // Nothing found — check if we're in a container before declaring "not installed"
+                        $in_container = file_exists( '/.dockerenv' )
+                            || ( is_readable( '/proc/1/cgroup' ) && str_contains( (string) @file_get_contents( '/proc/1/cgroup' ), 'docker' ) );
+                        $state = $in_container ? 'undetectable' : 'not_installed';
                     }
                 }
+
                 $last_check = get_option( 'csdt_ssh_monitor_last_check', null );
                 $recent     = ( is_array( $last_check ) && isset( $last_check['count'] ) ) ? (int) $last_check['count'] : null;
                 $age        = ( is_array( $last_check ) && isset( $last_check['ts'] ) ) ? (int) ( time() - $last_check['ts'] ) : null;
                 $count_note = ( $recent !== null && $age !== null && $age < 180 )
                     ? sprintf( ' — %d failed attempt%s in the last 60 s', $recent, $recent === 1 ? '' : 's' )
                     : '';
+
+                $detail_map = [
+                    'running'           => 'fail2ban is installed and the daemon is running — SSH brute-force attempts are being blocked automatically.',
+                    'installed_stopped' => 'fail2ban is installed but the daemon is not running. Start it: sudo systemctl start fail2ban && sudo systemctl enable fail2ban',
+                    'not_installed'     => 'CRITICAL: fail2ban is not installed. Unprotected SSH is scanned 24/7 — attackers attempt thousands of passwords per minute and compromised servers are immediately enlisted into DDoS botnets.',
+                    'undetectable'      => 'Cannot verify from inside this container — host services are not visible to PHP. Click "Enable Detection" for the one-line docker-compose fix.',
+                ];
+
                 return [
-                    'id'            => 'ssh_brute_force',
-                    'title'         => 'SSH brute-force protection' . $count_note,
-                    'detail'        => $installed
-                        ? ( $running
-                            ? 'fail2ban is installed and the daemon is running — SSH brute-force attempts are being blocked automatically.'
-                            : 'fail2ban is installed but the daemon is not running. Start it: sudo systemctl start fail2ban && sudo systemctl enable fail2ban' )
-                        : 'CRITICAL: fail2ban is not installed. Unprotected SSH is scanned 24/7 — attackers attempt thousands of passwords per minute and compromised servers are immediately enlisted into DDoS botnets.',
-                    'fixed'         => $running,
-                    'fix_label'     => 'Copy fail2ban config',
-                    'fix_modal'     => 'csdt-fail2ban-modal',
-                    'dismiss_label' => 'Externally Managed',
-                    'dismiss_id'    => 'fail2ban_external',
+                    'id'        => 'ssh_brute_force',
+                    'title'     => 'SSH brute-force protection' . $count_note,
+                    'detail'    => $detail_map[ $state ] ?? $detail_map['not_installed'],
+                    'fixed'     => ( $state === 'running' ),
+                    'fix_label' => ( $state === 'undetectable' ) ? 'Enable Detection' : 'Copy fail2ban config',
+                    'fix_modal' => ( $state === 'undetectable' ) ? 'csdt-fail2ban-docker-modal' : 'csdt-fail2ban-modal',
                 ];
             } )(),
             ( function () {
@@ -11241,6 +11275,38 @@ bantime  = 86400</pre>
                             <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';">Close</button>
                         </div>
                         <p style="margin:16px 0 0;font-size:12px;color:#64748b;">After saving <code>/etc/fail2ban/jail.local</code> run: <code>sudo systemctl restart fail2ban</code> — verify with: <code>sudo fail2ban-client status sshd</code></p>
+                    </div>
+                </div>
+
+                <!-- fail2ban Docker detection modal -->
+                <div id="csdt-fail2ban-docker-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
+                    <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:620px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+                        <button onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">✕</button>
+                        <h3 style="margin:0 0 6px;font-size:16px;">Enable fail2ban Detection</h3>
+                        <p style="margin:0 0 16px;font-size:13px;color:#50575e;">WordPress is running inside a Docker container that cannot see host services. To prove whether fail2ban is installed and running, expose its log file into the container — a read-only mount, one line in your docker-compose.yml.</p>
+
+                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 1 — Add this to your docker-compose.yml (under WordPress <code>volumes:</code>)</p>
+                        <pre id="csdt-f2b-docker-vol" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro</pre>
+                        <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
+                            navigator.clipboard.writeText('      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy line';},2000); }.bind(this));
+                        ">Copy line</button>
+
+                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 2 — Restart the WordPress container</p>
+                        <pre id="csdt-f2b-docker-restart" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">docker compose up -d wordpress</pre>
+                        <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
+                            navigator.clipboard.writeText('docker compose up -d wordpress').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy command';},2000); }.bind(this));
+                        ">Copy command</button>
+
+                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 3 — Refresh this page</p>
+                        <p style="margin:0 0 16px;font-size:13px;color:#50575e;">The plugin will now read <code>/var/log/fail2ban.log</code> directly and report whether fail2ban is installed and running.</p>
+
+                        <div style="background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#713f12;">
+                            <strong>fail2ban not installed?</strong> Click Close and use the "Copy fail2ban config" button to install it on your host first.
+                        </div>
+
+                        <div style="display:flex;justify-content:flex-end;">
+                            <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';">Close</button>
+                        </div>
                     </div>
                 </div>
 
