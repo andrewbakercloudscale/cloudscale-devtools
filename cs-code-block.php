@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.122
+ * Version: 1.9.123
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -11329,7 +11329,7 @@ PROMPT;
                     ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
 
         if ( $has_key ) {
-            $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first).';
+            $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first). IMPORTANT: Do NOT generate findings about missing backup plugins or missing SEO plugins — those are handled separately.';
 
             $user_msg = "Audit this WordPress site and return findings as a JSON array:\n\n" . wp_json_encode( $data, JSON_PRETTY_PRINT );
 
@@ -11341,6 +11341,9 @@ PROMPT;
                 $findings = json_decode( $raw, true );
                 if ( ! is_array( $findings ) ) {
                     $findings = self::generate_rule_based_findings( $data );
+                } else {
+                    // Always append cross-sell findings even with AI
+                    $findings = array_merge( $findings, self::get_cross_sell_findings( $data ) );
                 }
             } catch ( \Throwable $e ) {
                 $findings = self::generate_rule_based_findings( $data );
@@ -11477,6 +11480,21 @@ PROMPT;
         $active_count   = count( $active_slugs );
         $inactive_count = count( $all_plugins ) - $active_count;
 
+        // ── Cross-sell: backup & SEO plugin detection ──
+        $backup_slugs = [ 'cloudscale-backup', 'updraftplus', 'backwpup', 'backup-backup',
+                          'duplicator', 'duplicator-pro', 'backupbuddy', 'blogvault-real-time-backup',
+                          'wp-all-backup', 'wp-database-backup', 'xcloner-backup-and-restore' ];
+        $seo_slugs    = [ 'cloudscale-seo-ai-optimizer', 'wordpress-seo', 'wordpress-seo-premium',
+                          'rank-math', 'all-in-one-seo-pack', 'seopress', 'the-seo-framework',
+                          'squirrly-seo', 'wp-seopress' ];
+        $has_backup = false;
+        $has_seo    = false;
+        foreach ( $active_slugs as $slug ) {
+            $folder = explode( '/', $slug )[0];
+            if ( in_array( $folder, $backup_slugs, true ) ) { $has_backup = true; }
+            if ( in_array( $folder, $seo_slugs, true ) )    { $has_seo    = true; }
+        }
+
         // ── Config flags ──
         $debug_on      = defined( 'WP_DEBUG' ) && WP_DEBUG;
         $debug_log_on  = defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG;
@@ -11498,12 +11516,47 @@ PROMPT;
             'orphan_postmeta'     => $orphan_postmeta,
             'active_plugins'      => $active_count,
             'inactive_plugins'    => $inactive_count,
+            'has_backup_plugin'   => $has_backup,
+            'has_seo_plugin'      => $has_seo,
             'wp_debug'            => $debug_on,
             'wp_debug_log'        => $debug_log_on,
             'revisions_max'       => $revisions_max,
             'wp_version'          => get_bloginfo( 'version' ),
             'php_version'         => PHP_VERSION,
         ];
+    }
+
+    private static function get_cross_sell_findings( array $d ): array {
+        $findings = [];
+        if ( empty( $d['has_backup_plugin'] ) ) {
+            $findings[] = [
+                'category' => 'Security',
+                'severity' => 'high',
+                'title'    => 'No backup plugin detected — your site has no recovery point',
+                'detail'   => 'A server failure, bad plugin update, or hack with no backup means permanent data loss. Backups are non-negotiable for any production WordPress site.',
+                'fix'      => 'Install a backup plugin and schedule daily off-site backups before making any significant changes.',
+                'cta'      => [
+                    'label' => '🗄 CloudScale Backup & Restore — Free',
+                    'url'   => 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-backup-restore-help/',
+                    'desc'  => 'One-click backup to S3, automated schedules, and point-in-time restore. Free and open-source.',
+                ],
+            ];
+        }
+        if ( empty( $d['has_seo_plugin'] ) ) {
+            $findings[] = [
+                'category' => 'SEO',
+                'severity' => 'high',
+                'title'    => 'No SEO plugin detected — meta tags and structured data not managed',
+                'detail'   => 'Without an SEO plugin, Google receives no guidance on page titles, meta descriptions, canonical URLs, or structured data. This directly limits your organic search visibility.',
+                'fix'      => 'Install an SEO plugin to manage meta descriptions, Open Graph tags, sitemaps, and structured data across all your pages.',
+                'cta'      => [
+                    'label' => '🤖 CloudScale SEO AI — Free',
+                    'url'   => 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-seo-ai-help/',
+                    'desc'  => 'AI-generated meta descriptions, og:image creation, Cloudflare CDN integration, and a social preview checker. Free and open-source.',
+                ],
+            ];
+        }
+        return $findings;
     }
 
     private static function generate_rule_based_findings( array $d ): array {
@@ -11633,6 +11686,10 @@ PROMPT;
                 'fix'      => "Set define('WP_DEBUG', false) in wp-config.php. If you need debug logging, use WP_DEBUG_LOG with WP_DEBUG_DISPLAY set to false.",
                 'affected' => 'wp-config.php',
             ];
+        }
+
+        foreach ( self::get_cross_sell_findings( $d ) as $f ) {
+            $findings[] = $f;
         }
 
         if ( empty( $findings ) ) {

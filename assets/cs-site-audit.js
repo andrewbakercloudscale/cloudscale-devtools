@@ -57,9 +57,20 @@
         var sev = (f.severity || 'info').toLowerCase();
         var col = SEV_COLOR[sev] || SEV_COLOR.info;
         var icon = CAT_ICON[f.category] || '🔍';
+        var ctaHtml = '';
+        if (f.cta && f.cta.url && f.cta.label) {
+            ctaHtml = '<div style="margin-top:10px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+                '<div style="flex:1;min-width:0;">' +
+                '<div style="font-size:.78em;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">CloudScale Recommendation</div>' +
+                '<div style="font-size:.83em;color:#cbd5e1;line-height:1.4;">' + escHtml(f.cta.desc || '') + '</div>' +
+                '</div>' +
+                '<a href="' + escHtml(f.cta.url) + '" target="_blank" rel="noopener" style="flex-shrink:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;font-size:.8em;font-weight:700;padding:7px 14px;border-radius:6px;white-space:nowrap;">' +
+                escHtml(f.cta.label) + '</a>' +
+                '</div>';
+        }
         return '<div style="background:' + col.bg + ';border:1px solid ' + col.border +
             ';border-radius:8px;padding:16px 20px;margin-bottom:12px;">' +
-            '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;">' +
+            '<div style="display:flex;align-items:flex-start;gap:12px;">' +
             '<span style="font-size:1.1em;margin-top:1px;">' + icon + '</span>' +
             '<div style="flex:1;min-width:0;">' +
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
@@ -72,6 +83,7 @@
             '<div style="background:rgba(255,255,255,.7);border-left:2px solid ' + col.badge + ';padding:8px 12px;border-radius:0 4px 4px 0;font-size:.85em;color:#374151;line-height:1.5;">' +
             '<strong style="color:' + col.text + ';">Fix: </strong>' + escHtml(f.fix || '') +
             '</div>' +
+            ctaHtml +
             '</div></div></div>';
     }
 
