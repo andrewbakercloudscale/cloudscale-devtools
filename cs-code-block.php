@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.177
+ * Version: 1.9.179
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.177';
+    const VERSION      = '1.9.179';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1278,6 +1278,22 @@ class CloudScale_DevTools {
             ] );
         }
 
+        if ( $active_tab === 'debug' ) {
+            wp_enqueue_script(
+                'csdt-debug',
+                plugins_url( 'assets/cs-debug.js', __FILE__ ),
+                [],
+                self::VERSION,
+                true
+            );
+            wp_localize_script( 'csdt-debug', 'csdtDebug', [
+                'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+                'logsNonce' => wp_create_nonce( 'csdt_devtools_server_logs' ),
+                'aiNonce'   => wp_create_nonce( 'csdt_optimizer_nonce' ),
+                'sources'   => self::get_log_sources(),
+            ] );
+        }
+
         // Email-verified modal countdown — only needed when the verification
         // redirect lands back on the login tab with ?email_2fa_activated=1.
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -1371,6 +1387,10 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'logs' ? 'active' : ''; ?>">
                     📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=debug' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'debug' ? 'active' : ''; ?>">
+                    🧠 <?php esc_html_e( 'Debug AI', 'cloudscale-devtools' ); ?>
+                </a>
             </div>
 
             <!-- Copy All action bar -->
@@ -1424,6 +1444,10 @@ class CloudScale_DevTools {
             <?php elseif ( $active_tab === 'logs' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_server_logs_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'debug' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php self::render_debug_panel(); ?>
                 </div>
             <?php endif; ?>
 
@@ -1747,6 +1771,65 @@ class CloudScale_DevTools {
 
         update_option( 'csdt_custom_log_paths', $clean );
         wp_send_json_success( [ 'sources' => self::get_log_sources() ] );
+    }
+
+    private static function render_debug_panel(): void {
+        $has_key   = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) )
+                  || ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $key_url   = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        ?>
+        <div class="cs-panel" id="cs-panel-debug">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1a2e 0%,#16213e 100%);border-left:3px solid #7c3aed;">
+                <span>🧠 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Paste an error or load from your logs — AI identifies the root cause and gives step-by-step fixes', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div style="padding:24px;">
+                <?php if ( ! $has_key ) : ?>
+                    <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:16px 20px;margin-bottom:24px;">
+                        <strong><?php esc_html_e( 'No AI key configured.', 'cloudscale-devtools' ); ?></strong>
+                        <?php
+                        printf(
+                            wp_kses(
+                                /* translators: %s: link to security scan settings */
+                                __( 'Add an Anthropic or Gemini API key under <a href="%s">Security Scan → Settings</a> to enable analysis.', 'cloudscale-devtools' ),
+                                [ 'a' => [ 'href' => [] ] ]
+                            ),
+                            esc_url( $key_url )
+                        );
+                        ?>
+                    </div>
+                <?php endif; ?>
+
+                <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0e1628 100%);border-radius:10px;padding:24px 28px;margin-bottom:28px;color:#e2e8f0;">
+                    <p style="margin:0 0 10px;font-size:1.1em;font-weight:700;color:#a78bfa;"><?php esc_html_e( 'Your site broke. Find out why in seconds.', 'cloudscale-devtools' ); ?></p>
+                    <p style="margin:0;opacity:.85;font-size:.95em;line-height:1.6;"><?php esc_html_e( 'Paste a PHP error, stack trace, or problem description. Or click Load Errors to pull recent error lines directly from your server logs. The AI identifies the exact root cause, explains the mechanism, and gives you numbered steps to fix it — no Stack Overflow required.', 'cloudscale-devtools' ); ?></p>
+                </div>
+
+                <div style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+                    <span style="font-size:.8em;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.07em;"><?php esc_html_e( 'Load from log:', 'cloudscale-devtools' ); ?></span>
+                    <button type="button" class="cs-debug-load-btn cs-btn-sm" data-source="php_error"><?php esc_html_e( 'PHP Errors', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-debug-load-btn cs-btn-sm" data-source="wp_debug"><?php esc_html_e( 'WP Debug', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-debug-load-btn cs-btn-sm" data-source="web_error"><?php esc_html_e( 'Web Server', 'cloudscale-devtools' ); ?></button>
+                    <span id="csdt-debug-load-status" style="font-size:.85em;color:#94a3b8;"></span>
+                </div>
+
+                <div id="csdt-debug-log-lines" style="display:none;margin-bottom:16px;max-height:220px;overflow-y:auto;border:1px solid #334155;border-radius:6px;background:#0f172a;"></div>
+
+                <div style="margin-bottom:16px;">
+                    <textarea id="csdt-debug-input" rows="7" style="width:100%;box-sizing:border-box;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:12px;font-family:monospace;font-size:.85em;resize:vertical;" placeholder="<?php esc_attr_e( 'Paste an error message, stack trace, wp-cron failure, SMTP error, JavaScript console error, or describe what is broken...', 'cloudscale-devtools' ); ?>"></textarea>
+                </div>
+
+                <div style="margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+                    <button type="button" id="csdt-debug-analyze" class="cs-btn-primary"<?php echo $has_key ? '' : ' disabled'; ?>>
+                        🧠 <?php esc_html_e( 'Analyze with AI', 'cloudscale-devtools' ); ?>
+                    </button>
+                    <span id="csdt-debug-analyze-status" style="font-size:.85em;color:#94a3b8;"></span>
+                </div>
+
+                <div id="csdt-debug-result" style="display:none;"></div>
+            </div>
+        </div>
+        <?php
     }
 
     private static function render_server_logs_panel(): void {

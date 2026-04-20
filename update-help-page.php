@@ -46,7 +46,7 @@ $content = <<<'HTML'
 <div class="cs-hero">
 <a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
 <h1>CloudScale Cyber and Devtools</h1>
-<p>A free WordPress developer toolkit with <strong>enterprise-grade AI security scanning built in</strong>. The <strong>AI Cyber Audit</strong> uses frontier AI models (Anthropic Claude or Google Gemini) to perform deep security analysis of your WordPress installation — hardening checks, live HTTP probes, DNS record validation, weak TLS detection, plugin code vulnerability analysis, PHP end-of-life checks, one-click automated fixes, scheduled scans with email alerts, and full scan history. Bring your own API key and run the kind of security analysis that would normally cost hundreds of dollars, in under 60 seconds. Also includes: read-only server log viewer, temporary test accounts for CI pipelines, syntax-highlighted code blocks, social preview diagnostics, read-only SQL tool, bulk code migrator, login security (passkeys, TOTP, 2FA, hide URL, brute-force protection), SMTP mail, performance monitor, and a custom 404 page with mini-games.</p>
+<p>A free WordPress developer toolkit with <strong>enterprise-grade AI built in</strong>. The <strong>AI Cyber Audit</strong> uses frontier AI models (Anthropic Claude or Google Gemini) to perform deep security analysis of your WordPress installation — hardening checks, live HTTP probes, DNS record validation, weak TLS detection, plugin code vulnerability analysis, PHP end-of-life checks, one-click automated fixes, scheduled scans with email alerts, and full scan history. The <strong>AI Debugging Assistant</strong> connects your server logs directly to AI — paste a PHP error, click a log line, and get the root cause plus numbered fix steps in seconds. Bring your own API key and run the kind of analysis that would normally cost hundreds of dollars, in under 60 seconds. Also includes: read-only server log viewer, temporary test accounts for CI pipelines, syntax-highlighted code blocks, social preview diagnostics, read-only SQL tool, bulk code migrator, login security (passkeys, TOTP, 2FA, hide URL, brute-force protection), SMTP mail, performance monitor, and a custom 404 page with mini-games.</p>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;">
 <a class="cs-download-btn" href="https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">&#11015; Download Latest Version (.zip)</a>
 <a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a>
@@ -74,6 +74,7 @@ $content = <<<'HTML'
 <li><a href="#sql-tool">SQL Query Tool</a></li>
 <li><a href="#custom-404">Custom 404 Page</a></li>
 <li><a href="#perf-monitor">Performance Monitor</a></li>
+<li><a href="#ai-debug">AI Debugging Assistant</a></li>
 </ol>
 </div>
 
@@ -538,6 +539,42 @@ $content = <<<'HTML'
 <li><strong>Template hierarchy</strong> — the chain of template files WordPress evaluated to render the page.</li>
 </ul>
 <p>The panel is enabled by default. You can disable it under Tools → CloudScale Cyber and Devtools → Settings. Data is colour-coded by severity and can be exported as JSON for sharing with developers.</p>
+</div>
+</div>
+<hr class="cs-divider"/>
+
+<!-- ═══ AI DEBUGGING ASSISTANT ═══ -->
+<div class="cs-panel-section">
+<h3 class="cs-panel-heading" id="ai-debug">AI Debugging Assistant</h3>
+<div class="cs-panel-body">
+<div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0e1628 100%);border-radius:10px;padding:24px 28px;margin-bottom:28px;color:#e2e8f0;">
+<p style="margin:0 0 10px;font-size:1.1em;font-weight:700;color:#a78bfa;">Your site broke. Find out why in seconds.</p>
+<p style="margin:0;opacity:.85;font-size:.95em;line-height:1.6;">The <strong>AI Debugging Assistant</strong> (Tools → Debug AI tab) connects your server logs directly to a frontier AI model. When something breaks — a PHP fatal, a plugin conflict, a failing cron job, a cryptic SMTP error — paste the error or click <em>Load Errors</em> to pull recent lines from your PHP, WordPress, or web server logs. The AI returns three things: the exact root cause, the mechanism behind it, and numbered steps to fix it. No tab-switching, no Stack Overflow, no guessing.</p>
+</div>
+
+<h4 class="cs-sub-heading">How it works</h4>
+<ol>
+<li><strong>Load from logs</strong> — click <em>PHP Errors</em>, <em>WP Debug</em>, or <em>Web Server</em> to fetch the last 200 lines from the corresponding log file. Error-level lines are extracted and listed as clickable rows. Click any row to populate the input.</li>
+<li><strong>Or paste directly</strong> — paste any error message, stack trace, wp-cron failure, SMTP diagnostic, JavaScript console error, or plain-English problem description into the text area.</li>
+<li><strong>Analyze</strong> — click <em>Analyze with AI</em>. The assistant sends the input to Claude or Gemini (whichever API key is configured) with full WordPress and PHP version context.</li>
+<li><strong>Act on the result</strong> — the response is structured into three colour-coded sections: Root Cause, Why It Happens, and How to Fix It. File paths, function names, and code snippets are formatted for readability.</li>
+</ol>
+
+<h4 class="cs-sub-heading">What it can diagnose</h4>
+<ul>
+<li>PHP fatal errors, warnings, and notices — including plugin and theme conflicts</li>
+<li>WordPress database errors and table corruption</li>
+<li>WP-Cron failures and missed scheduled events</li>
+<li>SMTP delivery failures and mail configuration errors</li>
+<li>Memory exhaustion and max execution time errors</li>
+<li>REST API and AJAX errors from wp-admin logs</li>
+<li>Web server 500 errors, rewrite rule failures, and permission errors</li>
+<li>JavaScript console errors pasted from the browser DevTools</li>
+<li>Any plain-English description of unexpected behaviour</li>
+</ul>
+
+<h4 class="cs-sub-heading">Requirements</h4>
+<p>An Anthropic or Gemini API key must be configured under <strong>Security Scan → Settings</strong>. The assistant uses the same API key and model as the AI Cyber Audit — no separate configuration is needed. Log files must be readable by the web server process; see the <a href="#server-logs">Server Logs</a> section for setup instructions.</p>
 </div>
 </div>
 <hr class="cs-divider"/>
