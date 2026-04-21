@@ -1888,7 +1888,8 @@
             }
             var fix = getIssueFix(issue);
             var fixId = 'cs-fix-' + idx;
-            var tabLink = issue.tab ? ' <span class="cs-issue-tab-link" data-tab="' + esc(issue.tab) + '" style="font-size:10px;opacity:.6;cursor:pointer;text-decoration:underline;">→ ' + esc(issue.tab) + ' tab</span>' : '';
+            var tabLabels = { editor: 'browser', db: 'db', http: 'http', logs: 'logs', assets: 'assets', hooks: 'hooks' };
+            var tabLink = issue.tab ? ' <span class="cs-issue-tab-link" data-tab="' + esc(issue.tab) + '" style="font-size:10px;opacity:.6;cursor:pointer;text-decoration:underline;">→ ' + esc(tabLabels[issue.tab] || issue.tab) + ' tab</span>' : '';
             html += '<div class="cs-issue-row cs-issue-' + esc(issue.sev) + '">'
                 + '<div class="cs-issue-top">'
                     + '<span class="cs-issue-title">' + esc(issue.title) + '</span>'
