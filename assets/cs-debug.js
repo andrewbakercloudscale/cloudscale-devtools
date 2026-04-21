@@ -184,13 +184,15 @@
             fpmSaveBtn.disabled = true;
             if ( fpmStatus ) { fpmStatus.textContent = '\u23F3 Saving\u2026'; }
             post( 'csdt_fpm_monitor_save', {
-                enabled:       fpmEnabledChk.checked ? '1' : '0',
-                threshold:     ( document.getElementById( 'csdt-fpm-threshold'    ) || {} ).value || '3',
-                cooldown:      ( document.getElementById( 'csdt-fpm-cooldown'     ) || {} ).value || '1800',
-                probe_url:     ( document.getElementById( 'csdt-fpm-probe-url'    ) || {} ).value || '',
-                probe_timeout: ( document.getElementById( 'csdt-fpm-probe-timeout') || {} ).value || '5',
-                wp_container:  ( document.getElementById( 'csdt-fpm-wp-container' ) || {} ).value || 'pi_wordpress',
-                db_container:  ( document.getElementById( 'csdt-fpm-db-container' ) || {} ).value || 'pi_mariadb',
+                enabled:          fpmEnabledChk.checked ? '1' : '0',
+                threshold:        ( document.getElementById( 'csdt-fpm-threshold'        ) || {} ).value || '3',
+                cooldown:         ( document.getElementById( 'csdt-fpm-cooldown'         ) || {} ).value || '1800',
+                probe_url:        ( document.getElementById( 'csdt-fpm-probe-url'        ) || {} ).value || '',
+                probe_timeout:    ( document.getElementById( 'csdt-fpm-probe-timeout'    ) || {} ).value || '5',
+                wp_container:     ( document.getElementById( 'csdt-fpm-wp-container'     ) || {} ).value || 'pi_wordpress',
+                db_container:     ( document.getElementById( 'csdt-fpm-db-container'     ) || {} ).value || 'pi_mariadb',
+                auto_restart:     ( document.getElementById( 'csdt-fpm-auto-restart'     ) || {} ).checked ? '1' : '0',
+                restart_cooldown: ( document.getElementById( 'csdt-fpm-restart-cooldown' ) || {} ).value || '1200',
             }, cfg.fpmNonce )
                 .then( function ( res ) {
                     fpmSaveBtn.disabled = false;

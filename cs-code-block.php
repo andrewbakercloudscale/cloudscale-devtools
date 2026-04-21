@@ -1928,20 +1928,23 @@ class CloudScale_DevTools {
 
                 <!-- PHP-FPM Saturation Monitor -->
                 <?php
-                $fpm_enabled   = get_option( 'csdt_fpm_enabled',        '1' ) === '1';
-                $fpm_threshold = (int) get_option( 'csdt_fpm_threshold',      '3' );
-                $fpm_cooldown  = (int) get_option( 'csdt_fpm_cooldown',       '1800' );
-                $fpm_probe_url = get_option( 'csdt_fpm_probe_url',            'http://localhost:8082/' );
-                $fpm_timeout   = (int) get_option( 'csdt_fpm_probe_timeout',  '5' );
-                $fpm_wp_ctr    = get_option( 'csdt_fpm_wp_container',         'pi_wordpress' );
-                $fpm_db_ctr    = get_option( 'csdt_fpm_db_container',         'pi_mariadb' );
-                $fpm_token     = get_option( 'csdt_fpm_token',                '' );
+                $fpm_enabled          = get_option( 'csdt_fpm_enabled',          '1' ) === '1';
+                $fpm_threshold        = (int) get_option( 'csdt_fpm_threshold',        '3' );
+                $fpm_cooldown         = (int) get_option( 'csdt_fpm_cooldown',         '1800' );
+                $fpm_probe_url        = get_option( 'csdt_fpm_probe_url',              'http://localhost:8082/' );
+                $fpm_timeout          = (int) get_option( 'csdt_fpm_probe_timeout',    '5' );
+                $fpm_wp_ctr           = get_option( 'csdt_fpm_wp_container',           'pi_wordpress' );
+                $fpm_db_ctr           = get_option( 'csdt_fpm_db_container',           'pi_mariadb' );
+                $fpm_auto_restart     = get_option( 'csdt_fpm_auto_restart',           '0' ) === '1';
+                $fpm_restart_cooldown = (int) get_option( 'csdt_fpm_restart_cooldown', '1200' );
+                $fpm_token            = get_option( 'csdt_fpm_token',                  '' );
                 if ( empty( $fpm_token ) ) {
                     $fpm_token = wp_generate_password( 32, false );
                     update_option( 'csdt_fpm_token', $fpm_token, false );
                 }
-                $fpm_last      = get_option( 'csdt_fpm_last_event', null );
+                $fpm_last       = get_option( 'csdt_fpm_last_event', null );
                 $fpm_report_url = admin_url( 'admin-ajax.php' );
+                $fpm_auto_restart_val = $fpm_auto_restart ? 'true' : 'false';
                 $fpm_config_snippet = "# ── PHP-FPM Saturation Monitor ─────────────────────────────────────────────\n"
                     . "FPM_SATURATION_THRESHOLD={$fpm_threshold}\n"
                     . "FPM_PROBE_URL={$fpm_probe_url}\n"
@@ -1949,6 +1952,8 @@ class CloudScale_DevTools {
                     . "FPM_WP_CONTAINER={$fpm_wp_ctr}\n"
                     . "FPM_DB_CONTAINER={$fpm_db_ctr}\n"
                     . "FPM_ALERT_COOLDOWN={$fpm_cooldown}\n"
+                    . "FPM_AUTO_RESTART={$fpm_auto_restart_val}\n"
+                    . "FPM_RESTART_COOLDOWN={$fpm_restart_cooldown}\n"
                     . "FPM_CALLBACK_URL={$fpm_report_url}\n"
                     . "FPM_CALLBACK_TOKEN={$fpm_token}";
                 ?>
@@ -1957,7 +1962,7 @@ class CloudScale_DevTools {
                         <div>
                             <strong style="color:#e2e8f0;">🖥️ <?php esc_html_e( 'PHP-FPM Saturation Monitor', 'cloudscale-devtools' ); ?></strong>
                             <span style="display:inline-flex;align-items:center;margin-left:8px;padding:1px 8px;background:#1e3a5f;border-radius:10px;font-size:.72em;color:#60a5fa;">HOST CRON</span>
-                            <span style="display:block;font-size:.82em;color:#64748b;margin-top:2px;"><?php esc_html_e( 'Detects when all PHP-FPM workers are exhausted — alerts before WP-Cron itself stops running', 'cloudscale-devtools' ); ?></span>
+                            <span style="display:block;font-size:.82em;color:#64748b;margin-top:2px;"><?php esc_html_e( 'Detects when all PHP-FPM workers are exhausted. Runs on the host (not WP-Cron), so it fires even when PHP is fully saturated. Can automatically restart the WordPress container and notify via ntfy.', 'cloudscale-devtools' ); ?></span>
                         </div>
                         <div style="display:flex;align-items:center;gap:10px;">
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -1994,6 +1999,18 @@ class CloudScale_DevTools {
                             <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'MariaDB container name', 'cloudscale-devtools' ); ?></label>
                             <input type="text" id="csdt-fpm-db-container" value="<?php echo esc_attr( $fpm_db_ctr ); ?>" style="width:100%;box-sizing:border-box;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
                         </div>
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'Auto-restart on saturation', 'cloudscale-devtools' ); ?></label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
+                                <input type="checkbox" id="csdt-fpm-auto-restart" <?php checked( $fpm_auto_restart ); ?>>
+                                <span style="font-size:.85em;color:#94a3b8;"><?php esc_html_e( 'Restart container automatically', 'cloudscale-devtools' ); ?></span>
+                            </label>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'Restart cooldown (seconds)', 'cloudscale-devtools' ); ?></label>
+                            <input type="number" id="csdt-fpm-restart-cooldown" min="60" max="86400" value="<?php echo esc_attr( $fpm_restart_cooldown ); ?>" style="width:100px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
+                            <span style="font-size:.75em;color:#475569;margin-left:6px;"><?php echo esc_html( sprintf( __( '%d min', 'cloudscale-devtools' ), (int) round( $fpm_restart_cooldown / 60 ) ) ); ?></span>
+                        </div>
                     </div>
 
                     <div style="background:#0a1628;border:1px solid #1e3a5f;border-radius:6px;padding:14px 16px;margin-bottom:16px;">
@@ -2007,9 +2024,20 @@ class CloudScale_DevTools {
                     </div>
 
                     <div style="font-size:.82em;">
-                        <?php if ( $fpm_last ) : ?>
-                            <span style="color:<?php echo esc_attr( $fpm_last['type'] === 'recovered' ? '#86efac' : '#f87171' ); ?>;">
-                                <?php echo $fpm_last['type'] === 'recovered' ? '✓' : '🚨'; ?>
+                        <?php if ( $fpm_last ) :
+                            $fpm_event_color = match( $fpm_last['type'] ) {
+                                'recovered' => '#86efac',
+                                'restarted' => '#fbbf24',
+                                default     => '#f87171',
+                            };
+                            $fpm_event_icon = match( $fpm_last['type'] ) {
+                                'recovered' => '✓',
+                                'restarted' => '🔄',
+                                default     => '🚨',
+                            };
+                        ?>
+                            <span style="color:<?php echo esc_attr( $fpm_event_color ); ?>;">
+                                <?php echo $fpm_event_icon; ?>
                                 <?php echo esc_html( human_time_diff( (int) $fpm_last['ts'] ) . ' ago — ' . $fpm_last['msg'] ); ?>
                             </span>
                         <?php else : ?>
@@ -15941,17 +15969,21 @@ PROMPT;
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
-        $enabled   = isset( $_POST['enabled'] ) && $_POST['enabled'] === '1' ? '1' : '0';
-        $threshold = max( 1, min( 30,    (int) ( $_POST['threshold']     ?? 3    ) ) );
-        $cooldown  = max( 60, min( 86400, (int) ( $_POST['cooldown']     ?? 1800 ) ) );
-        $timeout   = max( 1, min( 30,    (int) ( $_POST['probe_timeout'] ?? 5    ) ) );
-        update_option( 'csdt_fpm_enabled',       $enabled,                                                                         false );
-        update_option( 'csdt_fpm_threshold',      (string) $threshold,                                                             false );
-        update_option( 'csdt_fpm_cooldown',       (string) $cooldown,                                                              false );
-        update_option( 'csdt_fpm_probe_url',      esc_url_raw( (string) ( $_POST['probe_url']    ?? 'http://localhost:8082/' ) ),   false );
-        update_option( 'csdt_fpm_probe_timeout',  (string) $timeout,                                                               false );
-        update_option( 'csdt_fpm_wp_container',   sanitize_text_field( (string) ( $_POST['wp_container'] ?? 'pi_wordpress' ) ),    false );
-        update_option( 'csdt_fpm_db_container',   sanitize_text_field( (string) ( $_POST['db_container'] ?? 'pi_mariadb'  ) ),    false );
+        $enabled          = isset( $_POST['enabled'] ) && $_POST['enabled'] === '1' ? '1' : '0';
+        $threshold        = max( 1, min( 30,    (int) ( $_POST['threshold']       ?? 3    ) ) );
+        $cooldown         = max( 60, min( 86400, (int) ( $_POST['cooldown']       ?? 1800 ) ) );
+        $timeout          = max( 1, min( 30,    (int) ( $_POST['probe_timeout']   ?? 5    ) ) );
+        $auto_restart     = isset( $_POST['auto_restart'] ) && $_POST['auto_restart'] === '1' ? '1' : '0';
+        $restart_cooldown = max( 60, min( 86400, (int) ( $_POST['restart_cooldown'] ?? 1200 ) ) );
+        update_option( 'csdt_fpm_enabled',          $enabled,                                                                         false );
+        update_option( 'csdt_fpm_threshold',         (string) $threshold,                                                             false );
+        update_option( 'csdt_fpm_cooldown',          (string) $cooldown,                                                              false );
+        update_option( 'csdt_fpm_probe_url',         esc_url_raw( (string) ( $_POST['probe_url']    ?? 'http://localhost:8082/' ) ),   false );
+        update_option( 'csdt_fpm_probe_timeout',     (string) $timeout,                                                               false );
+        update_option( 'csdt_fpm_wp_container',      sanitize_text_field( (string) ( $_POST['wp_container'] ?? 'pi_wordpress' ) ),    false );
+        update_option( 'csdt_fpm_db_container',      sanitize_text_field( (string) ( $_POST['db_container'] ?? 'pi_mariadb'  ) ),    false );
+        update_option( 'csdt_fpm_auto_restart',      $auto_restart,                                                                   false );
+        update_option( 'csdt_fpm_restart_cooldown',  (string) $restart_cooldown,                                                      false );
         wp_send_json_success();
     }
 
@@ -15970,7 +16002,7 @@ PROMPT;
             return new \WP_REST_Response( [ 'error' => 'Invalid token' ], 403 );
         }
         $type = sanitize_text_field( (string) $request->get_param( 'type' ) );
-        if ( ! in_array( $type, [ 'saturated', 'recovered' ], true ) ) {
+        if ( ! in_array( $type, [ 'saturated', 'recovered', 'restarted' ], true ) ) {
             $type = 'saturated';
         }
         $msg = sanitize_text_field( (string) $request->get_param( 'msg' ) );
