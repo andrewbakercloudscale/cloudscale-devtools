@@ -466,11 +466,6 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_perf_explain',       [ __CLASS__, 'ajax_perf_explain' ] );
         add_action( 'wp_ajax_csdt_devtools_perf_debug_toggle',  [ __CLASS__, 'ajax_perf_debug_toggle' ] );
 
-        // Editor debug panel — only on post/post-new screens when enabled.
-        if ( get_option( 'csdt_devtools_editor_debug_panel', '0' ) === '1' ) {
-            add_action( 'admin_footer', [ __CLASS__, 'output_editor_debug_panel' ], 9998 );
-        }
-
         // Performance monitor — only register data-collection hooks when the monitor is enabled.
         // This prevents SAVEQUERIES-scale memory accumulation on every request when disabled.
         if ( get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0' ) {
@@ -1057,7 +1052,7 @@ class CloudScale_DevTools {
     public static function add_tools_page() {
         add_management_page(
             'CloudScale Cyber and Devtools',
-            '🌩️ Cyber and Devtools',
+            '🔐 Cyber and Devtools',
             'manage_options',
             self::TOOLS_SLUG,
             [ __CLASS__, 'render_tools_page' ]
@@ -5438,6 +5433,7 @@ class CloudScale_DevTools {
                         . '<button class="cs-ptab"         data-tab="template"  role="tab" aria-selected="false">Template</button>'
                         . '<button class="cs-ptab"         data-tab="transients" role="tab" aria-selected="false">Transients <span id="cs-ptc-trans">0</span></button>'
                         . '<button class="cs-ptab"         data-tab="summary"   role="tab" aria-selected="false">Summary</button>'
+                        . '<button class="cs-ptab"         data-tab="editor"    role="tab" aria-selected="false">Editor <span id="cs-ptc-editor">0</span></button>'
                     . '</div>'
                     . '<button id="cs-perf-copy" class="cs-ptab-copy" title="Copy current tab to clipboard">&#128203; Copy</button>'
                 . '</div>'
@@ -5556,6 +5552,9 @@ class CloudScale_DevTools {
                 . '</div>'
                 . '<div id="cs-pp-summary" class="cs-ppane" role="tabpanel">'
                     . '<div id="cs-summary-wrap" class="cs-tbl-wrap"></div>'
+                . '</div>'
+                . '<div id="cs-pp-editor" class="cs-ppane" role="tabpanel">'
+                    . '<div id="cs-pp-editor-body" class="cs-tbl-wrap"></div>'
                 . '</div>'
                 . '<div id="cs-perf-foot"><span id="cs-perf-foot-txt"></span></div>'
             . '</div>'
@@ -9976,10 +9975,6 @@ class CloudScale_DevTools {
                     <input type="checkbox" id="cs-csp-enabled" <?php checked( $csp_on ); ?>>
                     <?php esc_html_e( 'Enable CSP', 'cloudscale-devtools' ); ?>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;" title="Shows a floating debug panel on post/post-new screens capturing CSP violations, JS errors, failed resources and network issues">
-                    <input type="checkbox" id="cs-csp-debug-panel" <?php checked( get_option( 'csdt_devtools_editor_debug_panel', '0' ), '1' ); ?>>
-                    <?php esc_html_e( 'Editor Debug Panel', 'cloudscale-devtools' ); ?>
-                </label>
                 <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
                     <input type="radio" name="cs-csp-mode" value="enforce" <?php checked( $csp_mode, 'enforce' ); ?>>
                     <?php esc_html_e( 'Enforce', 'cloudscale-devtools' ); ?>
@@ -10550,9 +10545,6 @@ class CloudScale_DevTools {
         update_option( 'csdt_devtools_csp_mode',          in_array( $mode, [ 'enforce', 'report_only' ], true ) ? $mode : 'enforce' );
         update_option( 'csdt_devtools_csp_services',      wp_json_encode( $services ) );
         update_option( 'csdt_devtools_csp_custom',        $custom );
-        $debug_panel = isset( $_POST['debug_panel'] ) && $_POST['debug_panel'] === '1' ? '1' : '0'; // phpcs:ignore
-        update_option( 'csdt_devtools_editor_debug_panel', $debug_panel );
-
         wp_send_json_success( [ 'has_backup' => true ] );
     }
 
