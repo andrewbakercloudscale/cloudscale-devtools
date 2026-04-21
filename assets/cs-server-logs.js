@@ -247,11 +247,25 @@
     }
 
     // ── PHP error log setup ───────────────────────────────────────────────────
-    var phpSetupBtn = document.getElementById( 'cs-logs-php-setup-btn' );
+    var phpSetupBtn     = document.getElementById( 'cs-logs-php-setup-btn' );
+    var phpSetupBanner  = document.getElementById( 'cs-logs-php-setup' );
+    var phpSetupErrEl   = null; // created on first error
+
+    function phpSetupShowError( msg ) {
+        if ( ! phpSetupBanner ) { return; }
+        if ( ! phpSetupErrEl ) {
+            phpSetupErrEl = document.createElement( 'p' );
+            phpSetupErrEl.style.cssText = 'margin:8px 0 0;font-size:12px;color:#b45309;font-weight:600;';
+            phpSetupBanner.appendChild( phpSetupErrEl );
+        }
+        phpSetupErrEl.textContent = msg;
+    }
+
     if ( phpSetupBtn ) {
         phpSetupBtn.addEventListener( 'click', function () {
             phpSetupBtn.disabled = true;
             phpSetupBtn.textContent = '…';
+            if ( phpSetupErrEl ) { phpSetupErrEl.textContent = ''; }
 
             var fd = new FormData();
             fd.append( 'action', 'csdt_devtools_logs_setup_php' );
@@ -261,17 +275,17 @@
                 .then( function ( r ) { return r.json(); } )
                 .then( function ( resp ) {
                     if ( resp.success ) {
-                        var setupBanner = document.getElementById( 'cs-logs-php-setup' );
-                        if ( setupBanner ) { setupBanner.style.display = 'none'; }
+                        if ( phpSetupBanner ) { phpSetupBanner.style.display = 'none'; }
                         rebuildSourceButtons( resp.data.sources );
                         loadStatuses();
                     } else {
-                        alert( 'Setup failed: ' + ( resp.data || 'unknown error' ) );
+                        phpSetupShowError( 'Setup failed: ' + ( resp.data && resp.data.message ? resp.data.message : ( resp.data || 'unknown error' ) ) );
                         phpSetupBtn.disabled = false;
                         phpSetupBtn.textContent = '⚡ Enable';
                     }
                 } )
                 .catch( function () {
+                    phpSetupShowError( 'Request failed — check your connection.' );
                     phpSetupBtn.disabled = false;
                     phpSetupBtn.textContent = '⚡ Enable';
                 } );

@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.194
+ * Version: 1.9.195
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.194';
+    const VERSION      = '1.9.195';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1759,6 +1759,12 @@ class CloudScale_DevTools {
         if ( ! is_dir( $mu_dir ) ) {
             wp_mkdir_p( $mu_dir );
         }
+        // If the directory exists but is not writable (e.g. owned by a different OS user),
+        // attempt a one-time chmod so the web-server user can write the mu-plugin file.
+        if ( is_dir( $mu_dir ) && ! is_writable( $mu_dir ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod
+            @chmod( $mu_dir, 0755 );
+        }
 
         $mu_file = $mu_dir . '/csdt-php-error-log.php';
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
@@ -1771,7 +1777,7 @@ class CloudScale_DevTools {
         );
 
         if ( false === $written ) {
-            wp_send_json_error( __( 'Could not write mu-plugin. Check that wp-content/mu-plugins is writable.', 'cloudscale-devtools' ) );
+            wp_send_json_error( [ 'message' => __( 'Could not write mu-plugin. Run: docker exec pi_wordpress chown www-data:www-data /var/www/html/wp-content/mu-plugins', 'cloudscale-devtools' ) ] );
             return;
         }
 
@@ -10994,7 +11000,7 @@ class CloudScale_DevTools {
                 </div>
 
                 <!-- ── AI Debugging Assistant ────────────────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;">
+                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
                     <h2 class="cs-panel-heading">🤖 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></h2>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Paste an error message, PHP warning, or stack trace. The AI identifies the root cause and gives you specific steps to fix it — no more hunting through Stack Overflow.', 'cloudscale-devtools' ); ?>
@@ -11031,7 +11037,7 @@ class CloudScale_DevTools {
                 </div>
 
                 <!-- ── Update Risk Scorer ────────────────────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;">
+                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
                     <h2 class="cs-panel-heading">🔄 <?php esc_html_e( 'Update Risk Scorer', 'cloudscale-devtools' ); ?></h2>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Before applying plugin updates, get an AI risk rating for each one: Patch (safe now), Minor (new features), or Breaking (review first). Prevents update-caused site breakage.', 'cloudscale-devtools' ); ?>
@@ -11051,7 +11057,7 @@ class CloudScale_DevTools {
                 </div>
 
                 <!-- ── Uptime Monitor ────────────────────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;">
+                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
                     <h2 class="cs-panel-heading">⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></h2>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Deploys a Cloudflare Worker that pings your site every 60 seconds from the edge — independent of your server. If the site goes down, the Worker sends an ntfy.sh alert immediately, even if your server is completely offline.', 'cloudscale-devtools' ); ?>
@@ -11095,7 +11101,7 @@ class CloudScale_DevTools {
                 </div>
 
                 <!-- ── Database Intelligence Engine ──────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;">
+                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
                     <h2 class="cs-panel-heading">🗄️ <?php esc_html_e( 'Database Intelligence Engine', 'cloudscale-devtools' ); ?></h2>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Scans your WordPress database for hidden bloat — oversized autoload cache, expired transients, post revisions, and orphaned metadata — then gives you one-click cleanup actions for each issue found.', 'cloudscale-devtools' ); ?>
