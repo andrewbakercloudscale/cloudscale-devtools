@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.188
+ * Version: 1.9.193
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.188';
+    const VERSION      = '1.9.193';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -346,6 +346,9 @@ class CloudScale_DevTools {
         add_action( 'csdt_ssh_monitor',                         [ __CLASS__, 'monitor_ssh_failures' ] );
         add_action( 'csdt_php_error_monitor',                   [ __CLASS__, 'monitor_php_errors' ] );
         add_action( 'wp_ajax_csdt_php_error_monitor_save',      [ __CLASS__, 'ajax_php_error_monitor_save' ] );
+        add_action( 'wp_ajax_csdt_fpm_monitor_save',             [ __CLASS__, 'ajax_fpm_monitor_save' ] );
+        add_action( 'wp_ajax_nopriv_csdt_fpm_report',            [ __CLASS__, 'ajax_fpm_report' ] );
+        add_action( 'wp_ajax_csdt_fpm_report',                   [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'csdt_threat_monitor',                      [ __CLASS__, 'monitor_threats' ] );
         add_action( 'wp_ajax_csdt_threat_monitor_save',         [ __CLASS__, 'ajax_threat_monitor_save' ] );
         add_action( 'wp_ajax_csdt_threat_integrity_reset',      [ __CLASS__, 'ajax_threat_integrity_reset' ] );
@@ -455,6 +458,7 @@ class CloudScale_DevTools {
         add_action( 'template_redirect',                        [ __CLASS__, 'maybe_custom_404' ], 1 );
         add_action( 'rest_api_init',                            [ __CLASS__, 'register_hiscore_routes' ] );
         add_action( 'rest_api_init',                            [ __CLASS__, 'register_csp_report_route' ] );
+        add_action( 'rest_api_init',                            [ __CLASS__, 'register_fpm_report_route' ] );
         add_action( 'wp_ajax_csdt_devtools_save_404_settings',    [ __CLASS__, 'ajax_save_404_settings' ] );
 
         // Performance monitor — EXPLAIN endpoint.
@@ -1316,6 +1320,7 @@ class CloudScale_DevTools {
                 'logsNonce'  => wp_create_nonce( 'csdt_devtools_server_logs' ),
                 'aiNonce'    => wp_create_nonce( 'csdt_optimizer_nonce' ),
                 'debugNonce' => wp_create_nonce( 'csdt_debug_nonce' ),
+                'fpmNonce'   => wp_create_nonce( 'csdt_fpm_nonce' ),
                 'sources'    => self::get_log_sources(),
             ] );
         }
@@ -1918,6 +1923,101 @@ class CloudScale_DevTools {
                         <?php endif; ?>
                     </div>
                 </div>
+
+                <hr style="border:none;border-top:1px solid #1e293b;margin:28px 0;">
+
+                <!-- PHP-FPM Saturation Monitor -->
+                <?php
+                $fpm_enabled   = get_option( 'csdt_fpm_enabled',        '1' ) === '1';
+                $fpm_threshold = (int) get_option( 'csdt_fpm_threshold',      '3' );
+                $fpm_cooldown  = (int) get_option( 'csdt_fpm_cooldown',       '1800' );
+                $fpm_probe_url = get_option( 'csdt_fpm_probe_url',            'http://localhost:8082/' );
+                $fpm_timeout   = (int) get_option( 'csdt_fpm_probe_timeout',  '5' );
+                $fpm_wp_ctr    = get_option( 'csdt_fpm_wp_container',         'pi_wordpress' );
+                $fpm_db_ctr    = get_option( 'csdt_fpm_db_container',         'pi_mariadb' );
+                $fpm_token     = get_option( 'csdt_fpm_token',                '' );
+                if ( empty( $fpm_token ) ) {
+                    $fpm_token = wp_generate_password( 32, false );
+                    update_option( 'csdt_fpm_token', $fpm_token, false );
+                }
+                $fpm_last      = get_option( 'csdt_fpm_last_event', null );
+                $fpm_report_url = admin_url( 'admin-ajax.php' );
+                $fpm_config_snippet = "# ── PHP-FPM Saturation Monitor ─────────────────────────────────────────────\n"
+                    . "FPM_SATURATION_THRESHOLD={$fpm_threshold}\n"
+                    . "FPM_PROBE_URL={$fpm_probe_url}\n"
+                    . "FPM_PROBE_TIMEOUT={$fpm_timeout}\n"
+                    . "FPM_WP_CONTAINER={$fpm_wp_ctr}\n"
+                    . "FPM_DB_CONTAINER={$fpm_db_ctr}\n"
+                    . "FPM_ALERT_COOLDOWN={$fpm_cooldown}\n"
+                    . "FPM_CALLBACK_URL={$fpm_report_url}\n"
+                    . "FPM_CALLBACK_TOKEN={$fpm_token}";
+                ?>
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:20px 24px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+                        <div>
+                            <strong style="color:#e2e8f0;">🖥️ <?php esc_html_e( 'PHP-FPM Saturation Monitor', 'cloudscale-devtools' ); ?></strong>
+                            <span style="display:inline-flex;align-items:center;margin-left:8px;padding:1px 8px;background:#1e3a5f;border-radius:10px;font-size:.72em;color:#60a5fa;">HOST CRON</span>
+                            <span style="display:block;font-size:.82em;color:#64748b;margin-top:2px;"><?php esc_html_e( 'Detects when all PHP-FPM workers are exhausted — alerts before WP-Cron itself stops running', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="csdt-fpm-enabled" <?php checked( $fpm_enabled ); ?>>
+                                <span style="font-size:.85em;color:#94a3b8;"><?php esc_html_e( 'Enabled', 'cloudscale-devtools' ); ?></span>
+                            </label>
+                            <button type="button" id="csdt-fpm-save" class="cs-btn-sm cs-btn-primary"><?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?></button>
+                            <span id="csdt-fpm-status" style="font-size:.82em;color:#94a3b8;"></span>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'Saturation threshold (consecutive checks)', 'cloudscale-devtools' ); ?></label>
+                            <input type="number" id="csdt-fpm-threshold" min="1" max="30" value="<?php echo esc_attr( $fpm_threshold ); ?>" style="width:80px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'Alert cooldown (seconds)', 'cloudscale-devtools' ); ?></label>
+                            <input type="number" id="csdt-fpm-cooldown" min="60" max="86400" value="<?php echo esc_attr( $fpm_cooldown ); ?>" style="width:100px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'HTTP probe URL', 'cloudscale-devtools' ); ?></label>
+                            <input type="text" id="csdt-fpm-probe-url" value="<?php echo esc_attr( $fpm_probe_url ); ?>" style="width:100%;box-sizing:border-box;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'Probe timeout (seconds)', 'cloudscale-devtools' ); ?></label>
+                            <input type="number" id="csdt-fpm-probe-timeout" min="1" max="30" value="<?php echo esc_attr( $fpm_timeout ); ?>" style="width:80px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'WordPress container name', 'cloudscale-devtools' ); ?></label>
+                            <input type="text" id="csdt-fpm-wp-container" value="<?php echo esc_attr( $fpm_wp_ctr ); ?>" style="width:100%;box-sizing:border-box;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'MariaDB container name', 'cloudscale-devtools' ); ?></label>
+                            <input type="text" id="csdt-fpm-db-container" value="<?php echo esc_attr( $fpm_db_ctr ); ?>" style="width:100%;box-sizing:border-box;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:.9em;">
+                        </div>
+                    </div>
+
+                    <div style="background:#0a1628;border:1px solid #1e3a5f;border-radius:6px;padding:14px 16px;margin-bottom:16px;">
+                        <div style="font-size:.82em;color:#60a5fa;font-weight:600;margin-bottom:10px;">📋 <?php esc_html_e( 'Host Cron Setup', 'cloudscale-devtools' ); ?></div>
+                        <div style="font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'Add to crontab on your Pi host (crontab -e):', 'cloudscale-devtools' ); ?></div>
+                        <code style="display:block;background:#0f172a;border:1px solid #1e293b;border-radius:4px;padding:8px 12px;font-size:.8em;color:#86efac;white-space:nowrap;overflow-x:auto;margin-bottom:10px;">* * * * * /home/pi/pi2s3/fpm-saturation-monitor.sh 2&gt;/dev/null</code>
+                        <div style="font-size:.78em;color:#64748b;margin-bottom:4px;"><?php esc_html_e( 'Add to ~/pi2s3/config.env (includes callback so last event appears above):', 'cloudscale-devtools' ); ?></div>
+                        <code id="csdt-fpm-config-snippet" style="display:block;background:#0f172a;border:1px solid #1e293b;border-radius:4px;padding:8px 12px;font-size:.78em;color:#cbd5e1;white-space:pre;overflow-x:auto;margin-bottom:10px;"><?php echo esc_html( $fpm_config_snippet ); ?></code>
+                        <button type="button" id="csdt-fpm-copy-snippet" class="cs-btn-sm cs-btn-secondary"><?php esc_html_e( 'Copy config.env snippet', 'cloudscale-devtools' ); ?></button>
+                        <span id="csdt-fpm-copy-status" style="font-size:.78em;color:#86efac;margin-left:8px;"></span>
+                    </div>
+
+                    <div style="font-size:.82em;">
+                        <?php if ( $fpm_last ) : ?>
+                            <span style="color:<?php echo esc_attr( $fpm_last['type'] === 'recovered' ? '#86efac' : '#f87171' ); ?>;">
+                                <?php echo $fpm_last['type'] === 'recovered' ? '✓' : '🚨'; ?>
+                                <?php echo esc_html( human_time_diff( (int) $fpm_last['ts'] ) . ' ago — ' . $fpm_last['msg'] ); ?>
+                            </span>
+                        <?php else : ?>
+                            <span style="color:#475569;"><?php esc_html_e( 'No saturation events recorded. Install the host cron to enable monitoring.', 'cloudscale-devtools' ); ?></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
             </div>
         </div>
         <?php
@@ -15836,6 +15936,52 @@ PROMPT;
         wp_send_json_success( [ 'enabled' => $enabled, 'threshold' => $threshold ] );
     }
 
+    public static function ajax_fpm_monitor_save(): void {
+        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $enabled   = isset( $_POST['enabled'] ) && $_POST['enabled'] === '1' ? '1' : '0';
+        $threshold = max( 1, min( 30,    (int) ( $_POST['threshold']     ?? 3    ) ) );
+        $cooldown  = max( 60, min( 86400, (int) ( $_POST['cooldown']     ?? 1800 ) ) );
+        $timeout   = max( 1, min( 30,    (int) ( $_POST['probe_timeout'] ?? 5    ) ) );
+        update_option( 'csdt_fpm_enabled',       $enabled,                                                                         false );
+        update_option( 'csdt_fpm_threshold',      (string) $threshold,                                                             false );
+        update_option( 'csdt_fpm_cooldown',       (string) $cooldown,                                                              false );
+        update_option( 'csdt_fpm_probe_url',      esc_url_raw( (string) ( $_POST['probe_url']    ?? 'http://localhost:8082/' ) ),   false );
+        update_option( 'csdt_fpm_probe_timeout',  (string) $timeout,                                                               false );
+        update_option( 'csdt_fpm_wp_container',   sanitize_text_field( (string) ( $_POST['wp_container'] ?? 'pi_wordpress' ) ),    false );
+        update_option( 'csdt_fpm_db_container',   sanitize_text_field( (string) ( $_POST['db_container'] ?? 'pi_mariadb'  ) ),    false );
+        wp_send_json_success();
+    }
+
+    public static function register_fpm_report_route(): void {
+        register_rest_route( 'csdt/v1', '/fpm-report', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'rest_fpm_report' ],
+            'permission_callback' => '__return_true',
+        ] );
+    }
+
+    public static function rest_fpm_report( \WP_REST_Request $request ): \WP_REST_Response {
+        $token  = sanitize_text_field( (string) $request->get_param( 'token' ) );
+        $stored = get_option( 'csdt_fpm_token', '' );
+        if ( empty( $stored ) || ! hash_equals( $stored, $token ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Invalid token' ], 403 );
+        }
+        $type = sanitize_text_field( (string) $request->get_param( 'type' ) );
+        if ( ! in_array( $type, [ 'saturated', 'recovered' ], true ) ) {
+            $type = 'saturated';
+        }
+        $msg = sanitize_text_field( (string) $request->get_param( 'msg' ) );
+        update_option( 'csdt_fpm_last_event', [
+            'ts'   => time(),
+            'type' => $type,
+            'msg'  => substr( $msg, 0, 200 ),
+        ], false );
+        return new \WP_REST_Response( [ 'ok' => true ] );
+    }
+
     public static function cleanup_expired_test_accounts(): void {
         $now = time();
 
@@ -16294,7 +16440,7 @@ PROMPT;
     }
 
     private static function uptime_worker_js(): string {
-        return "// CloudScale Uptime Monitor\nexport default {\n  async scheduled(event, env, ctx) {\n    const start = Date.now();\n    let statusCode = 0, responseMs = 0, isUp = false;\n    try {\n      const res = await fetch(env.SITE_URL, {\n        method: 'HEAD',\n        headers: {'User-Agent': 'CloudScale-Uptime/1.0'},\n        signal: AbortSignal.timeout(15000),\n        redirect: 'follow',\n      });\n      statusCode = res.status;\n      responseMs = Date.now() - start;\n      isUp = statusCode >= 200 && statusCode < 500;\n    } catch(e) { responseMs = Date.now() - start; }\n    if (!isUp && env.NTFY_URL) {\n      ctx.waitUntil(fetch(env.NTFY_URL, {\n        method: 'POST',\n        headers: {'Title': 'Site Down: ' + env.SITE_URL, 'Priority': 'urgent', 'Tags': 'rotating_light'},\n        body: 'Status: ' + (statusCode || 'timeout') + ' — ' + responseMs + 'ms',\n      }).catch(() => {}));\n    }\n    ctx.waitUntil(fetch(env.PING_URL, {\n      method: 'POST',\n      headers: {'Content-Type': 'application/x-www-form-urlencoded'},\n      body: 'action=csdt_uptime_ping&token=' + encodeURIComponent(env.PING_TOKEN) + '&status_code=' + statusCode + '&response_ms=' + responseMs,\n      signal: AbortSignal.timeout(10000),\n    }).catch(() => {}));\n  },\n};";
+        return "// CloudScale Uptime Monitor\nexport default {\n  async scheduled(event, env, ctx) {\n    const start = Date.now();\n    let statusCode = 0, responseMs = 0, isUp = false;\n    try {\n      // Cache-bust to force a fresh origin request — prevents Cloudflare edge\n      // cache from masking a down origin with a cached 200.\n      const probeUrl = env.SITE_URL + (env.SITE_URL.includes('?') ? '&' : '?') + '_up=' + Date.now();\n      const res = await fetch(probeUrl, {\n        method: 'HEAD',\n        headers: {\n          'User-Agent': 'CloudScale-Uptime/1.0',\n          'Cache-Control': 'no-store',\n          'Pragma': 'no-cache',\n        },\n        signal: AbortSignal.timeout(15000),\n        redirect: 'follow',\n      });\n      statusCode = res.status;\n      responseMs = Date.now() - start;\n      isUp = statusCode >= 200 && statusCode < 500;\n    } catch(e) { responseMs = Date.now() - start; }\n    if (!isUp && env.NTFY_URL) {\n      ctx.waitUntil(fetch(env.NTFY_URL, {\n        method: 'POST',\n        headers: {'Title': 'Site Down: ' + env.SITE_URL, 'Priority': 'urgent', 'Tags': 'rotating_light'},\n        body: 'Status: ' + (statusCode || 'timeout') + ' — ' + responseMs + 'ms',\n      }).catch(() => {}));\n    }\n    ctx.waitUntil(fetch(env.PING_URL, {\n      method: 'POST',\n      headers: {'Content-Type': 'application/x-www-form-urlencoded'},\n      body: 'action=csdt_uptime_ping&token=' + encodeURIComponent(env.PING_TOKEN) + '&status_code=' + statusCode + '&response_ms=' + responseMs,\n      signal: AbortSignal.timeout(10000),\n    }).catch(() => {}));\n  },\n};";
     }
 
     private static function uptime_wrangler_toml( string $site_url, string $ping_url, string $token, string $ntfy_url ): string {

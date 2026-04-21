@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.189
+Stable tag: 1.9.193
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,12 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 5. SQL Query Tool with quick queries and paginated results
 
 == Changelog ==
+
+= 1.9.193 =
+* feat: PHP-FPM Saturation Monitor — new panel in Debug AI tab; configurable threshold, cooldown, probe URL, and container names; shows crontab install command and config.env snippet; callback endpoint so last saturation event appears in the panel; default on
+
+= 1.9.191 =
+* fix: Uptime Monitor Worker — add cache-busting query param and Cache-Control: no-store / Pragma: no-cache headers to site probe; prevents Cloudflare edge cache from masking a down origin with a cached 200 response
 
 = 1.9.189 =
 * feat: Threat Monitor — file integrity check (wp-includes/wp-admin core files), new admin account alert, and probe attack detection; alerts once per incident via email + ntfy.sh; no spam — WP core updates rebuild baseline silently, new admin fires once per user, probe throttled to once per hour

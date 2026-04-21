@@ -172,6 +172,57 @@
         loadSource( 'php_error' );
     }
 
+    // PHP-FPM Saturation Monitor save + copy
+    var fpmSaveBtn      = document.getElementById( 'csdt-fpm-save' );
+    var fpmEnabledChk   = document.getElementById( 'csdt-fpm-enabled' );
+    var fpmStatus       = document.getElementById( 'csdt-fpm-status' );
+    var fpmCopyBtn      = document.getElementById( 'csdt-fpm-copy-snippet' );
+    var fpmCopyStatus   = document.getElementById( 'csdt-fpm-copy-status' );
+
+    if ( fpmSaveBtn && fpmEnabledChk ) {
+        fpmSaveBtn.addEventListener( 'click', function () {
+            fpmSaveBtn.disabled = true;
+            if ( fpmStatus ) { fpmStatus.textContent = '\u23F3 Saving\u2026'; }
+            post( 'csdt_fpm_monitor_save', {
+                enabled:       fpmEnabledChk.checked ? '1' : '0',
+                threshold:     ( document.getElementById( 'csdt-fpm-threshold'    ) || {} ).value || '3',
+                cooldown:      ( document.getElementById( 'csdt-fpm-cooldown'     ) || {} ).value || '1800',
+                probe_url:     ( document.getElementById( 'csdt-fpm-probe-url'    ) || {} ).value || '',
+                probe_timeout: ( document.getElementById( 'csdt-fpm-probe-timeout') || {} ).value || '5',
+                wp_container:  ( document.getElementById( 'csdt-fpm-wp-container' ) || {} ).value || 'pi_wordpress',
+                db_container:  ( document.getElementById( 'csdt-fpm-db-container' ) || {} ).value || 'pi_mariadb',
+            }, cfg.fpmNonce )
+                .then( function ( res ) {
+                    fpmSaveBtn.disabled = false;
+                    if ( fpmStatus ) {
+                        fpmStatus.textContent = res.success ? '\u2705 Saved' : '\u274C ' + esc( ( res.data && res.data.message ) || 'Failed' );
+                        setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; } }, 3000 );
+                    }
+                } )
+                .catch( function () {
+                    fpmSaveBtn.disabled = false;
+                    if ( fpmStatus ) { fpmStatus.textContent = 'Request failed.'; }
+                } );
+        } );
+    }
+
+    if ( fpmCopyBtn ) {
+        fpmCopyBtn.addEventListener( 'click', function () {
+            var snippet = document.getElementById( 'csdt-fpm-config-snippet' );
+            if ( ! snippet ) { return; }
+            navigator.clipboard.writeText( snippet.textContent || snippet.innerText )
+                .then( function () {
+                    if ( fpmCopyStatus ) {
+                        fpmCopyStatus.textContent = 'Copied!';
+                        setTimeout( function () { if ( fpmCopyStatus ) { fpmCopyStatus.textContent = ''; } }, 2000 );
+                    }
+                } )
+                .catch( function () {
+                    if ( fpmCopyStatus ) { fpmCopyStatus.textContent = 'Select text above and copy manually.'; }
+                } );
+        } );
+    }
+
     // PHP Error Alerting save button
     var saveBtn     = document.getElementById( 'csdt-errmon-save' );
     var enabledChk  = document.getElementById( 'csdt-errmon-enabled' );
