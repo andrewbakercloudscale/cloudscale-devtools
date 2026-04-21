@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.193
+ * Version: 1.9.194
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.193';
+    const VERSION      = '1.9.194';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1943,6 +1943,7 @@ class CloudScale_DevTools {
                     update_option( 'csdt_fpm_token', $fpm_token, false );
                 }
                 $fpm_last       = get_option( 'csdt_fpm_last_event', null );
+                $fpm_event_log  = is_array( get_option( 'csdt_fpm_event_log', [] ) ) ? get_option( 'csdt_fpm_event_log', [] ) : [];
                 $fpm_report_url = admin_url( 'admin-ajax.php' );
                 $fpm_auto_restart_val = $fpm_auto_restart ? 'true' : 'false';
                 $fpm_config_snippet = "# ── PHP-FPM Saturation Monitor ─────────────────────────────────────────────\n"
@@ -2023,27 +2024,59 @@ class CloudScale_DevTools {
                         <span id="csdt-fpm-copy-status" style="font-size:.78em;color:#86efac;margin-left:8px;"></span>
                     </div>
 
-                    <div style="font-size:.82em;">
-                        <?php if ( $fpm_last ) :
-                            $fpm_event_color = match( $fpm_last['type'] ) {
-                                'recovered' => '#86efac',
-                                'restarted' => '#fbbf24',
-                                default     => '#f87171',
-                            };
-                            $fpm_event_icon = match( $fpm_last['type'] ) {
-                                'recovered' => '✓',
-                                'restarted' => '🔄',
-                                default     => '🚨',
-                            };
-                        ?>
-                            <span style="color:<?php echo esc_attr( $fpm_event_color ); ?>;">
-                                <?php echo $fpm_event_icon; ?>
-                                <?php echo esc_html( human_time_diff( (int) $fpm_last['ts'] ) . ' ago — ' . $fpm_last['msg'] ); ?>
-                            </span>
-                        <?php else : ?>
-                            <span style="color:#475569;"><?php esc_html_e( 'No saturation events recorded. Install the host cron to enable monitoring.', 'cloudscale-devtools' ); ?></span>
-                        <?php endif; ?>
+                    <!-- Event audit trail -->
+                    <?php if ( ! empty( $fpm_event_log ) ) : ?>
+                    <div style="margin-top:4px;">
+                        <div style="font-size:.78em;color:#64748b;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+                            <span><?php printf( esc_html__( 'Last %d events (newest first)', 'cloudscale-devtools' ), count( $fpm_event_log ) ); ?></span>
+                        </div>
+                        <div style="max-height:240px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px;">
+                            <table style="width:100%;border-collapse:collapse;font-size:.78em;">
+                                <thead>
+                                    <tr style="background:#0a1628;position:sticky;top:0;">
+                                        <th style="text-align:left;padding:5px 10px;color:#475569;font-weight:600;white-space:nowrap;"><?php esc_html_e( 'Time', 'cloudscale-devtools' ); ?></th>
+                                        <th style="text-align:left;padding:5px 10px;color:#475569;font-weight:600;"><?php esc_html_e( 'Event', 'cloudscale-devtools' ); ?></th>
+                                        <th style="text-align:left;padding:5px 10px;color:#475569;font-weight:600;"><?php esc_html_e( 'Detail', 'cloudscale-devtools' ); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ( $fpm_event_log as $i => $ev ) :
+                                    $ev_color = match( $ev['type'] ?? '' ) {
+                                        'recovered' => '#86efac',
+                                        'restarted' => '#fbbf24',
+                                        default     => '#f87171',
+                                    };
+                                    $ev_icon = match( $ev['type'] ?? '' ) {
+                                        'recovered' => '✓',
+                                        'restarted' => '🔄',
+                                        default     => '🚨',
+                                    };
+                                    $ev_label = match( $ev['type'] ?? '' ) {
+                                        'recovered' => __( 'Recovered', 'cloudscale-devtools' ),
+                                        'restarted' => __( 'Auto-restarted', 'cloudscale-devtools' ),
+                                        default     => __( 'Saturated', 'cloudscale-devtools' ),
+                                    };
+                                    $row_bg = $i % 2 === 0 ? '#0f172a' : '#0a1628';
+                                ?>
+                                    <tr style="background:<?php echo esc_attr( $row_bg ); ?>;border-top:1px solid #1e293b;">
+                                        <td style="padding:5px 10px;color:#64748b;white-space:nowrap;" title="<?php echo esc_attr( wp_date( 'Y-m-d H:i:s', (int) $ev['ts'] ) ); ?>">
+                                            <?php echo esc_html( human_time_diff( (int) $ev['ts'] ) . ' ago' ); ?>
+                                        </td>
+                                        <td style="padding:5px 10px;white-space:nowrap;">
+                                            <span style="color:<?php echo esc_attr( $ev_color ); ?>;"><?php echo $ev_icon . ' ' . esc_html( $ev_label ); ?></span>
+                                        </td>
+                                        <td style="padding:5px 10px;color:#94a3b8;"><?php echo esc_html( $ev['msg'] ?? '' ); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+                    <?php else : ?>
+                    <div style="font-size:.82em;">
+                        <span style="color:#475569;"><?php esc_html_e( 'No saturation events recorded yet. Install the host cron and set FPM_CALLBACK_URL + FPM_CALLBACK_TOKEN to enable the audit trail.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
             </div>
@@ -16005,12 +16038,20 @@ PROMPT;
         if ( ! in_array( $type, [ 'saturated', 'recovered', 'restarted' ], true ) ) {
             $type = 'saturated';
         }
-        $msg = sanitize_text_field( (string) $request->get_param( 'msg' ) );
-        update_option( 'csdt_fpm_last_event', [
+        $msg   = sanitize_text_field( (string) $request->get_param( 'msg' ) );
+        $event = [
             'ts'   => time(),
             'type' => $type,
             'msg'  => substr( $msg, 0, 200 ),
-        ], false );
+        ];
+        update_option( 'csdt_fpm_last_event', $event, false );
+        $log   = get_option( 'csdt_fpm_event_log', [] );
+        if ( ! is_array( $log ) ) {
+            $log = [];
+        }
+        array_unshift( $log, $event );
+        $log = array_slice( $log, 0, 50 );
+        update_option( 'csdt_fpm_event_log', $log, false );
         return new \WP_REST_Response( [ 'ok' => true ] );
     }
 
