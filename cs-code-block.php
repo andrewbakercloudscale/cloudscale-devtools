@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.214
+ * Version: 1.9.216
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.214';
+    const VERSION      = '1.9.216';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1548,7 +1548,7 @@ class CloudScale_DevTools {
         ?>
         <button type="button" id="<?php echo esc_attr( $btn_id ); ?>"
             onclick="document.getElementById('<?php echo esc_attr( $modal_id ); ?>').style.display='flex'"
-            style="background:#1e293b!important;border:1px solid rgba(255,255,255,0.3)!important;border-radius:5px!important;color:#fff!important;font-size:12px!important;font-weight:700!important;padding:5px 14px!important;cursor:pointer!important;margin-left:auto!important;flex-shrink:0!important;display:block!important;box-shadow:none!important;text-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;line-height:1.4!important">
+            style="background:#2563eb!important;border:1px solid rgba(255,255,255,0.35)!important;border-radius:5px!important;color:#fff!important;font-size:12px!important;font-weight:700!important;padding:5px 14px!important;cursor:pointer!important;margin-left:auto!important;flex-shrink:0!important;display:block!important;box-shadow:none!important;text-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;line-height:1.4!important">
             Explain&hellip;
         </button>
         <div id="<?php echo esc_attr( $modal_id ); ?>"
@@ -1864,6 +1864,12 @@ class CloudScale_DevTools {
             <div class="cs-section-header" style="background:linear-gradient(90deg,#3b0764 0%,#6d28d9 100%);border-left:3px solid #a78bfa;">
                 <span>🧠 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Paste an error or load from your logs — AI identifies the root cause and gives step-by-step fixes', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'ai-debug', 'AI Debugging Assistant', [
+                    [ 'name' => 'What it does',       'rec' => 'Info',        'html' => 'Sends your pasted error or log excerpt to an AI model (Anthropic Claude or Google Gemini). The AI identifies the root cause, explains why it happens, and gives you numbered fix steps — no Stack Overflow required.' ],
+                    [ 'name' => 'Load from log',      'rec' => 'Recommended', 'html' => 'Click <strong>PHP Errors</strong>, <strong>WP Debug</strong>, or <strong>Web Server</strong> to pull the most recent error lines from your server logs directly into the text area. Configure log paths under the Server Logs panel first if nothing loads.' ],
+                    [ 'name' => 'API key required',   'rec' => 'Critical',    'html' => 'You must add an Anthropic or Gemini API key under <strong>Security Scan → Settings</strong> before the Analyze button becomes active. Keys are stored encrypted in wp_options and never transmitted to third parties other than the chosen AI provider.' ],
+                    [ 'name' => 'Privacy',            'rec' => 'Info',        'html' => 'The text you submit is sent directly to the AI provider (Anthropic or Gemini). Do not paste passwords, API keys, or personally identifiable data into the text area. Error stack traces are generally safe.' ],
+                ] ); ?>
             </div>
             <div style="padding:24px;">
                 <?php if ( ! $has_key ) : ?>
@@ -1927,6 +1933,13 @@ class CloudScale_DevTools {
                             <span style="display:block;font-size:.82em;color:#64748b;margin-top:2px;"><?php esc_html_e( 'Polls PHP + WP debug logs every 5 min — alerts via email and ntfy.sh when new fatals appear', 'cloudscale-devtools' ); ?></span>
                         </div>
                         <div style="display:flex;align-items:center;gap:10px;">
+                            <?php self::render_explain_btn( 'php-error-alerting', 'PHP Error Alerting', [
+                                [ 'name' => 'How it works',     'rec' => 'Info',        'html' => 'A WP-Cron job runs every 5 minutes. It records the last byte-offset read for each log file and only reads <em>new</em> lines since the previous check — so you only get alerted about errors that just appeared, not the entire log history.' ],
+                                [ 'name' => 'Alert channels',   'rec' => 'Recommended', 'html' => '<strong>Email</strong> — sent to the WordPress admin email address. <strong>ntfy.sh</strong> — instant push notification to any device running the ntfy app. Set your ntfy URL under <strong>Security Scan → Settings → Notification URL</strong>. Both channels fire independently if configured.' ],
+                                [ 'name' => 'Threshold',        'rec' => 'Info',        'html' => 'The <em>threshold</em> is the minimum number of new errors per check before an alert fires. Set it to 1 to be notified about every single error. Fatal errors (PHP Fatal, WordPress die) always trigger an alert regardless of the threshold.' ],
+                                [ 'name' => 'Log paths',        'rec' => 'Recommended', 'html' => 'The monitor watches the same log sources configured in the Server Logs panel. If no PHP error log path is set, enable the mu-plugin under Server Logs → PHP Error Log to redirect errors to <code>wp-content/php-error.log</code>.' ],
+                            ] ); ?>
+
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                                 <input type="checkbox" id="csdt-errmon-enabled" <?php checked( $mon_enabled ); ?>>
                                 <span style="font-size:.85em;color:#94a3b8;"><?php esc_html_e( 'Enabled', 'cloudscale-devtools' ); ?></span>
