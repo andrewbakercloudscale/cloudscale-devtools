@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.210
+ * Version: 1.9.211
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.210';
+    const VERSION      = '1.9.211';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -337,6 +337,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_db_prefix_migrate',           [ __CLASS__, 'ajax_db_prefix_migrate' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_save',           [ __CLASS__, 'ajax_csp_save' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_rollback',       [ __CLASS__, 'ajax_csp_rollback' ] );
+        add_action( 'wp_ajax_csdt_scan_headers',                 [ __CLASS__, 'ajax_scan_headers' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_violations_get',  [ __CLASS__, 'ajax_csp_violations_get' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_violations_clear', [ __CLASS__, 'ajax_csp_violations_clear' ] );
         add_action( 'send_headers',                             [ __CLASS__, 'output_security_headers' ] );
@@ -1566,12 +1567,23 @@ class CloudScale_DevTools {
                     </div>
                     <?php endif; ?>
                     <?php foreach ( $items as $item ) :
-                        $rec    = $item['rec'];
-                        $is_rec = str_contains( $rec, 'Recommended' );
-                        $is_opt = str_contains( $rec, 'Optional' );
-                        $bg     = $is_rec ? '#edfaef' : ( $is_opt ? '#f6f7f7' : '#f0f6fc' );
-                        $col    = $is_rec ? '#1a7a34' : ( $is_opt ? '#50575e' : '#1a4a7a' );
-                        $bdr    = $is_rec ? '#1a7a34' : ( $is_opt ? '#c3c4c7' : '#2271b1' );
+                        $rec = $item['rec'];
+                        $rl  = strtolower( $rec );
+                        if ( str_contains( $rl, 'critical' ) || str_contains( $rl, 'not recommended' ) ) {
+                            $bg = '#fef2f2'; $col = '#991b1b'; $bdr = '#dc2626';
+                        } elseif ( str_contains( $rl, 'high' ) ) {
+                            $bg = '#fff7ed'; $col = '#9a3412'; $bdr = '#f97316';
+                        } elseif ( str_contains( $rl, 'recommended' ) ) {
+                            $bg = '#f0fdf4'; $col = '#14532d'; $bdr = '#16a34a';
+                        } elseif ( str_contains( $rl, 'important' ) || str_contains( $rl, 'required' ) ) {
+                            $bg = '#fffbeb'; $col = '#92400e'; $bdr = '#d97706';
+                        } elseif ( str_contains( $rl, 'optional' ) || str_contains( $rl, 'note' ) ) {
+                            $bg = '#f6f7f7'; $col = '#50575e'; $bdr = '#c3c4c7';
+                        } elseif ( str_contains( $rl, 'info' ) || str_contains( $rl, 'overview' ) || str_contains( $rl, 'diagnostic' ) || str_contains( $rl, 'technical' ) || str_contains( $rl, 'automatic' ) ) {
+                            $bg = '#eff6ff'; $col = '#1e40af'; $bdr = '#3b82f6';
+                        } else {
+                            $bg = '#faf5ff'; $col = '#6b21a8'; $bdr = '#a855f7';
+                        }
                     ?>
                     <div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;margin-bottom:10px">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
@@ -10106,6 +10118,17 @@ class CloudScale_DevTools {
                     <?php esc_html_e( 'The browser reports what would be blocked if CSP were in Enforce mode. Browse your site normally to populate this log, then review before switching to Enforce.', 'cloudscale-devtools' ); ?>
                 </p>
             </div>
+
+            <!-- Header security scan -->
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">🔍 <?php esc_html_e( 'Header Security Scan', 'cloudscale-devtools' ); ?></span>
+                    <button type="button" id="cs-csp-scan-btn" class="cs-btn-secondary cs-btn-sm"><?php esc_html_e( 'Scan Headers Now', 'cloudscale-devtools' ); ?></button>
+                    <span id="cs-csp-scan-spinner" style="display:none;font-size:12px;color:#64748b;"><?php esc_html_e( 'Scanning…', 'cloudscale-devtools' ); ?></span>
+                </div>
+                <p style="font-size:11px;color:#94a3b8;margin:0 0 8px;"><?php esc_html_e( 'Checks the homepage and last 10 published posts/pages for duplicate CSP headers, missing security headers, and plugin conflicts.', 'cloudscale-devtools' ); ?></p>
+                <div id="cs-csp-scan-results" style="font-size:12px;"></div>
+            </div>
         </div>
 
         <script>
@@ -10317,6 +10340,126 @@ class CloudScale_DevTools {
             setInterval(function() {
                 if (violWrap && violWrap.style.display !== 'none') fetchViolations();
             }, 30000);
+
+            // ── Header security scan ──────────────────────────────────────
+            var scanBtn     = document.getElementById('cs-csp-scan-btn');
+            var scanResults = document.getElementById('cs-csp-scan-results');
+            var scanSpinner = document.getElementById('cs-csp-scan-spinner');
+
+            var SCAN_HDRS = [
+                {key:'content-security-policy',             label:'CSP'},
+                {key:'content-security-policy-report-only', label:'CSP (RO)'},
+                {key:'strict-transport-security',           label:'HSTS'},
+                {key:'x-frame-options',                     label:'X-Frame-Options'},
+                {key:'x-content-type-options',              label:'X-Content-Type-Options'},
+                {key:'referrer-policy',                     label:'Referrer-Policy'},
+                {key:'permissions-policy',                  label:'Permissions-Policy'},
+            ];
+            var MANDATORY = ['content-security-policy','strict-transport-security','x-frame-options','x-content-type-options'];
+
+            function renderScanResults(data) {
+                if (!scanResults) return;
+                if (!data || !data.results || !data.results.length) {
+                    scanResults.innerHTML = '<p style="color:#94a3b8;font-size:12px;margin:0;">No results returned.</p>';
+                    return;
+                }
+                var html = '<div style="overflow-x:auto;margin-bottom:10px;"><table style="width:100%;border-collapse:collapse;font-size:11px;">';
+                html += '<thead><tr style="background:#f8fafc;">';
+                html += '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;min-width:120px;">URL</th>';
+                SCAN_HDRS.forEach(function(h) {
+                    html += '<th style="padding:5px 6px;text-align:center;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;white-space:nowrap;font-size:10px;" title="' + h.key + '">' + h.label + '</th>';
+                });
+                html += '</tr></thead><tbody>';
+                data.results.forEach(function(row, i) {
+                    var bg = i % 2 ? '#f8fafc' : '#fff';
+                    if (row.error) {
+                        html += '<tr style="background:' + bg + '"><td colspan="' + (SCAN_HDRS.length + 1) + '" style="padding:5px 8px;color:#dc2626;font-size:11px;">✗ ' + row.url + ' — ' + row.error + '</td></tr>';
+                        return;
+                    }
+                    var slug = (row.url.replace(/^https?:\/\/[^/]+/, '') || '/');
+                    if (slug.length > 34) slug = slug.slice(0, 31) + '…';
+                    html += '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;">';
+                    html += '<td style="padding:5px 8px;font-family:monospace;color:#374151;font-size:10px;" title="' + row.url + '">' + slug + '</td>';
+                    SCAN_HDRS.forEach(function(h) {
+                        var hdr = row.headers ? row.headers[h.key] : null;
+                        if (!hdr || hdr.status === 'missing') {
+                            var isMand = MANDATORY.indexOf(h.key) !== -1;
+                            html += '<td style="text-align:center;padding:5px 4px;" title="Missing">' +
+                                (isMand ? '<span style="color:#dc2626;font-weight:700;">✗</span>' : '<span style="color:#d1d5db;">−</span>') + '</td>';
+                        } else if (hdr.status === 'duplicate') {
+                            html += '<td style="text-align:center;padding:5px 4px;" title="DUPLICATE: ' + hdr.values.length + ' headers"><span style="color:#d97706;font-weight:700;">⚠' + hdr.values.length + '</span></td>';
+                        } else {
+                            html += '<td style="text-align:center;padding:5px 4px;" title="' + (hdr.values[0]||'').replace(/"/g,'&quot;').slice(0,120) + '"><span style="color:#16a34a;font-weight:700;">✓</span></td>';
+                        }
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+
+                // Issues panel
+                var issues = [];
+                data.results.forEach(function(row) {
+                    if (!row.headers) return;
+                    SCAN_HDRS.forEach(function(h) {
+                        var hdr = row.headers[h.key];
+                        if (!hdr) return;
+                        var slug2 = (row.url.replace(/^https?:\/\/[^/]+/,'') || '/');
+                        if (hdr.status === 'duplicate') {
+                            issues.push({ sev:'error', msg: '<strong>' + h.label + ' duplicate</strong> on <code>' + slug2 + '</code> — ' + hdr.values.length + ' conflicting headers (likely two plugins both setting this header)' });
+                        } else if (hdr.status === 'missing' && MANDATORY.indexOf(h.key) !== -1) {
+                            issues.push({ sev:'warn', msg: '<strong>' + h.label + ' missing</strong> on <code>' + slug2 + '</code>' });
+                        }
+                    });
+                });
+                // Dedupe warnings (same header missing on multiple pages → one entry)
+                var seen = {}, deduped = [];
+                issues.forEach(function(i) {
+                    if (i.sev === 'warn') {
+                        var k = i.msg.replace(/<code>.*<\/code>/, '');
+                        if (seen[k]) return;
+                        seen[k] = true;
+                        i.msg = i.msg.replace(' on <code>' + i.msg.match(/<code>(.*?)<\/code>/)[1] + '</code>', ' (all pages)');
+                    }
+                    deduped.push(i);
+                });
+                if (deduped.length) {
+                    html += '<div style="background:#fef9f0;border:1px solid #fed7aa;border-radius:6px;padding:10px 12px;">';
+                    html += '<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:6px;">Issues found</div>';
+                    deduped.forEach(function(i) {
+                        var ic = i.sev === 'error' ? '#991b1b' : '#78350f';
+                        var prefix = i.sev === 'error' ? '🔴 ' : '🟡 ';
+                        html += '<div style="font-size:11px;color:' + ic + ';margin-bottom:4px;line-height:1.5;">' + prefix + i.msg + '</div>';
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;font-size:11px;color:#14532d;">✓ No duplicate or missing critical headers detected.</div>';
+                }
+                scanResults.innerHTML = html;
+            }
+
+            if (scanBtn) {
+                scanBtn.addEventListener('click', function() {
+                    scanBtn.disabled = true;
+                    if (scanSpinner) scanSpinner.style.display = 'inline';
+                    if (scanResults) scanResults.innerHTML = '';
+                    var fd = new FormData();
+                    fd.append('action', 'csdt_scan_headers');
+                    fd.append('nonce',  csdtVulnScan.nonce);
+                    fetch(csdtVulnScan.ajaxUrl, { method:'POST', body:fd })
+                        .then(function(r){ return r.json(); })
+                        .then(function(resp) {
+                            scanBtn.disabled = false;
+                            if (scanSpinner) scanSpinner.style.display = 'none';
+                            if (resp && resp.success) renderScanResults(resp.data);
+                            else if (scanResults) scanResults.innerHTML = '<p style="color:#dc2626;font-size:12px;">Scan failed: ' + (resp && resp.data ? resp.data : 'unknown error') + '</p>';
+                        })
+                        .catch(function(e) {
+                            scanBtn.disabled = false;
+                            if (scanSpinner) scanSpinner.style.display = 'none';
+                            if (scanResults) scanResults.innerHTML = '<p style="color:#dc2626;font-size:12px;">Request failed.</p>';
+                        });
+                });
+            }
         })();
         </script>
         <?php
@@ -10690,6 +10833,64 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
         delete_option( 'csdt_csp_violations' );
         wp_send_json_success();
+    }
+
+    public static function ajax_scan_headers(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+
+        $urls  = [ home_url( '/' ) ];
+        $posts = get_posts( [
+            'numberposts' => 10,
+            'post_status' => 'publish',
+            'post_type'   => [ 'post', 'page' ],
+            'orderby'     => 'date',
+            'order'       => 'DESC',
+        ] );
+        foreach ( $posts as $post ) {
+            $url = get_permalink( $post->ID );
+            if ( $url ) { $urls[] = $url; }
+        }
+        $urls = array_values( array_unique( $urls ) );
+
+        $header_keys = [
+            'content-security-policy',
+            'content-security-policy-report-only',
+            'strict-transport-security',
+            'x-frame-options',
+            'x-content-type-options',
+            'referrer-policy',
+            'permissions-policy',
+        ];
+
+        $results = [];
+        foreach ( $urls as $url ) {
+            $resp = wp_remote_get( $url, [
+                'timeout'    => 10,
+                'sslverify'  => false,
+                'redirection'=> 3,
+                'user-agent' => 'CloudScale-Header-Scanner/1.0',
+            ] );
+            if ( is_wp_error( $resp ) ) {
+                $results[] = [ 'url' => $url, 'error' => $resp->get_error_message() ];
+                continue;
+            }
+            $headers = wp_remote_retrieve_headers( $resp );
+            $row     = [ 'url' => $url, 'headers' => [] ];
+            foreach ( $header_keys as $hkey ) {
+                $val = $headers[ $hkey ] ?? null;
+                if ( null === $val ) {
+                    $row['headers'][ $hkey ] = [ 'status' => 'missing', 'values' => [] ];
+                } elseif ( is_array( $val ) ) {
+                    $row['headers'][ $hkey ] = [ 'status' => count( $val ) > 1 ? 'duplicate' : 'present', 'values' => $val ];
+                } else {
+                    $row['headers'][ $hkey ] = [ 'status' => 'present', 'values' => [ $val ] ];
+                }
+            }
+            $results[] = $row;
+        }
+
+        wp_send_json_success( [ 'results' => $results ] );
     }
 
     public static function register_dashboard_widget(): void {
