@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.208
+ * Version: 1.9.209
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.208';
+    const VERSION      = '1.9.209';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -10007,7 +10007,7 @@ class CloudScale_DevTools {
         ];
         ?>
         <hr class="cs-sec-divider">
-        <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #6366f1;margin-bottom:0;border-radius:6px 6px 0 0;">
+        <div class="cs-section-header" style="background:linear-gradient(90deg,#2e1065 0%,#3730a3 100%);border-left:3px solid #818cf8;margin-bottom:0;border-radius:6px 6px 0 0;">
             <span>🛡️ <?php esc_html_e( 'Content Security Policy (CSP)', 'cloudscale-devtools' ); ?></span>
             <span class="cs-header-hint"><?php esc_html_e( 'Block unauthorised scripts and resources. Select the services your site uses before enabling.', 'cloudscale-devtools' ); ?></span>
             <?php self::render_explain_btn( 'csp', 'Content Security Policy (CSP)', [
@@ -11696,7 +11696,7 @@ bantime  = 86400</pre>
 
                 <?php self::render_csp_panel(); ?>
 
-                <div class="cs-section-header" style="margin-top:24px;background:linear-gradient(90deg,#0a1f1a 0%,#0d2920 100%);border-left:3px solid #10b981;border-radius:6px 6px 0 0;">
+                <div class="cs-section-header" style="margin-top:24px;background:linear-gradient(90deg,#022c22 0%,#065f46 100%);border-left:3px solid #34d399;border-radius:6px 6px 0 0;">
                     <span>🕵️ <?php esc_html_e( 'AI Cyber Audit', 'cloudscale-devtools' ); ?></span>
                     <span class="cs-header-hint"><?php esc_html_e( 'AI-powered WordPress security scanning — standard or deep dive', 'cloudscale-devtools' ); ?></span>
                 </div>
