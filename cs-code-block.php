@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.213
+ * Version: 1.9.214
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.213';
+    const VERSION      = '1.9.214';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -338,6 +338,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_csp_save',           [ __CLASS__, 'ajax_csp_save' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_rollback',       [ __CLASS__, 'ajax_csp_rollback' ] );
         add_action( 'wp_ajax_csdt_scan_headers',                 [ __CLASS__, 'ajax_scan_headers' ] );
+        add_action( 'wp_ajax_csdt_scan_history_item',            [ __CLASS__, 'ajax_scan_history_item' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_violations_get',  [ __CLASS__, 'ajax_csp_violations_get' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_violations_clear', [ __CLASS__, 'ajax_csp_violations_clear' ] );
         add_action( 'send_headers',                             [ __CLASS__, 'output_security_headers' ] );
@@ -1547,7 +1548,7 @@ class CloudScale_DevTools {
         ?>
         <button type="button" id="<?php echo esc_attr( $btn_id ); ?>"
             onclick="document.getElementById('<?php echo esc_attr( $modal_id ); ?>').style.display='flex'"
-            style="background:rgba(0,0,0,0.28)!important;border:1px solid rgba(255,255,255,0.55)!important;border-radius:5px!important;color:#fff!important;font-size:12px!important;font-weight:700!important;padding:5px 14px!important;cursor:pointer!important;margin-left:auto!important;flex-shrink:0!important;display:block!important;box-shadow:none!important;text-shadow:0 1px 2px rgba(0,0,0,0.4)!important;text-transform:none!important;letter-spacing:normal!important;line-height:1.4!important">
+            style="background:#1e293b!important;border:1px solid rgba(255,255,255,0.3)!important;border-radius:5px!important;color:#fff!important;font-size:12px!important;font-weight:700!important;padding:5px 14px!important;cursor:pointer!important;margin-left:auto!important;flex-shrink:0!important;display:block!important;box-shadow:none!important;text-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;line-height:1.4!important">
             Explain&hellip;
         </button>
         <div id="<?php echo esc_attr( $modal_id ); ?>"
@@ -12090,12 +12091,13 @@ bantime  = 86400</pre>
                     <p style="color:#888;font-size:13px;margin:0;padding:8px 0;"><?php esc_html_e( 'No scan history yet. Run your first AI Cyber Audit above.', 'cloudscale-devtools' ); ?></p>
                 <?php else : ?>
                     <div style="display:flex;flex-direction:column;gap:6px;">
-                    <?php foreach ( $history as $entry ) :
+                    <?php foreach ( $history as $idx => $entry ) :
                         $score       = (int) ( $entry['score'] ?? 0 );
                         $label       = esc_html( $entry['score_label'] ?? '' );
                         $type_label  = $entry['type'] === 'deep' ? 'Deep Dive' : 'AI Cyber Audit';
                         $date        = $entry['scanned_at'] ? wp_date( 'D j M Y, g:ia', $entry['scanned_at'] ) : '';
                         $score_color = $score >= 90 ? '#22c55e' : ( $score >= 75 ? '#4ade80' : ( $score >= 55 ? '#fbbf24' : ( $score >= 35 ? '#f97316' : '#ef4444' ) ) );
+                        $has_findings = ! empty( $entry['findings'] );
                     ?>
                         <div style="display:flex;align-items:flex-start;gap:14px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
                             <div style="flex-shrink:0;text-align:center;min-width:48px;">
@@ -12103,9 +12105,22 @@ bantime  = 86400</pre>
                                 <div style="font-size:10px;color:<?php echo esc_attr( $score_color ); ?>;opacity:.8;"><?php echo esc_html( $label ); ?></div>
                             </div>
                             <div style="flex:1;min-width:0;">
-                                <div style="font-size:12px;font-weight:600;color:#9da5b4;margin-bottom:3px;">
-                                    <?php echo esc_html( $type_label ); ?>
-                                    <span style="font-weight:400;opacity:.7;margin-left:8px;"><?php echo esc_html( $date ); ?></span>
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">
+                                    <span style="font-size:12px;font-weight:600;color:#9da5b4;"><?php echo esc_html( $type_label ); ?></span>
+                                    <span style="font-size:12px;font-weight:400;color:#9da5b4;opacity:.7;"><?php echo esc_html( $date ); ?></span>
+                                    <?php if ( $has_findings ) : ?>
+                                    <button type="button"
+                                        class="csdt-view-report-btn"
+                                        data-idx="<?php echo esc_attr( $idx ); ?>"
+                                        data-type="<?php echo esc_attr( $type_label ); ?>"
+                                        data-date="<?php echo esc_attr( $date ); ?>"
+                                        data-score="<?php echo esc_attr( $score ); ?>"
+                                        data-label="<?php echo esc_attr( $label ); ?>"
+                                        data-summary="<?php echo esc_attr( $entry['summary'] ?? '' ); ?>"
+                                        style="font-size:11px;font-weight:600;color:#60a5fa;background:none;border:1px solid #60a5fa;border-radius:4px;padding:1px 8px;cursor:pointer;line-height:1.5;flex-shrink:0;">
+                                        View Report
+                                    </button>
+                                    <?php endif; ?>
                                 </div>
                                 <div style="font-size:12px;color:#c5cad4;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
                                     <?php echo esc_html( $entry['summary'] ?? '' ); ?>
@@ -15689,6 +15704,13 @@ PROMPT;
             'high_count'     => count( $report['high']     ?? [] ),
             'model_used'     => $model_used,
             'scanned_at'     => $scanned_at,
+            'findings'       => [
+                'critical' => $report['critical'] ?? [],
+                'high'     => $report['high']     ?? [],
+                'medium'   => $report['medium']   ?? [],
+                'low'      => $report['low']      ?? [],
+                'good'     => $report['good']     ?? [],
+            ],
         ] );
         // Keep last 50 across both scan types
         $history = array_slice( $history, 0, 50 );
@@ -15702,6 +15724,17 @@ PROMPT;
             return;
         }
         wp_send_json_success( get_option( 'csdt_scan_history', [] ) );
+    }
+
+    public static function ajax_scan_history_item(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+        $idx     = (int) ( $_POST['idx'] ?? -1 );
+        $history = get_option( 'csdt_scan_history', [] );
+        if ( ! is_array( $history ) || ! isset( $history[ $idx ] ) ) {
+            wp_send_json_error( 'Not found' );
+        }
+        wp_send_json_success( $history[ $idx ] );
     }
 
     public static function ajax_scan_status(): void {

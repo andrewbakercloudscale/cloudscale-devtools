@@ -1045,4 +1045,103 @@
         }
     }());
 
+    // ── Scan History — View Report modal ─────────────────────────────────
+
+    (function () {
+        // Create modal once
+        var modal = document.createElement('div');
+        modal.id = 'csdt-history-report-modal';
+        modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;';
+        modal.innerHTML =
+            '<div style="background:#fff;border-radius:10px;max-width:720px;width:100%;margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,0.3);">' +
+            '<div id="csdt-hrm-header" style="padding:16px 20px 12px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;">' +
+            '<div id="csdt-hrm-score" style="width:52px;height:52px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;"></div>' +
+            '<div style="flex:1;min-width:0;">' +
+            '<div id="csdt-hrm-title" style="font-size:14px;font-weight:700;color:#111;"></div>' +
+            '<div id="csdt-hrm-summary" style="font-size:12px;color:#6b7280;margin-top:3px;line-height:1.5;"></div>' +
+            '</div>' +
+            '<button type="button" id="csdt-hrm-close" style="margin-left:auto;background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1;padding:0;flex-shrink:0;">&times;</button>' +
+            '</div>' +
+            '<div id="csdt-hrm-body" style="padding:18px 20px 24px;max-height:72vh;overflow-y:auto;"></div>' +
+            '</div>';
+        document.body.appendChild(modal);
+
+        document.getElementById('csdt-hrm-close').addEventListener('click', function () { modal.style.display = 'none'; });
+        modal.addEventListener('click', function (e) { if (e.target === modal) modal.style.display = 'none'; });
+
+        function scoreColor(s) {
+            return s >= 90 ? '#16a34a' : s >= 75 ? '#22c55e' : s >= 55 ? '#f59e0b' : s >= 35 ? '#f97316' : '#dc2626';
+        }
+
+        function renderHistoryFindings(findings) {
+            var secs = [
+                { key:'critical', label:'Critical', color:'#dc2626', bg:'#fef2f2', border:'#fecaca' },
+                { key:'high',     label:'High',     color:'#ea580c', bg:'#fff7ed', border:'#fed7aa' },
+                { key:'medium',   label:'Medium',   color:'#d97706', bg:'#fffbeb', border:'#fde68a' },
+                { key:'low',      label:'Low',      color:'#ca8a04', bg:'#fefce8', border:'#fef08a' },
+                { key:'good',     label:'Good Practices', color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
+            ];
+            var html = '';
+            secs.forEach(function (sec) {
+                var items = findings[sec.key];
+                if (!items || !items.length) return;
+                html += '<div style="margin-bottom:18px;">';
+                html += '<div style="font-size:11px;font-weight:700;color:' + sec.color + ';text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid ' + sec.color + ';">' +
+                    escHtml(sec.label) + ' (' + items.length + ')</div>';
+                items.forEach(function (issue) {
+                    if (sec.key === 'good') {
+                        html += '<div style="display:flex;gap:8px;margin-bottom:6px;font-size:13px;">' +
+                            '<span style="color:#16a34a;font-weight:700;flex-shrink:0;">✓</span>' +
+                            '<span style="color:#374151;"><strong>' + escHtml(issue.title) + '</strong>' +
+                            (issue.detail ? ' — ' + escHtml(issue.detail) : '') + '</span></div>';
+                    } else {
+                        html += '<div style="background:' + sec.bg + ';border:1px solid ' + sec.border + ';border-left:3px solid ' + sec.color + ';border-radius:0 5px 5px 0;padding:10px 12px;margin-bottom:8px;">';
+                        html += '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:4px;">' + escHtml(issue.title) + '</div>';
+                        if (issue.detail) html += '<div style="font-size:12px;color:#374151;line-height:1.5;margin-bottom:4px;">' + escHtml(issue.detail) + '</div>';
+                        if (issue.fix)    html += '<div style="font-size:12px;color:#1d4ed8;font-style:italic;">💡 ' + escHtml(issue.fix) + '</div>';
+                        html += '</div>';
+                    }
+                });
+                html += '</div>';
+            });
+            return html || '<p style="color:#94a3b8;font-size:13px;">No findings recorded.</p>';
+        }
+
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.csdt-view-report-btn');
+            if (!btn) return;
+
+            var idx     = btn.dataset.idx;
+            var score   = parseInt(btn.dataset.score, 10) || 0;
+            var label   = btn.dataset.label || '';
+            var type    = btn.dataset.type || '';
+            var date    = btn.dataset.date || '';
+            var summary = btn.dataset.summary || '';
+            var sc      = scoreColor(score);
+
+            // Populate header immediately
+            document.getElementById('csdt-hrm-score').style.background = sc;
+            document.getElementById('csdt-hrm-score').innerHTML =
+                '<span style="color:#fff;font-size:22px;font-weight:900;line-height:1;">' + escHtml(String(score)) + '</span>' +
+                '<span style="color:rgba(255,255,255,.8);font-size:10px;">' + escHtml(label) + '</span>';
+            document.getElementById('csdt-hrm-title').textContent = type + '  ·  ' + date;
+            document.getElementById('csdt-hrm-summary').textContent = summary;
+            document.getElementById('csdt-hrm-body').innerHTML = '<p style="color:#94a3b8;font-size:13px;text-align:center;padding:24px 0;">Loading…</p>';
+            modal.style.display = 'flex';
+
+            // Fetch findings
+            post('csdt_scan_history_item', { idx: idx })
+                .then(function (resp) {
+                    if (!resp.success || !resp.data || !resp.data.findings) {
+                        document.getElementById('csdt-hrm-body').innerHTML = '<p style="color:#dc2626;font-size:13px;">Report data not available for this scan (scans before v1.9.214 did not store findings).</p>';
+                        return;
+                    }
+                    document.getElementById('csdt-hrm-body').innerHTML = renderHistoryFindings(resp.data.findings);
+                })
+                .catch(function () {
+                    document.getElementById('csdt-hrm-body').innerHTML = '<p style="color:#dc2626;font-size:13px;">Failed to load report.</p>';
+                });
+        });
+    }());
+
 })();
