@@ -258,6 +258,7 @@
                      + '<th style="padding:7px 10px;border-bottom:1px solid #e0e0e0">Subject</th>'
                      + '<th style="padding:7px 10px;border-bottom:1px solid #e0e0e0;white-space:nowrap">Via</th>'
                      + '<th style="padding:7px 10px;border-bottom:1px solid #e0e0e0">Status</th>'
+                     + '<th style="padding:7px 10px;border-bottom:1px solid #e0e0e0"></th>'
                      + '</tr></thead><tbody>';
             rows.forEach( ( row, i ) => {
                 const bg      = i % 2 === 0 ? '#fff' : '#fafafa';
@@ -273,12 +274,14 @@
                 } else {
                     status = '<span style="color:#888">— Unknown</span>';
                 }
+                const viewBtn = '<button type="button" class="csdt-email-view-btn" data-idx="' + i + '" style="background:none;border:1px solid #2563eb;color:#2563eb;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">View</button>';
                 html += `<tr style="background:${bg}">
                     <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;white-space:nowrap;color:#666">${fmtTs(row.ts)}</td>
                     <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.to}</td>
                     <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.subject}</td>
                     <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0">${via}</td>
                     <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0">${status}</td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0">${viewBtn}</td>
                 </tr>`;
             } );
             html += '</tbody></table></div>';
@@ -300,5 +303,77 @@
             } ).catch( () => { logClearBtn.disabled = false; } );
         } );
     }
+
+    // ── Email view modal ──────────────────────────────────────────────────
+
+    const emailModal      = document.getElementById( 'csdt-email-modal' );
+    const emailModalClose = document.getElementById( 'csdt-email-modal-close' );
+    const emailModalSubj  = document.getElementById( 'csdt-email-modal-subject' );
+    const emailModalMeta  = document.getElementById( 'csdt-email-modal-meta' );
+    const emailModalBody  = document.getElementById( 'csdt-email-modal-body' );
+
+    function openEmailModal( idx ) {
+        if ( ! emailModal ) return;
+        emailModal.style.display = 'flex';
+        if ( emailModalSubj ) emailModalSubj.textContent = 'Loading…';
+        if ( emailModalMeta  ) emailModalMeta.innerHTML  = '';
+        if ( emailModalBody  ) emailModalBody.innerHTML  = '<div style="padding:24px;color:#94a3b8;">Loading…</div>';
+
+        post( 'csdt_devtools_smtp_log_view', { idx } ).then( res => {
+            if ( ! res.success ) {
+                if ( emailModalBody ) emailModalBody.innerHTML = '<div style="padding:24px;color:#c0392b;">Could not load email. It may have been logged before body capture was added — only emails sent after updating to v1.9.228 include the body.</div>';
+                return;
+            }
+            const e = res.data;
+            if ( emailModalSubj ) emailModalSubj.textContent = e.subject || '(no subject)';
+
+            const monthNames = [ 'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec' ];
+            function fmtTs( ts ) {
+                const d = new Date( ts * 1000 );
+                const pad = n => String( n ).padStart( 2, '0' );
+                return monthNames[ d.getMonth() ] + ' ' + d.getDate() + ', ' + pad( d.getHours() ) + ':' + pad( d.getMinutes() ) + ':' + pad( d.getSeconds() );
+            }
+            if ( emailModalMeta ) {
+                emailModalMeta.innerHTML =
+                    '<span><strong>To:</strong> ' + ( e.to || '—' ) + '</span>' +
+                    '<span><strong>Sent:</strong> ' + fmtTs( e.ts ) + '</span>' +
+                    '<span><strong>Via:</strong> ' + ( e.via === 'smtp' ? 'SMTP' : 'PHP mail' ) + '</span>' +
+                    '<span><strong>Status:</strong> ' + ( e.status === 'sent' ? '✓ Sent' : '✗ ' + ( e.error || 'Failed' ) ) + '</span>';
+            }
+            if ( emailModalBody ) {
+                if ( ! e.body ) {
+                    emailModalBody.innerHTML = '<div style="padding:24px;color:#94a3b8;">No body recorded for this email.</div>';
+                } else if ( e.is_html ) {
+                    const iframe = document.createElement( 'iframe' );
+                    iframe.sandbox = 'allow-same-origin';
+                    iframe.style.cssText = 'width:100%;height:100%;min-height:400px;border:none;display:block;';
+                    emailModalBody.appendChild( iframe );
+                    iframe.contentDocument.open();
+                    iframe.contentDocument.write( e.body );
+                    iframe.contentDocument.close();
+                } else {
+                    const pre = document.createElement( 'pre' );
+                    pre.style.cssText = 'margin:0;padding:20px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#1e293b;';
+                    pre.textContent = e.body;
+                    emailModalBody.appendChild( pre );
+                }
+            }
+        } );
+    }
+
+    function closeEmailModal() {
+        if ( emailModal ) emailModal.style.display = 'none';
+        if ( emailModalBody ) emailModalBody.innerHTML = '';
+    }
+
+    if ( emailModalClose ) emailModalClose.addEventListener( 'click', closeEmailModal );
+    if ( emailModal ) emailModal.addEventListener( 'click', e => { if ( e.target === emailModal ) closeEmailModal(); } );
+
+    // Delegate click on View buttons (works for both PHP-rendered and JS-rendered table)
+    document.addEventListener( 'click', e => {
+        const btn = e.target.closest( '.csdt-email-view-btn' );
+        if ( ! btn ) return;
+        openEmailModal( btn.dataset.idx );
+    } );
 
 } )();

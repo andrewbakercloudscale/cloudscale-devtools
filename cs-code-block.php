@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.226
+ * Version: 1.9.228
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.226';
+    const VERSION      = '1.9.228';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -318,6 +318,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_smtp_test',      [ __CLASS__, 'ajax_smtp_test' ] );
         add_action( 'wp_ajax_csdt_devtools_smtp_log_clear', [ __CLASS__, 'ajax_smtp_log_clear' ] );
         add_action( 'wp_ajax_csdt_devtools_smtp_log_fetch', [ __CLASS__, 'ajax_smtp_log_fetch' ] );
+        add_action( 'wp_ajax_csdt_devtools_smtp_log_view',  [ __CLASS__, 'ajax_smtp_log_view' ] );
 
         add_action( 'wp_ajax_csdt_devtools_vuln_scan',          [ __CLASS__, 'ajax_vuln_scan' ] );
         add_action( 'wp_ajax_csdt_devtools_deep_scan',          [ __CLASS__, 'ajax_deep_scan' ] );
@@ -7104,7 +7105,7 @@ class CloudScale_DevTools {
                     [ 'name' => 'How it works',   'rec' => 'Overview',     'html' => 'Every email WordPress sends via <code>wp_mail()</code> is intercepted and logged — recipient, subject, status (sent / failed), and timestamp. The log holds the last 100 entries and is stored as a WordPress option.' ],
                     [ 'name' => 'Failed emails',  'rec' => 'Important',    'html' => 'A <strong>Failed</strong> status means <code>wp_mail()</code> returned false. The most common cause is an unconfigured SMTP server — WordPress falls back to PHP <code>mail()</code> which many hosts block. Configure SMTP in the SMTP Configuration panel above.' ],
                     [ 'name' => 'Resend',         'rec' => 'Optional',     'html' => 'You can resend any logged email using the Resend button. This re-triggers <code>wp_mail()</code> with the same recipient and subject. Useful for testing SMTP changes without waiting for a real event.' ],
-                    [ 'name' => 'Privacy',        'rec' => 'Info',         'html' => 'Email body content is not stored — only the recipient, subject, and send status. The log is visible to administrators only and is cleared when the plugin is uninstalled.' ],
+                    [ 'name' => 'Privacy',        'rec' => 'Info',         'html' => 'Email body content is stored (up to 100 KB per email) so you can view it later. The log is visible to administrators only and is cleared when you click Clear Log or uninstall the plugin.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -7115,6 +7116,18 @@ class CloudScale_DevTools {
                 <div id="cs-email-log-wrap">
                     <?php self::render_email_log_table(); ?>
                 </div>
+            </div>
+        </div>
+
+        <!-- Email View Modal -->
+        <div id="csdt-email-modal" style="display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:10px;width:min(860px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e2e8f0;">
+                    <strong style="font-size:15px;color:#1e293b;" id="csdt-email-modal-subject">Email</strong>
+                    <button id="csdt-email-modal-close" type="button" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;line-height:1;">&times;</button>
+                </div>
+                <div id="csdt-email-modal-meta" style="padding:10px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:12px;color:#475569;display:flex;gap:20px;flex-wrap:wrap;"></div>
+                <div id="csdt-email-modal-body" style="flex:1;overflow:auto;padding:0;"></div>
             </div>
         </div>
         <?php
@@ -7142,6 +7155,7 @@ class CloudScale_DevTools {
                     <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0"><?php esc_html_e( 'Subject', 'cloudscale-devtools' ); ?></th>
                     <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0;white-space:nowrap"><?php esc_html_e( 'Via', 'cloudscale-devtools' ); ?></th>
                     <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0"><?php esc_html_e( 'Status', 'cloudscale-devtools' ); ?></th>
+                    <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0"></th>
                 </tr>
             </thead>
             <tbody>
@@ -7173,6 +7187,14 @@ class CloudScale_DevTools {
                     </td>
                     <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0"><?php echo $via_label; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
                     <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0"><?php echo $badge; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0">
+                        <?php if ( ! empty( $entry['body'] ) ) : ?>
+                        <button type="button" class="csdt-email-view-btn" data-idx="<?php echo esc_attr( $i ); ?>"
+                            style="background:none;border:1px solid #2563eb;color:#2563eb;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">
+                            <?php esc_html_e( 'View', 'cloudscale-devtools' ); ?>
+                        </button>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -7411,10 +7433,26 @@ class CloudScale_DevTools {
         if ( is_array( $to ) ) {
             $to = implode( ', ', $to );
         }
+        $hdrs = $args['headers'] ?? [];
+        if ( is_string( $hdrs ) ) { $hdrs = [ $hdrs ]; }
+        $is_html = false;
+        foreach ( $hdrs as $h ) {
+            if ( stripos( $h, 'content-type' ) !== false && stripos( $h, 'text/html' ) !== false ) {
+                $is_html = true;
+                break;
+            }
+        }
+        $body = (string) ( $args['message'] ?? '' );
+        if ( ! $is_html && ( strpos( $body, '<html' ) !== false || strpos( $body, '<body' ) !== false ) ) {
+            $is_html = true;
+        }
+
         self::$smtp_log_pending = [
             'ts'      => time(),
             'to'      => (string) $to,
             'subject' => (string) ( $args['subject'] ?? '' ),
+            'body'    => mb_substr( $body, 0, 102400 ),
+            'is_html' => $is_html,
             'status'  => 'pending',
             'error'   => '',
             'via'     => ( get_option( 'csdt_devtools_smtp_enabled', '0' ) === '1'
@@ -7524,10 +7562,26 @@ class CloudScale_DevTools {
             wp_send_json_error( 'Unauthorized', 403 );
         }
         $log = get_option( self::EMAIL_LOG_OPTION, [] );
-        if ( ! is_array( $log ) ) {
-            $log = [];
+        if ( ! is_array( $log ) ) { $log = []; }
+        // Strip body from table-refresh payload to keep it lightweight
+        $slim = array_map( static function ( $e ) {
+            unset( $e['body'] );
+            return $e;
+        }, $log );
+        wp_send_json_success( $slim );
+    }
+
+    public static function ajax_smtp_log_view(): void {
+        check_ajax_referer( self::SMTP_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
         }
-        wp_send_json_success( $log );
+        $idx = isset( $_POST['idx'] ) ? (int) $_POST['idx'] : -1;
+        $log = get_option( self::EMAIL_LOG_OPTION, [] );
+        if ( ! is_array( $log ) || ! isset( $log[ $idx ] ) ) {
+            wp_send_json_error( 'Not found' );
+        }
+        wp_send_json_success( $log[ $idx ] );
     }
 
     // ── Prefix migration (cs_ → csdt_devtools_) ───────────────────────────────
