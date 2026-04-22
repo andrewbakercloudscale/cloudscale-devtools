@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.212
+ * Version: 1.9.213
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.212';
+    const VERSION      = '1.9.213';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -10381,6 +10381,8 @@ class CloudScale_DevTools {
                     SEC_KEYS.forEach(function(k) {
                         var s = sec[k] ? sec[k].status : 'missing';
                         var lbl = SEC_LABELS[k] || k;
+                        // CSP-Report-Only is optional/informational — only show when present
+                        if (k === 'content-security-policy-report-only' && s === 'missing') return;
                         if (s === 'present') {
                             pills += '<span style="display:inline-flex;align-items:center;gap:4px;background:#15803d;color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;margin:2px 3px 2px 0;white-space:nowrap;">✓ ' + lbl + '</span>';
                         } else if (s === 'duplicate') {
@@ -10446,9 +10448,10 @@ class CloudScale_DevTools {
 
                 // ── 4. Other pages compact table ─────────────────────────────
                 if (data.pages && data.pages.length) {
+                    var PAGE_COLS = ['content-security-policy','strict-transport-security','x-frame-options','x-content-type-options'];
                     var pageRows = '<tr style="background:#f8fafc;">' +
                         '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;font-size:11px;">Page</th>';
-                    SEC_KEYS.slice(0,4).forEach(function(k) { pageRows += '<th style="padding:5px 6px;text-align:center;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;font-size:10px;white-space:nowrap;">' + SEC_LABELS[k] + '</th>'; });
+                    PAGE_COLS.forEach(function(k) { pageRows += '<th style="padding:5px 6px;text-align:center;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;font-size:10px;white-space:nowrap;">' + SEC_LABELS[k] + '</th>'; });
                     pageRows += '</tr>';
                     data.pages.forEach(function(row, i) {
                         var bg = i % 2 ? '#f8fafc' : '#fff';
@@ -10456,7 +10459,7 @@ class CloudScale_DevTools {
                         var slug = (row.url.replace(/^https?:\/\/[^/]+/,'') || '/');
                         if (slug.length > 50) slug = slug.slice(0,47) + '…';
                         pageRows += '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;font-size:11px;color:#374151;" title="' + esc(row.url) + '">' + esc(slug) + '</td>';
-                        SEC_KEYS.slice(0,4).forEach(function(k) {
+                        PAGE_COLS.forEach(function(k) {
                             var s = row.sec && row.sec[k] ? row.sec[k].status : 'missing';
                             var cell = s === 'present' ? '<span style="color:#16a34a;font-weight:700;">✓</span>'
                                      : s === 'duplicate' ? '<span style="color:#d97706;font-weight:700;">⚠</span>'
