@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.216
+ * Version: 1.9.218
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.216';
+    const VERSION      = '1.9.218';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -10282,8 +10282,9 @@ class CloudScale_DevTools {
                 var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
                     '<thead><tr style="background:#f1f5f9;">' +
                     '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Time</th>' +
-                    '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Blocked URI</th>' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Blocked</th>' +
                     '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Directive</th>' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Source</th>' +
                     '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Page</th>' +
                     '</tr></thead><tbody>';
                 rows.forEach(function(r, i) {
@@ -10291,14 +10292,19 @@ class CloudScale_DevTools {
                     var t = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' ' + d.toLocaleDateString([], {month:'short',day:'numeric'});
                     var bg = i % 2 === 0 ? '#fff' : '#f8fafc';
                     var blocked = r.blocked || '—';
-                    // Truncate long URIs for display
-                    var blockedDisplay = blocked.length > 60 ? blocked.slice(0, 57) + '…' : blocked;
+                    var isEval   = blocked === 'eval' || blocked === 'inline';
+                    var blockedColor = isEval ? '#dc2626' : '#0f172a';
+                    var blockedDisplay = blocked.length > 50 ? blocked.slice(0, 47) + '…' : blocked;
+                    var srcFile = r.source ? r.source.replace(/^https?:\/\/[^/]+\//, '') : '';
+                    if (srcFile.length > 45) srcFile = '…' + srcFile.slice(-42);
+                    var srcDisplay = srcFile ? srcFile + (r.line ? ':' + r.line : '') : '—';
                     var pageDisplay = (r.page || '—').replace(/^https?:\/\/[^/]+/, '');
-                    if (pageDisplay.length > 40) pageDisplay = pageDisplay.slice(0, 37) + '…';
+                    if (pageDisplay.length > 35) pageDisplay = pageDisplay.slice(0, 32) + '…';
                     html += '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;">' +
                         '<td style="padding:5px 8px;white-space:nowrap;color:#64748b;">' + t + '</td>' +
-                        '<td style="padding:5px 8px;font-family:monospace;color:#0f172a;" title="' + blocked.replace(/"/g,'&quot;') + '">' + blockedDisplay + '</td>' +
+                        '<td style="padding:5px 8px;font-family:monospace;color:' + blockedColor + ';" title="' + blocked.replace(/"/g,'&quot;') + '">' + blockedDisplay + '</td>' +
                         '<td style="padding:5px 8px;font-family:monospace;color:#6366f1;">' + (r.directive || '—') + '</td>' +
+                        '<td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#0369a1;" title="' + (r.source||'').replace(/"/g,'&quot;') + (r.line?':'+r.line:'') + '">' + srcDisplay + '</td>' +
                         '<td style="padding:5px 8px;color:#64748b;" title="' + (r.page||'').replace(/"/g,'&quot;') + '">' + pageDisplay + '</td>' +
                         '</tr>';
                 });
@@ -10857,10 +10863,11 @@ class CloudScale_DevTools {
             'directive' => isset( $report['violated-directive'] )    ? (string) $report['violated-directive']    : '',
             'page'      => isset( $report['document-uri'] )         ? (string) $report['document-uri']         : '',
             'source'    => isset( $report['source-file'] )          ? (string) $report['source-file']          : '',
+            'line'      => isset( $report['line-number'] )          ? (int)    $report['line-number']          : 0,
         ];
 
-        // Skip noise: inline/eval violations that are expected with unsafe-inline in the policy
-        if ( in_array( $entry['blocked'], [ 'inline', 'eval', 'data' ], true ) ) {
+        // Skip truly empty reports; keep eval/inline violations — they surface plugin issues
+        if ( $entry['blocked'] === '' && $entry['directive'] === '' ) {
             return new \WP_REST_Response( null, 204 );
         }
 

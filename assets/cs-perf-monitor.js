@@ -85,7 +85,9 @@
 
         window.addEventListener('error', function (e) {
             if (e.target && e.target !== window) { return; } // resource errors handled separately
-            pushEditorLog({ type:'jserr', detail: e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '') });
+            var filePath = e.filename ? e.filename.replace(/^https?:\/\/[^/]+\//, '') : '';
+            pushEditorLog({ type:'jserr', detail: e.message,
+                file: filePath ? filePath + ':' + e.lineno + (e.colno ? ':' + e.colno : '') : '' });
         });
 
         window.addEventListener('unhandledrejection', function (e) {
@@ -990,14 +992,25 @@
 
         // Slow / critical hooks
         (data.hooks || []).forEach(function (h) {
+            var avgPart = h.avg_ms ? ' · ' + fmtMs(h.avg_ms) + ' avg' : '';
+            var cbPart  = '';
+            if (h.callbacks && h.callbacks.length > 0) {
+                var seen = {}, labels = [];
+                h.callbacks.forEach(function (c) {
+                    var key = c.plugin || c.label || '';
+                    if (key && !seen[key]) { seen[key] = true; labels.push(key); }
+                });
+                if (labels.length > 0) cbPart = ' · ' + labels.slice(0, 3).join(', ');
+            }
+            var hookDetail = h.count + ' fires · ' + fmtMs(h.total_ms) + ' total' + avgPart + cbPart;
             if (h.max_ms >= T_CRITICAL) {
                 issuesList.push({ sev: 'critical', tab: 'hooks',
                     title: 'Critical hook — ' + h.hook + ' — max ' + fmtMs(h.max_ms),
-                    detail: h.count + ' fires · ' + fmtMs(h.total_ms) + ' total', plugin: '' });
+                    detail: hookDetail, plugin: '' });
             } else if (h.max_ms >= T_SLOW) {
                 issuesList.push({ sev: 'warning', tab: 'hooks',
                     title: 'Slow hook — ' + h.hook + ' — max ' + fmtMs(h.max_ms),
-                    detail: h.count + ' fires · ' + fmtMs(h.total_ms) + ' total', plugin: '' });
+                    detail: hookDetail, plugin: '' });
             }
         });
 
@@ -1380,8 +1393,8 @@
                     detail: e.detail ? e.detail.slice(0,100) : '', plugin: '' });
             } else if (e.type === 'jserr') {
                 issuesList.push({ sev: 'critical', tab: 'editor',
-                    title: 'JS Error — ' + (e.detail||'').slice(0,100),
-                    detail: '', plugin: '' });
+                    title: 'JS Error — ' + (e.detail||'').slice(0,120),
+                    detail: e.file || '', plugin: '' });
             }
         });
 
