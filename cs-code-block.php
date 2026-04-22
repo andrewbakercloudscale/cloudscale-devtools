@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.206
+ * Version: 1.9.207
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.206';
+    const VERSION      = '1.9.207';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1388,6 +1388,14 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'security' ? 'active' : ''; ?>">
                     🛡️ <?php esc_html_e( 'AI Security Scan', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=optimizer' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'optimizer' ? 'active' : ''; ?>">
+                    🔧 <?php esc_html_e( 'Optimizer', 'cloudscale-devtools' ); ?>
+                </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=debug' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'debug' ? 'active' : ''; ?>">
+                    🧠 <?php esc_html_e( 'Debug AI', 'cloudscale-devtools' ); ?>
+                </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=migrate' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'migrate' ? 'active' : ''; ?>">
                     🔄 <?php esc_html_e( 'Code Migrator', 'cloudscale-devtools' ); ?>
@@ -1408,17 +1416,9 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === '404' ? 'active' : ''; ?>">
                     🎮 <?php esc_html_e( '404 Games', 'cloudscale-devtools' ); ?>
                 </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=optimizer' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'optimizer' ? 'active' : ''; ?>">
-                    🔧 <?php esc_html_e( 'Optimizer', 'cloudscale-devtools' ); ?>
-                </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=logs' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'logs' ? 'active' : ''; ?>">
                     📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?>
-                </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=debug' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'debug' ? 'active' : ''; ?>">
-                    🧠 <?php esc_html_e( 'Debug AI', 'cloudscale-devtools' ); ?>
                 </a>
             </div>
             <script>

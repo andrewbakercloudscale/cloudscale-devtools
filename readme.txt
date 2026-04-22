@@ -85,6 +85,9 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
+= 1.9.207 =
+* fix: tab order — Optimizer and Debug AI moved to immediately after AI Security Scan
+
 = 1.9.206 =
 * feat: CSP panel — Google Fonts checkbox added; AdSense checkbox now includes fundingchoicesmessages.google.com (consent management) and ep1.adtrafficquality.google (IVT detection)
 * feat: PHP-FPM Saturation Monitor — Explain button with 6 sections; live worker count (active/idle/total) with auto-load and Refresh button via /fpm-status probe
