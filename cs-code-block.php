@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.207
+ * Version: 1.9.208
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.207';
+    const VERSION      = '1.9.208';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -10007,7 +10007,7 @@ class CloudScale_DevTools {
         ];
         ?>
         <hr class="cs-sec-divider">
-        <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #6366f1;margin-bottom:0;">
+        <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #6366f1;margin-bottom:0;border-radius:6px 6px 0 0;">
             <span>🛡️ <?php esc_html_e( 'Content Security Policy (CSP)', 'cloudscale-devtools' ); ?></span>
             <span class="cs-header-hint"><?php esc_html_e( 'Block unauthorised scripts and resources. Select the services your site uses before enabling.', 'cloudscale-devtools' ); ?></span>
             <?php self::render_explain_btn( 'csp', 'Content Security Policy (CSP)', [
@@ -10022,7 +10022,7 @@ class CloudScale_DevTools {
             ],
             'Protects your site against XSS attacks by telling the browser which scripts, styles, and resources are allowed to load. Always start in Report-Only mode to check nothing breaks before switching to Enforce.' ); ?>
         </div>
-        <div style="padding:16px 0 8px;" id="cs-csp-panel">
+        <div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;margin-bottom:0;" id="cs-csp-panel">
 
             <!-- Quick-start guide — hidden once CSP is enabled -->
             <?php if ( ! $csp_on ) : ?>
@@ -11696,8 +11696,11 @@ bantime  = 86400</pre>
 
                 <?php self::render_csp_panel(); ?>
 
-                <hr class="cs-sec-divider">
-
+                <div class="cs-section-header" style="margin-top:24px;background:linear-gradient(90deg,#0a1f1a 0%,#0d2920 100%);border-left:3px solid #10b981;border-radius:6px 6px 0 0;">
+                    <span>🕵️ <?php esc_html_e( 'AI Cyber Audit', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-header-hint"><?php esc_html_e( 'AI-powered WordPress security scanning — standard or deep dive', 'cloudscale-devtools' ); ?></span>
+                </div>
+                <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;padding:20px;">
                 <div class="cs-scan-row">
                     <div class="cs-scan-col">
                         <div class="cs-scan-col-header">
@@ -11753,6 +11756,7 @@ bantime  = 86400</pre>
                         <div id="cs-deep-results" class="cs-vuln-results" style="display:none;margin-top:6px"></div>
                     </div>
                 </div>
+                </div><!-- /AI Cyber Audit content box -->
 
             </div>
 

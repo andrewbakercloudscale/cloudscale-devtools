@@ -85,6 +85,9 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
+= 1.9.208 =
+* fix: CSP panel now has a white bordered card (indigo header) clearly separated from AI Cyber Audit section; AI Cyber Audit gets its own emerald section header above the scan cards
+
 = 1.9.207 =
 * fix: tab order — Optimizer and Debug AI moved to immediately after AI Security Scan
 
