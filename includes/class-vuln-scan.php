@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class CSDT_Vuln_Scan {
 
     public static function ajax_vuln_save_key(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -45,7 +45,7 @@ class CSDT_Vuln_Scan {
     }
 
     public static function ajax_security_test_key(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -99,7 +99,7 @@ class CSDT_Vuln_Scan {
     }
 
     public static function ajax_vuln_scan(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }

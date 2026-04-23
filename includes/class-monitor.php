@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class CSDT_Monitor {
 
     public static function ajax_ssh_log_clear(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -19,7 +19,7 @@ class CSDT_Monitor {
     }
 
     public static function ajax_ssh_monitor_save(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -53,7 +53,7 @@ class CSDT_Monitor {
         }
 
         // Read the last 256 KB (enough for several minutes of auth activity)
-        $handle = @fopen( $auth_log, 'r' );
+        $handle = is_readable( $auth_log ) ? fopen( $auth_log, 'r' ) : false;
         if ( ! $handle ) {
             return;
         }
@@ -218,8 +218,7 @@ class CSDT_Monitor {
 
             // Cap at 128 KB of new content per source to avoid memory issues
             $read_bytes = min( $unread, 131072 );
-            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-            $handle = @fopen( $path, 'rb' );
+            $handle = is_readable( $path ) ? fopen( $path, 'rb' ) : false;
             if ( ! $handle ) {
                 continue;
             }
@@ -323,7 +322,7 @@ class CSDT_Monitor {
     }
 
     public static function ajax_php_error_monitor_save(): void {
-        check_ajax_referer( 'csdt_debug_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::DEBUG_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -344,7 +343,7 @@ class CSDT_Monitor {
     }
 
     public static function ajax_fpm_monitor_save(): void {
-        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::FPM_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -367,7 +366,7 @@ class CSDT_Monitor {
     }
 
     public static function ajax_fpm_worker_status(): void {
-        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::FPM_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -396,7 +395,7 @@ class CSDT_Monitor {
     }
 
     public static function ajax_fpm_worker_detail(): void {
-        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::FPM_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -482,7 +481,7 @@ class CSDT_Monitor {
     }
 
     public static function ajax_fpm_setup_detect(): void {
-        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::FPM_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -543,7 +542,7 @@ class CSDT_Monitor {
         foreach ( [ '/etc/nginx/sites-enabled', '/etc/nginx/conf.d', '/etc/nginx' ] as $dir ) {
             if ( ! is_dir( $dir ) ) continue;
             foreach ( (array) glob( $dir . '/*.conf' ) as $cf ) {
-                $nc = (string) @file_get_contents( $cf );
+                $nc = is_readable( $cf ) ? (string) file_get_contents( $cf ) : '';
                 if ( preg_match( '/fastcgi_pass\s+([^\s;]+)/i', $nc, $m ) ) {
                     $fastcgi_pass = $m[1];
                     break 2;
@@ -562,7 +561,7 @@ class CSDT_Monitor {
     }
 
     public static function ajax_fpm_setup_patch(): void {
-        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::FPM_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -630,7 +629,7 @@ class CSDT_Monitor {
         if ( ! $reloaded && is_dir( '/proc' ) && function_exists( 'posix_kill' ) ) {
             $fpm_pids = [];
             foreach ( (array) glob( '/proc/[0-9]*', GLOB_ONLYDIR ) as $d ) {
-                $comm = (string) @file_get_contents( $d . '/comm' );
+                $comm = is_readable( $d . '/comm' ) ? (string) file_get_contents( $d . '/comm' ) : '';
                 if ( str_contains( trim( $comm ), 'php-fpm' ) ) {
                     $fpm_pids[] = (int) basename( $d );
                 }
