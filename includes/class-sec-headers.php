@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class CSDT_Security_Headers {
 
-    private static function render_security_headers_panel(): void {
+    public static function render_security_headers_panel(): void {
         $enabled = get_option( 'csdt_devtools_safe_headers_enabled', '0' ) === '1';
         $ext_ack = get_option( 'csdt_devtools_sec_headers_ack', '0' ) === '1';
 

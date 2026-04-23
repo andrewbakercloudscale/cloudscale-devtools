@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class CSDT_Test_Accounts {
 
-    private static function get_active_test_accounts(): array {
+    public static function get_active_test_accounts(): array {
         $users = get_users( [
             'meta_key'   => 'csdt_test_account',
             'meta_value' => '1',

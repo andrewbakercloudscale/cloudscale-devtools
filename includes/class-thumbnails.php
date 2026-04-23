@@ -36,7 +36,7 @@ class CSDT_Thumbnails {
 
     // ─── Panel render ────────────────────────────────────────────────────
 
-    private static function render_thumbnails_panel(): void {
+    public static function render_thumbnails_panel(): void {
         $cf_zone  = get_option( 'csdt_devtools_cf_zone_id', '' );
         $cf_token = get_option( 'csdt_devtools_cf_api_token', '' );
         $cf_token_masked = $cf_token ? str_repeat( '•', 12 ) . substr( $cf_token, -4 ) : '';

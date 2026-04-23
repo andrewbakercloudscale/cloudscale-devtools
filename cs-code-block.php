@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: AI security scanner and developer toolkit. Replaces your security scanner, 2FA plugin, SMTP mailer, SQL tool, and log viewer — one free plugin, no cloud dependency.
- * Version: 1.9.375
+ * Version: 1.9.376
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.375';
+    const VERSION      = '1.9.376';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -206,6 +206,21 @@ class CloudScale_DevTools {
 
     private static $instance_count  = 0;
     private static $assets_enqueued = false;
+
+    /**
+     * Returns the real client IP, respecting Cloudflare and proxy headers.
+     */
+    public static function get_client_ip(): string {
+        foreach ( [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' ] as $key ) {
+            if ( ! empty( $_SERVER[ $key ] ) ) {
+                $candidate = sanitize_text_field( wp_unslash( explode( ',', $_SERVER[ $key ] )[0] ) );
+                if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
+                    return $candidate;
+                }
+            }
+        }
+        return '';
+    }
 
     /**
      * Registers all plugin hooks.
