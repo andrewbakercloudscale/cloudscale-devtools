@@ -343,6 +343,44 @@ class CSDT_Uptime {
         wp_send_json_success( [ 'saved' => true, 'ready_url' => self::readiness_url() ] );
     }
 
+    public static function ajax_uptime_test_endpoint(): void {
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Unauthorized', 403 );
+
+        $url   = self::readiness_url();
+        $token = (string) get_option( 'csdt_uptime_token', '' );
+        if ( $token === '' ) {
+            wp_send_json_error( [ 'message' => 'No token set — click Generate Token first.' ] );
+            return;
+        }
+
+        $start = microtime( true );
+        $resp  = wp_remote_get( $url, [
+            'timeout' => 15,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Cache-Control' => 'no-store',
+            ],
+            'sslverify' => true,
+        ] );
+        $ms = (int) round( ( microtime( true ) - $start ) * 1000 );
+
+        if ( is_wp_error( $resp ) ) {
+            wp_send_json_error( [ 'message' => 'Request failed: ' . $resp->get_error_message(), 'ms' => $ms ] );
+            return;
+        }
+
+        $code = wp_remote_retrieve_response_code( $resp );
+        $body = json_decode( wp_remote_retrieve_body( $resp ), true );
+        wp_send_json_success( [
+            'status_code' => $code,
+            'ok'          => $code === 200,
+            'ms'          => $ms,
+            'checks'      => $body['checks'] ?? null,
+            'url'         => $url,
+        ] );
+    }
+
     public static function ajax_uptime_deploy_worker(): void {
         check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Unauthorized', 403 );

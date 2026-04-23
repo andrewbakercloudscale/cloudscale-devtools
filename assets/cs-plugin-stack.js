@@ -201,6 +201,9 @@
     var uptimeSlugInput   = document.getElementById('csdt-uptime-ready-slug');
     var uptimeUrlDisplay  = document.getElementById('csdt-ready-url-display');
     var uptimeRefreshBtn  = document.getElementById('csdt-uptime-refresh-btn');
+    var uptimeSaveBtn     = document.getElementById('csdt-uptime-save-btn');
+    var uptimeSaveStatus  = document.getElementById('csdt-uptime-save-status');
+    var uptimeTestBtn     = document.getElementById('csdt-uptime-test-btn');
 
     if (uptimeGenBtn) {
         uptimeGenBtn.addEventListener('click', function () {
@@ -299,12 +302,84 @@
         });
     }
 
+    if (uptimeSaveBtn) {
+        uptimeSaveBtn.addEventListener('click', function () {
+            var ntfy = uptimeNtfyInput ? uptimeNtfyInput.value.trim() : '';
+            var slug = uptimeSlugInput ? uptimeSlugInput.value.trim() : '';
+            uptimeSaveBtn.disabled = true;
+            post('csdt_uptime_save_settings', { ntfy_url: ntfy, ready_slug: slug }).then(function (res) {
+                uptimeSaveBtn.disabled = false;
+                if (!uptimeSaveStatus) return;
+                if (res.success) {
+                    if (res.data.ready_url && uptimeUrlDisplay) uptimeUrlDisplay.textContent = res.data.ready_url;
+                    uptimeSaveStatus.style.display = '';
+                    uptimeSaveStatus.style.color = '#16a34a';
+                    uptimeSaveStatus.textContent = '✓ Saved';
+                    setTimeout(function () { uptimeSaveStatus.style.display = 'none'; }, 2500);
+                } else {
+                    uptimeSaveStatus.style.display = '';
+                    uptimeSaveStatus.style.color = '#dc2626';
+                    uptimeSaveStatus.textContent = '✗ Save failed';
+                }
+            }).catch(function () {
+                uptimeSaveBtn.disabled = false;
+            });
+        });
+    }
+
+    if (uptimeTestBtn) {
+        uptimeTestBtn.addEventListener('click', function () {
+            uptimeTestBtn.disabled = true;
+            uptimeTestBtn.textContent = '⏳ Testing…';
+            if (uptimeDeployRes) uptimeDeployRes.innerHTML = '';
+            post('csdt_uptime_test_endpoint').then(function (res) {
+                uptimeTestBtn.disabled = false;
+                uptimeTestBtn.textContent = '🧪 Test Endpoint';
+                if (!uptimeDeployRes) return;
+                if (!res.success) {
+                    uptimeDeployRes.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:10px 14px;border-radius:0 6px 6px 0;font-size:.87em;color:#7f1d1d;">⚠ ' + escHtml((res.data && res.data.message) || 'Test failed') + '</div>';
+                    return;
+                }
+                var d = res.data;
+                var ok = d.ok;
+                var col = ok ? '#166534' : '#7f1d1d';
+                var bg  = ok ? '#f0fdf4' : '#fef2f2';
+                var brd = ok ? '#16a34a' : '#dc2626';
+                var checksHtml = '';
+                if (d.checks) {
+                    checksHtml = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">';
+                    ['db','fpm','wp'].forEach(function(k) {
+                        var c = d.checks[k] || {};
+                        var icon = c.ok !== false ? '✅' : '❌';
+                        checksHtml += '<span style="font-size:.82em;background:rgba(0,0,0,.05);padding:2px 8px;border-radius:4px;">' + icon + ' ' + k.toUpperCase() + '</span>';
+                    });
+                    checksHtml += '</div>';
+                }
+                uptimeDeployRes.innerHTML = '<div style="background:' + bg + ';border-left:3px solid ' + brd + ';padding:10px 14px;border-radius:0 6px 6px 0;font-size:.87em;color:' + col + ';">' +
+                    (ok ? '✅ Endpoint healthy' : '🔴 Endpoint returned HTTP ' + d.status_code) +
+                    ' — <strong>' + d.ms + 'ms</strong>' +
+                    checksHtml + '</div>';
+                loadUptimeHistory();
+            }).catch(function () {
+                uptimeTestBtn.disabled = false;
+                uptimeTestBtn.textContent = '🧪 Test Endpoint';
+            });
+        });
+    }
+
     if (uptimeRefreshBtn) {
-        uptimeRefreshBtn.addEventListener('click', loadUptimeHistory);
+        uptimeRefreshBtn.addEventListener('click', function () {
+            uptimeRefreshBtn.disabled = true;
+            uptimeRefreshBtn.textContent = '⏳ Loading…';
+            loadUptimeHistory().then(function () {
+                uptimeRefreshBtn.disabled = false;
+                uptimeRefreshBtn.textContent = '↻ Refresh';
+            });
+        });
     }
 
     function loadUptimeHistory() {
-        post('csdt_uptime_history').then(function (res) {
+        return post('csdt_uptime_history').then(function (res) {
             if (!res.success || !uptimeStatusInner) return;
             renderUptimeStatus(res.data);
             if (uptimeStatusWrap) uptimeStatusWrap.style.display = '';
