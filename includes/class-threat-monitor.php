@@ -124,7 +124,7 @@ class CSDT_Threat_Monitor {
             return;
         }
 
-        $handle = @fopen( $log_path, 'rb' );
+        $handle = is_readable( $log_path ) ? fopen( $log_path, 'rb' ) : false;
         if ( ! $handle ) {
             return;
         }
@@ -249,7 +249,7 @@ class CSDT_Threat_Monitor {
     }
 
     public static function ajax_threat_monitor_save(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -276,7 +276,7 @@ class CSDT_Threat_Monitor {
     }
 
     public static function ajax_threat_integrity_reset(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }

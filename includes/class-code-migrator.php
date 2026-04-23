@@ -39,10 +39,10 @@ class CSDT_Code_Migrator {
      */
     public static function ajax_save_theme_setting(): void {
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden' );
+            wp_send_json_error( 'Forbidden', 403 );
         }
         if ( ! check_ajax_referer( 'csdt_devtools_code_settings_inline', 'nonce', false ) ) {
-            wp_send_json_error( 'Bad nonce' );
+            wp_send_json_error( 'Bad nonce', 403 );
         }
 
         $theme = isset( $_POST['theme'] ) ? sanitize_text_field( wp_unslash( $_POST['theme'] ) ) : 'dark';
@@ -66,10 +66,10 @@ class CSDT_Code_Migrator {
 
     public static function ajax_save_perf_monitor(): void {
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden' );
+            wp_send_json_error( 'Forbidden', 403 );
         }
-        if ( ! check_ajax_referer( 'csdt_devtools_perf_monitor_nonce', 'nonce', false ) ) {
-            wp_send_json_error( 'Bad nonce' );
+        if ( ! check_ajax_referer( CloudScale_DevTools::PERF_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
         }
         $enabled = isset( $_POST['enabled'] ) && '1' === $_POST['enabled'] ? '1' : '0'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
         update_option( 'csdt_devtools_perf_monitor_enabled', $enabled );

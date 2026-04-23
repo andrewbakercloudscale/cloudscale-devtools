@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: AI security scanner and developer toolkit. Replaces your security scanner, 2FA plugin, SMTP mailer, SQL tool, and log viewer — one free plugin, no cloud dependency.
- * Version: 1.9.376
+ * Version: 1.9.377
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,11 +54,31 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.376';
+    const VERSION      = '1.9.377';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
-    const MIGRATE_NONCE = 'csdt_devtools_code_migrate_action';
+
+    // Nonce action strings — single source of truth used across all extracted classes.
+    const MIGRATE_NONCE      = 'csdt_devtools_code_migrate_action';
+    const SECURITY_NONCE     = CloudScale_DevTools::SECURITY_NONCE;
+    const OPTIMIZER_NONCE    = CloudScale_DevTools::OPTIMIZER_NONCE;
+    const LOGS_NONCE         = CloudScale_DevTools::LOGS_NONCE;
+    const SQL_NONCE          = CloudScale_DevTools::SQL_NONCE;
+    const DEBUG_NONCE        = CloudScale_DevTools::DEBUG_NONCE;
+    const FPM_NONCE          = CloudScale_DevTools::FPM_NONCE;
+    const SITE_AUDIT_NONCE   = CloudScale_DevTools::SITE_AUDIT_NONCE;
+    const PERF_NONCE         = CloudScale_DevTools::PERF_NONCE;
+    const LOGIN_NONCE        = 'csdt_devtools_login_nonce';
+    const SMTP_NONCE         = 'csdt_devtools_smtp_nonce';
+
+    // Auth transient key prefixes (suffixed at call-site).
+    const LOGIN_2FA_TRANSIENT    = 'csdt_devtools_2fa_pending_';
+    const LOGIN_OTP_TRANSIENT    = 'csdt_devtools_2fa_otp_';
+    const EMAIL_VERIFY_TRANSIENT = 'csdt_devtools_email_verify_';
+    const TOTP_CHARS             = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+    // Option / REST constants.
     const CUSTOM_404_OPTION  = 'csdt_devtools_custom_404';
     const SCHEME_404_OPTION  = 'csdt_devtools_404_scheme';
     const HISCORE_NS         = 'csdt-devtools/v1';
@@ -1148,7 +1168,7 @@ class CloudScale_DevTools {
             true
         );
         wp_localize_script( 'csdt-sql-editor', 'csdtDevtoolsSqlEditor', [
-            'nonce' => wp_create_nonce( 'csdt_devtools_sql_nonce' ),
+            'nonce' => wp_create_nonce( CloudScale_DevTools::SQL_NONCE ),
         ] );
 
         // Login security JS (only loaded on the login tab)
@@ -1246,7 +1266,7 @@ class CloudScale_DevTools {
             $has_key          = $saved_provider === 'gemini' ? ! empty( $gemini_key ) : ! empty( $api_key );
             wp_localize_script( 'csdt-vuln-scan', 'csdtVulnScan', [
                 'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
-                'nonce'          => wp_create_nonce( 'csdt_devtools_security_nonce' ),
+                'nonce'          => wp_create_nonce( CloudScale_DevTools::SECURITY_NONCE ),
                 'hasKey'         => $has_key,
                 'savedProvider'  => $saved_provider,
                 'maskedKey'      => $masked_key,
@@ -1290,7 +1310,7 @@ class CloudScale_DevTools {
             );
             wp_localize_script( 'csdt-optimizer', 'csdtOptimizer', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-                'nonce'   => wp_create_nonce( 'csdt_optimizer_nonce' ),
+                'nonce'   => wp_create_nonce( CloudScale_DevTools::OPTIMIZER_NONCE ),
                 'baseUrl' => admin_url( 'tools.php?page=' . self::TOOLS_SLUG ),
             ] );
         }
@@ -1306,8 +1326,8 @@ class CloudScale_DevTools {
             $audit_cache = get_option( 'csdt_site_audit_cache', null );
             wp_localize_script( 'csdt-site-audit', 'csdtSiteAudit', [
                 'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
-                'nonce'    => wp_create_nonce( 'csdt_site_audit_nonce' ),
-                'secNonce' => wp_create_nonce( 'csdt_devtools_security_nonce' ),
+                'nonce'    => wp_create_nonce( CloudScale_DevTools::SITE_AUDIT_NONCE ),
+                'secNonce' => wp_create_nonce( CloudScale_DevTools::SECURITY_NONCE ),
                 'seoAiUrl' => admin_url( 'tools.php?page=cs-seo-optimizer' ),
                 'cached'   => $audit_cache ? $audit_cache['data']   : null,
                 'cachedAt' => $audit_cache ? $audit_cache['run_at'] : null,
@@ -1325,7 +1345,7 @@ class CloudScale_DevTools {
             );
             wp_localize_script( 'csdt-server-logs', 'csdtServerLogs', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-                'nonce'   => wp_create_nonce( 'csdt_devtools_server_logs' ),
+                'nonce'   => wp_create_nonce( CloudScale_DevTools::LOGS_NONCE ),
                 'sources' => self::get_log_sources(),
             ] );
         }
@@ -1340,11 +1360,11 @@ class CloudScale_DevTools {
             );
             wp_localize_script( 'csdt-debug', 'csdtDebug', [
                 'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
-                'logsNonce'     => wp_create_nonce( 'csdt_devtools_server_logs' ),
-                'aiNonce'       => wp_create_nonce( 'csdt_optimizer_nonce' ),
-                'debugNonce'    => wp_create_nonce( 'csdt_debug_nonce' ),
-                'fpmNonce'      => wp_create_nonce( 'csdt_fpm_nonce' ),
-                'perfNonce'     => wp_create_nonce( 'csdt_devtools_perf_monitor_nonce' ),
+                'logsNonce'     => wp_create_nonce( CloudScale_DevTools::LOGS_NONCE ),
+                'aiNonce'       => wp_create_nonce( CloudScale_DevTools::OPTIMIZER_NONCE ),
+                'debugNonce'    => wp_create_nonce( CloudScale_DevTools::DEBUG_NONCE ),
+                'fpmNonce'      => wp_create_nonce( CloudScale_DevTools::FPM_NONCE ),
+                'perfNonce'     => wp_create_nonce( CloudScale_DevTools::PERF_NONCE ),
                 'perfEnabled'   => get_option( 'csdt_devtools_perf_monitor_enabled', '1' ),
                 'sources'       => self::get_log_sources(),
             ] );
@@ -1760,7 +1780,7 @@ class CloudScale_DevTools {
     }
 
     public static function ajax_logs_setup_php(): void {
-        check_ajax_referer( 'csdt_devtools_server_logs', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::LOGS_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -1797,7 +1817,7 @@ class CloudScale_DevTools {
     }
 
     public static function ajax_logs_fix_mu_perms(): void {
-        check_ajax_referer( 'csdt_devtools_server_logs', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::LOGS_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -1824,7 +1844,7 @@ class CloudScale_DevTools {
     }
 
     public static function ajax_logs_custom_save(): void {
-        check_ajax_referer( 'csdt_devtools_server_logs', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::LOGS_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -1849,8 +1869,7 @@ class CloudScale_DevTools {
     }
 
     private static function render_debug_panel(): void {
-        $has_key   = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) )
-                  || ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $has_key = CSDT_AI_Dispatcher::has_key();
         $key_url   = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         $perf_on   = get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0';
         ?>
@@ -2414,7 +2433,7 @@ class CloudScale_DevTools {
     }
 
     public static function ajax_server_logs_status(): void {
-        check_ajax_referer( 'csdt_devtools_server_logs', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::LOGS_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -2436,7 +2455,7 @@ class CloudScale_DevTools {
     }
 
     public static function ajax_server_logs_fetch(): void {
-        check_ajax_referer( 'csdt_devtools_server_logs', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::LOGS_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -2462,8 +2481,7 @@ class CloudScale_DevTools {
         }
 
         // Read last N lines efficiently without loading the entire file
-        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-        $handle = @fopen( $path, 'rb' );
+        $handle = is_readable( $path ) ? fopen( $path, 'rb' ) : false;
         if ( ! $handle ) {
             wp_send_json_success( [ 'status' => 'error', 'lines' => [], 'count' => 0, 'path' => $path ] );
             return;
@@ -3481,7 +3499,7 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
         }
-        if ( ! check_ajax_referer( 'csdt_devtools_sql_nonce', 'nonce', false ) ) {
+        if ( ! check_ajax_referer( CloudScale_DevTools::SQL_NONCE, 'nonce', false ) ) {
             wp_send_json_error( 'Bad nonce', 403 );
         }
 
@@ -3523,7 +3541,7 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
         }
-        if ( ! check_ajax_referer( 'csdt_devtools_sql_nonce', 'nonce', false ) ) {
+        if ( ! check_ajax_referer( CloudScale_DevTools::SQL_NONCE, 'nonce', false ) ) {
             wp_send_json_error( 'Bad nonce', 403 );
         }
 
@@ -3605,17 +3623,8 @@ class CloudScale_DevTools {
     }
 
     /* ==================================================================
-       8. LOGIN SECURITY — Hide Login + 2FA (Email / TOTP)
+       8. LOGIN SECURITY — Hook registrations (class extracted to class-login.php)
        ================================================================== */
-
-    // ── Constants ────────────────────────────────────────────────────────
-
-    const LOGIN_NONCE           = 'csdt_devtools_login_nonce';
-    const SMTP_NONCE            = 'csdt_devtools_smtp_nonce';
-    const LOGIN_2FA_TRANSIENT   = 'csdt_devtools_2fa_pending_';    // + random token
-    const LOGIN_OTP_TRANSIENT   = 'csdt_devtools_2fa_otp_';        // + user_id
-    const EMAIL_VERIFY_TRANSIENT = 'csdt_devtools_email_verify_';  // + random token (10 min)
-    const TOTP_CHARS            = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 
     public static function output_editor_debug_panel(): void {
@@ -4212,7 +4221,7 @@ class CloudScale_DevTools {
                 var msg = document.getElementById('csdt-prefix-rollback-persistent-msg');
                 var fd = new FormData();
                 fd.append('action', 'csdt_db_prefix_rollback');
-                fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( 'csdt_devtools_security_nonce' ) ); ?>);
+                fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( CloudScale_DevTools::SECURITY_NONCE ) ); ?>);
                 fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method:'POST', body:fd, credentials:'same-origin' })
                     .then(function(r){ return r.json(); })
                     .then(function(r){
@@ -4292,8 +4301,7 @@ class CloudScale_DevTools {
        ================================================================== */
 
     private static function render_optimizer_panel(): void {
-        $has_key = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
-                   ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $has_key = CSDT_AI_Dispatcher::has_key();
         $security_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         ?>
         <div class="cs-panel" id="cs-panel-optimizer">
@@ -4480,12 +4488,12 @@ class CloudScale_DevTools {
                     </div>
                 </div>
                 <?php
-                $ai_key_set = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) || ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+                $ai_key_set = CSDT_AI_Dispatcher::has_key();
                 ?>
                 <script>
                 (function(){
                     var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-                    var nonce   = <?php echo wp_json_encode( wp_create_nonce( 'csdt_optimizer_nonce' ) ); ?>;
+                    var nonce   = <?php echo wp_json_encode( wp_create_nonce( CloudScale_DevTools::OPTIMIZER_NONCE ) ); ?>;
                     var hasAi   = <?php echo $ai_key_set ? 'true' : 'false'; ?>;
 
                     function post(action, data) {

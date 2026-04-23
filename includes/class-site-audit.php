@@ -369,11 +369,11 @@ class CSDT_Site_Audit {
                             $out = [];
                             @exec( 'tail -20 ' . escapeshellarg( $f2b_log ) . ' 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
                             $tail = implode( "\n", $out );
-                        } elseif ( ( $fh = @fopen( $f2b_log, 'r' ) ) ) {
-                            $sz = (int) @filesize( $f2b_log );
-                            if ( $sz > 2048 ) { @fseek( $fh, -2048, SEEK_END ); }
-                            $tail = (string) @fread( $fh, 2048 );
-                            @fclose( $fh );
+                        } elseif ( is_readable( $f2b_log ) && ( $fh = fopen( $f2b_log, 'r' ) ) ) {
+                            $sz = (int) filesize( $f2b_log );
+                            if ( $sz > 2048 ) { fseek( $fh, -2048, SEEK_END ); }
+                            $tail = (string) fread( $fh, 2048 );
+                            fclose( $fh );
                         }
                         preg_match_all( '/(?:started successfully|Stopping all jails)/i', $tail, $m );
                         $last = ! empty( $m[0] ) ? strtolower( end( $m[0] ) ) : '';
@@ -415,7 +415,7 @@ class CSDT_Site_Audit {
                     } else {
                         // Nothing found — check if we're in a container before declaring "not installed"
                         $in_container = file_exists( '/.dockerenv' )
-                            || ( is_readable( '/proc/1/cgroup' ) && str_contains( (string) @file_get_contents( '/proc/1/cgroup' ), 'docker' ) );
+                            || ( is_readable( '/proc/1/cgroup' ) && str_contains( (string) file_get_contents( '/proc/1/cgroup' ), 'docker' ) );
                         $state = $in_container ? 'undetectable' : 'not_installed';
                     }
                 }
@@ -470,8 +470,7 @@ class CSDT_Site_Audit {
 
 
     public static function render_site_audit_panel(): void {
-        $has_key    = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
-                      ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $has_key = CSDT_AI_Dispatcher::has_key();
         $security_url = admin_url( 'tools.php?page=' . CloudScale_DevTools::TOOLS_SLUG . '&tab=security' );
         ?>
         <div class="cs-panel" id="cs-panel-site-audit">
@@ -521,7 +520,7 @@ class CSDT_Site_Audit {
     }
 
     public static function render_quick_fix_modals(): void {
-        $sec_nonce = wp_json_encode( wp_create_nonce( 'csdt_devtools_security_nonce' ) );
+        $sec_nonce = wp_json_encode( wp_create_nonce( CloudScale_DevTools::SECURITY_NONCE ) );
         $ajax_url  = wp_json_encode( admin_url( 'admin-ajax.php' ) );
         ?>
         <!-- DB Prefix Migration Modal -->
@@ -651,7 +650,7 @@ bantime  = 86400</pre>
     }
 
     public static function ajax_save_schedule(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -751,7 +750,7 @@ bantime  = 86400</pre>
 
 
     public static function ajax_apply_quick_fix(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -961,7 +960,7 @@ bantime  = 86400</pre>
     }
 
     public static function ajax_db_prefix_preflight(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -1006,7 +1005,7 @@ bantime  = 86400</pre>
     }
 
     public static function ajax_db_prefix_migrate(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -1155,7 +1154,7 @@ bantime  = 86400</pre>
     }
 
     public static function ajax_db_prefix_rollback(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -1393,7 +1392,7 @@ PROMPT;
     // ── Cancel scan ───────────────────────────────────────────────────
 
     public static function ajax_cancel_scan(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -1409,14 +1408,13 @@ PROMPT;
     }
 
     public static function ajax_site_audit(): void {
-        check_ajax_referer( 'csdt_site_audit_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SITE_AUDIT_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
 
         $data     = self::gather_site_audit_data();
-        $has_key  = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
-                    ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $has_key = CSDT_AI_Dispatcher::has_key();
 
         if ( $has_key ) {
             $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first). IMPORTANT: (1) Do NOT generate findings about missing backup plugins or missing SEO plugins — those are handled separately. (2) The field "template_rendered_pages" lists pages whose post_content is empty because they use a custom theme template or page builder — their actual rendered content may be substantial. Do NOT flag these as thin or empty content. (3) Do NOT generate findings about post revisions in the database — those are handled separately. (4) Do NOT generate findings about missing meta descriptions or missing SEO title tags — those are handled separately. Never recommend Yoast SEO or Rank Math — use CloudScale SEO AI only. (5) Do NOT generate findings about brute-force protection, SSH monitor, login URL hiding, or two-factor authentication — those are already reported. (6) Do NOT generate findings about disk space, WordPress core updates, or the "admin" username — those are already reported. (7) Do NOT generate findings about passkey or WebAuthn authentication status — those are handled separately. (8) Do NOT generate findings about WP-Cron health, expired transients, or DISABLE_WP_CRON — those are handled separately. (9) Do NOT generate findings about autoloaded options or wp_options autoload size — those are handled separately. (10) Do NOT generate findings about the default featured image, default post thumbnail, or broken/missing default images — those are handled separately. (11) Do NOT generate findings about thin content, stub posts, near-zero word count, or average post word count being below any threshold — those are handled separately. (12) Do NOT generate findings about missing featured images on individual posts/pages (non-default) or overall featured image coverage — those are handled separately. (13) Do NOT generate findings about duplicate page titles or duplicate post titles — those are handled separately. (14) Do NOT generate findings about wp-config.php file permissions, readability, or writability — those are handled separately.';
@@ -2954,7 +2952,7 @@ PROMPT;
                     break; // cap per plugin
                 }
                 $files_scanned++;
-                $content = @file_get_contents( $file->getPathname() ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+                $content = is_readable( $file->getPathname() ) ? file_get_contents( $file->getPathname() ) : false;
                 if ( $content === false ) {
                     continue;
                 }
@@ -3633,7 +3631,7 @@ PROMPT;
     }
 
     public static function ajax_deep_scan(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -3761,7 +3759,7 @@ PROMPT;
     }
 
     public static function ajax_scan_history(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
             return;
@@ -3770,7 +3768,7 @@ PROMPT;
     }
 
     public static function ajax_scan_status(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }

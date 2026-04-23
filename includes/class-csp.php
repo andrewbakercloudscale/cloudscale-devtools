@@ -741,7 +741,7 @@ class CSDT_CSP {
     }
 
     public static function ajax_csp_save(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
 
         $enabled  = isset( $_POST['enabled'] )  ? sanitize_key( wp_unslash( $_POST['enabled'] ) )                            : '0';
@@ -813,7 +813,7 @@ class CSDT_CSP {
     }
 
     public static function ajax_csp_restore(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
 
         $idx = isset( $_POST['index'] ) ? (int) wp_unslash( $_POST['index'] ) : -1;
@@ -854,7 +854,7 @@ class CSDT_CSP {
     }
 
     public static function ajax_csp_rollback(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
 
         $raw = get_option( 'csdt_devtools_csp_backup', '' );
@@ -915,14 +915,14 @@ class CSDT_CSP {
     }
 
     public static function ajax_csp_violations_get(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
         $stored = json_decode( get_option( 'csdt_csp_violations', '[]' ), true );
         wp_send_json_success( is_array( $stored ) ? $stored : [] );
     }
 
     public static function ajax_csp_violations_clear(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
         delete_option( 'csdt_csp_violations' );
         wp_send_json_success();

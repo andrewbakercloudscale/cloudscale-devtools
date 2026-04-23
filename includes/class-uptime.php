@@ -156,7 +156,7 @@ class CSDT_Uptime {
     }
 
     public static function ajax_uptime_setup(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Unauthorized', 403 );
 
         $token = (string) get_option( 'csdt_uptime_token', '' );
@@ -177,7 +177,7 @@ class CSDT_Uptime {
     }
 
     public static function ajax_uptime_history(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Unauthorized', 403 );
 
         $last_ping = get_option( 'csdt_uptime_last_ping', null );
@@ -230,7 +230,7 @@ class CSDT_Uptime {
     }
 
     public static function ajax_uptime_save_settings(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Unauthorized', 403 );
 
         $ntfy_url = esc_url_raw( wp_unslash( $_POST['ntfy_url'] ?? '' ) );
@@ -239,7 +239,7 @@ class CSDT_Uptime {
     }
 
     public static function ajax_uptime_deploy_worker(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Unauthorized', 403 );
 
         $zone_id  = (string) get_option( 'csdt_devtools_cf_zone_id', '' );

@@ -89,7 +89,7 @@ class CSDT_Security_Headers {
     }
 
     public static function ajax_sec_headers_save(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -102,7 +102,7 @@ class CSDT_Security_Headers {
     }
 
     public static function ajax_scan_headers(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
 
         $sec_keys = [
@@ -246,7 +246,7 @@ class CSDT_Security_Headers {
             $home_data['warnings'] = $warnings;
             // Server IP
             $host = parse_url( $home_url, PHP_URL_HOST );
-            $home_data['ip'] = $host ? @gethostbyname( $host ) : '';
+            $home_data['ip'] = $host ? gethostbyname( $host ) : '';
         }
 
         // ── Last 10 posts/pages — security headers only ──────────────────────
@@ -273,7 +273,7 @@ class CSDT_Security_Headers {
     }
 
     public static function ajax_scan_history_item(): void {
-        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
         $idx     = (int) ( $_POST['idx'] ?? -1 );
         $history = get_option( 'csdt_scan_history', [] );

@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class CSDT_Optimizer {
 
     public static function ajax_db_orphaned_scan(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -104,7 +104,7 @@ class CSDT_Optimizer {
     }
 
     public static function ajax_db_identify_table(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -222,7 +222,7 @@ class CSDT_Optimizer {
     }
 
     public static function ajax_db_archive_tables(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -303,7 +303,7 @@ class CSDT_Optimizer {
     }
 
     public static function ajax_db_trash_scan(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -360,7 +360,7 @@ class CSDT_Optimizer {
     }
 
     public static function ajax_db_restore_tables(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -412,7 +412,7 @@ class CSDT_Optimizer {
     }
 
     public static function ajax_db_drop_tables(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -462,7 +462,7 @@ class CSDT_Optimizer {
     // ── Optimizer: Plugin Stack Scanner ──────────────────────────────
 
     public static function ajax_plugin_stack_scan(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -552,7 +552,7 @@ class CSDT_Optimizer {
     // ── Optimizer: Update Risk Scanner ───────────────────────────────
 
     public static function ajax_update_risk_scan(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -587,7 +587,7 @@ class CSDT_Optimizer {
     }
 
     public static function ajax_update_risk_assess(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -618,8 +618,7 @@ class CSDT_Optimizer {
             }
         }
 
-        $has_key = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
-                   ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $has_key = CSDT_AI_Dispatcher::has_key();
 
         if ( $has_key && $changelog ) {
             $system   = 'You are a WordPress plugin update risk assessor. Given a plugin name, version numbers, and changelog, classify the update as exactly one of: "patch" (security fix or bug fix — apply immediately), "minor" (new features, low breaking risk), or "breaking" (major version, deprecated APIs, DB migrations, or significant structural changes — review before applying). Respond with ONLY valid JSON, no other text: {"risk":"patch","reason":"One sentence."}';
@@ -666,7 +665,7 @@ class CSDT_Optimizer {
     // ── Optimizer: Database Intelligence Engine ──────────────────────
 
     public static function ajax_db_intelligence_scan(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -830,7 +829,7 @@ class CSDT_Optimizer {
     }
 
     public static function ajax_db_intelligence_fix(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
@@ -894,7 +893,7 @@ class CSDT_Optimizer {
     // ── Optimizer: AI Debugging Assistant ────────────────────────────
 
     public static function ajax_ai_debug_log(): void {
-        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
