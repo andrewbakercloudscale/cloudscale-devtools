@@ -18,7 +18,7 @@ class CSDT_SMTP {
      * @since  1.9.4
      * @return void
      */
-    private static function render_smtp_panel(): void {
+    public static function render_smtp_panel(): void {
         $enabled    = get_option( 'csdt_devtools_smtp_enabled',    '0' ) === '1';
         $host       = get_option( 'csdt_devtools_smtp_host',       '' );
         $port       = get_option( 'csdt_devtools_smtp_port',       587 );
@@ -704,7 +704,7 @@ class CSDT_SMTP {
      * to csdt_devtools_.  Runs on every load but exits immediately after the first
      * successful run (guarded by a flag option).
      */
-    private static function maybe_migrate_prefix(): void {
+    public static function maybe_migrate_prefix(): void {
         if ( get_option( 'csdt_devtools_prefix_migrated' ) ) {
             return;
         }
@@ -750,7 +750,7 @@ class CSDT_SMTP {
      * One-time migration: renames SMTP options from the cs_devtools_ prefix
      * (missed by the first migration) to csdt_devtools_.
      */
-    private static function maybe_migrate_smtp_prefix(): void {
+    public static function maybe_migrate_smtp_prefix(): void {
         if ( get_option( 'csdt_devtools_smtp_prefix_migrated' ) ) {
             return;
         }
@@ -781,7 +781,7 @@ class CSDT_SMTP {
      * One-time migration: renames TOTP/2FA user meta from cs_devtools_ prefix
      * (missed by the first migration which used incorrect short keys) to csdt_devtools_.
      */
-    private static function maybe_migrate_usermeta_prefix(): void {
+    public static function maybe_migrate_usermeta_prefix(): void {
         if ( get_option( 'csdt_devtools_usermeta_prefix_migrated' ) ) {
             return;
         }

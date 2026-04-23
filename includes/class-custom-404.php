@@ -301,7 +301,7 @@ class CSDT_Custom_404 {
     }
 
     /** Renders the 404 Games settings panel. */
-    private static function render_404_panel(): void {
+    public static function render_404_panel(): void {
         $current_scheme = get_option( CloudScale_DevTools::SCHEME_404_OPTION, 'ocean' );
         $enabled        = (bool) get_option( CloudScale_DevTools::CUSTOM_404_OPTION, 1 );
         ?>

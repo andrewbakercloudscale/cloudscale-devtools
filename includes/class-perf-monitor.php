@@ -382,7 +382,7 @@ class CSDT_Perf_Monitor {
      * @param  string $label Human-readable phase label.
      * @return void
      */
-    private static function perf_record_milestone( string $label ): void {
+    public static function perf_record_milestone( string $label ): void {
         if ( ! isset( $_SERVER['REQUEST_TIME_FLOAT'] ) ) {
             return;
         }
@@ -592,7 +592,7 @@ class CSDT_Perf_Monitor {
      * @since  1.8.113
      * @return string
      */
-    private static function get_thumbnails_admin_css(): string {
+    public static function get_thumbnails_admin_css(): string {
         return '
 .cs-thumb-cf-steps{display:flex;flex-direction:column;gap:12px;margin-top:10px}
 .cs-thumb-cf-step{display:flex;gap:12px;align-items:flex-start}
@@ -655,7 +655,7 @@ class CSDT_Perf_Monitor {
      * @since  1.8.118
      * @return string
      */
-    private static function get_explain_modal_css(): string {
+    public static function get_explain_modal_css(): string {
         return '
 .cs-explain-desc{color:#50575e;font-size:12px;line-height:1.7}
 .cs-explain-desc p{margin:0 0 8px 0}

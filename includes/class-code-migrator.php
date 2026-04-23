@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class CSDT_Code_Migrator {
 
-    private static function recursive_str_replace( string $from, string $to, $data ) {
+    public static function recursive_str_replace( string $from, string $to, $data ) {
         if ( is_array( $data ) ) {
             foreach ( $data as $k => $v ) {
                 $data[ $k ] = self::recursive_str_replace( $from, $to, $v );

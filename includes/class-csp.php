@@ -159,7 +159,7 @@ class CSDT_CSP {
     }
 
 
-    private static function render_csp_panel(): void {
+    public static function render_csp_panel(): void {
         $csp_on       = get_option( 'csdt_devtools_csp_enabled', '0' ) === '1';
         $csp_mode     = get_option( 'csdt_devtools_csp_mode', 'enforce' );
         $csp_services = json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true );

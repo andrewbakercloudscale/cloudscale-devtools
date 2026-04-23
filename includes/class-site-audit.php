@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class CSDT_Site_Audit {
 
-    private static function default_security_prompt(): string {
+    public static function default_security_prompt(): string {
         return 'You are an expert WordPress security auditor with deep knowledge of WordPress internals, common attack vectors, and security hardening best practices.'
             . "\n\nAnalyse the provided site configuration and return a comprehensive, prioritised security assessment."
             . "\n\nReturn ONLY valid JSON — no markdown code fences, no explanation outside the JSON. Use this exact schema:"
@@ -25,7 +25,7 @@ class CSDT_Site_Audit {
             . "\n\nAnalyse: WordPress/PHP version currency, plugin/theme security posture, authentication hardening (2FA, brute-force, admin username), configuration security (debug mode, file editing, DB prefix), exposed sensitive files, HTTP security headers, HTTPS enforcement, and any notable risk combinations.";
     }
 
-    private static function gather_security_data(): array {
+    public static function gather_security_data(): array {
         global $wpdb;
 
         if ( ! function_exists( 'get_plugins' ) ) {
@@ -179,7 +179,7 @@ class CSDT_Site_Audit {
     }
 
 
-    private static function get_quick_fixes(): array {
+    public static function get_quick_fixes(): array {
         $app_pw_available = function_exists( 'wp_is_application_passwords_available' )
                            && wp_is_application_passwords_available();
         return [
@@ -469,7 +469,7 @@ class CSDT_Site_Audit {
     // ── Editor Debug Panel ────────────────────────────────────────────────────
 
 
-    private static function render_site_audit_panel(): void {
+    public static function render_site_audit_panel(): void {
         $has_key    = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
                       ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
         $security_url = admin_url( 'tools.php?page=' . CloudScale_DevTools::TOOLS_SLUG . '&tab=security' );
@@ -520,7 +520,7 @@ class CSDT_Site_Audit {
         <?php
     }
 
-    private static function render_quick_fix_modals(): void {
+    public static function render_quick_fix_modals(): void {
         $sec_nonce = wp_json_encode( wp_create_nonce( 'csdt_devtools_security_nonce' ) );
         $ajax_url  = wp_json_encode( admin_url( 'admin-ajax.php' ) );
         ?>
@@ -1224,7 +1224,7 @@ bantime  = 86400</pre>
     }
 
     // ── Shared list of WordPress core table suffixes (no prefix) ────────────
-    private static function core_table_suffixes(): array {
+    public static function core_table_suffixes(): array {
         return [
             'comments', 'commentmeta', 'links', 'options', 'postmeta', 'posts',
             'terms', 'termmeta', 'term_relationships', 'term_taxonomy', 'usermeta', 'users',
@@ -1234,7 +1234,7 @@ bantime  = 86400</pre>
     }
 
     // ── Map a table suffix to a likely plugin name ───────────────────────────
-    private static function guess_plugin_from_suffix( string $suffix ): string {
+    public static function guess_plugin_from_suffix( string $suffix ): string {
         $map = [
             'rank_math'       => 'Rank Math SEO',
             'shortpixel'      => 'ShortPixel',
@@ -1295,7 +1295,7 @@ bantime  = 86400</pre>
         return 'Unknown plugin';
     }
 
-    private static function guess_plugin_url_from_suffix( string $suffix ): string {
+    public static function guess_plugin_url_from_suffix( string $suffix ): string {
         $map = [
             'rank_math'       => 'https://wordpress.org/plugins/seo-by-rank-math/',
             'shortpixel'      => 'https://wordpress.org/plugins/shortpixel-image-optimiser/',
@@ -3735,7 +3735,7 @@ PROMPT;
         error_log( '[CSDT-DEEP] cron complete (parallel), score=' . $report['score'] );
     }
 
-    private static function append_scan_history( string $type, array $report, string $model_used, int $scanned_at ): void {
+    public static function append_scan_history( string $type, array $report, string $model_used, int $scanned_at ): void {
         $history = get_option( 'csdt_scan_history', [] );
         if ( ! is_array( $history ) ) { $history = []; }
         array_unshift( $history, [
