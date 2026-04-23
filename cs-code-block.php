@@ -390,8 +390,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_fpm_setup_patch',              [ 'CSDT_Monitor', 'ajax_fpm_setup_patch' ] );
         add_action( 'wp_ajax_csdt_fpm_worker_detail',            [ 'CSDT_Monitor', 'ajax_fpm_worker_detail' ] );
         add_action( 'wp_ajax_csdt_sql_http_fix',                  [ __CLASS__, 'ajax_sql_http_fix' ] );
-        add_action( 'wp_ajax_nopriv_csdt_fpm_report',            [ __CLASS__, 'ajax_fpm_report' ] );
-        add_action( 'wp_ajax_csdt_fpm_report',                   [ __CLASS__, 'ajax_fpm_report' ] );
+        // FPM report uses the REST endpoint csdt/v1/fpm-report (CSDT_Monitor::rest_fpm_report).
         add_action( 'csdt_threat_monitor',                      [ 'CSDT_Threat_Monitor', 'monitor_threats' ] );
         add_action( 'wp_ajax_csdt_threat_monitor_save',         [ 'CSDT_Threat_Monitor', 'ajax_threat_monitor_save' ] );
         add_action( 'wp_ajax_csdt_threat_integrity_reset',      [ 'CSDT_Threat_Monitor', 'ajax_threat_integrity_reset' ] );
@@ -412,8 +411,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_uptime_deploy_worker',        [ 'CSDT_Uptime', 'ajax_uptime_deploy_worker' ] );
         add_action( 'wp_ajax_csdt_uptime_save_settings',        [ 'CSDT_Uptime', 'ajax_uptime_save_settings' ] );
         add_action( 'admin_bar_menu',                           [ 'CSDT_Uptime', 'render_admin_bar_badge' ], 100 );
-        add_action( 'admin_head',                               [ 'CSDT_Uptime', 'admin_bar_badge_styles' ] );
-        add_action( 'wp_head',                                  [ 'CSDT_Uptime', 'admin_bar_badge_styles' ] );
+        add_action( 'admin_enqueue_scripts',                    [ 'CSDT_Uptime', 'admin_bar_badge_styles' ] );
+        add_action( 'wp_enqueue_scripts',                       [ 'CSDT_Uptime', 'admin_bar_badge_styles' ] );
 
         // CSP nonce injection — only active when nonce mode is enabled
         if ( ! is_admin() && get_option( 'csdt_csp_nonces_enabled', '0' ) === '1' ) {
@@ -715,6 +714,34 @@ class CloudScale_DevTools {
      * @since  1.7.17
      * @return string
      */
+
+    private static function get_log_viewer_css(): string {
+        return '.cs-log-src-btn.status-ok{border-color:#22c55e;color:#22c55e}' .
+               '.cs-log-src-btn.status-not-found{border-color:#555;color:#555}' .
+               '.cs-log-src-btn.status-permission-denied{border-color:#f59e0b;color:#f59e0b}' .
+               '.cs-log-src-btn.status-empty{border-color:#6366f1;color:#6366f1}' .
+               '.cs-log-src-btn.active{background:rgba(74,158,255,.15);border-color:#4a9eff;color:#4a9eff}' .
+               '.cs-log-line{padding:1px 0;white-space:pre-wrap;word-break:break-all;border-bottom:1px solid rgba(255,255,255,.03)}' .
+               '.cs-log-line.level-emerg,.cs-log-line.level-alert,.cs-log-line.level-crit{color:#ff6b6b}' .
+               '.cs-log-line.level-error{color:#f87171}' .
+               '.cs-log-line.level-warn{color:#fbbf24}' .
+               '.cs-log-line.level-notice{color:#a78bfa}' .
+               '.cs-log-line.level-info{color:#60a5fa}' .
+               '.cs-log-line.level-debug{color:#6b7280}' .
+               '.cs-log-line.level-default{color:#c9d1d9}';
+    }
+
+    private static function get_dashboard_widget_css(): string {
+        return '#csdt_security_summary .cs-dw-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px}' .
+               '#csdt_security_summary .cs-dw-row:last-child{border-bottom:none}' .
+               '#csdt_security_summary .cs-dw-lbl{color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}' .
+               '#csdt_security_summary .cs-dw-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;padding:12px 0 6px;border-bottom:2px solid #e5e7eb;margin-bottom:4px}' .
+               '#csdt_security_summary .cs-dw-actions{margin-top:14px;display:flex}' .
+               '#csdt_security_summary .cs-dw-actions a{flex:1;text-align:center;padding:8px 10px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;transition:opacity .15s}' .
+               '#csdt_security_summary .cs-dw-btn-pri{background:linear-gradient(135deg,#1a3a8f,#1e6fd9);color:#fff!important}' .
+               '#csdt_security_summary .cs-dw-btn-pri:hover{opacity:.88}';
+    }
+
     private static function get_convert_toast_css(): string {
         return '#cs-convert-all-toast{'
             . 'position:fixed;bottom:24px;right:24px;z-index:999999;'
@@ -1128,6 +1155,11 @@ class CloudScale_DevTools {
         // Explain modal description styling — scoped to .cs-explain-desc.
         wp_add_inline_style( 'csdt-admin-tabs', CSDT_Perf_Monitor::get_explain_modal_css() );
 
+        // Dashboard widget styles (only on wp-admin dashboard).
+        if ( $hook === 'index.php' ) {
+            wp_add_inline_style( 'dashboard', self::get_dashboard_widget_css() );
+        }
+
         // Migrate CSS + JS
         wp_enqueue_style(
             'csdt-code-migrate',
@@ -1284,6 +1316,23 @@ class CloudScale_DevTools {
                 self::VERSION,
                 true
             );
+            wp_enqueue_script(
+                'csdt-csp',
+                plugins_url( 'assets/cs-csp.js', __FILE__ ),
+                [ 'csdt-vuln-scan' ],
+                self::VERSION,
+                true
+            );
+            wp_localize_script( 'csdt-csp', 'csdtCspI18n', [
+                'rollbackLabel' => esc_js( __( 'Rollback to previous settings', 'cloudscale-devtools' ) ),
+            ] );
+            wp_enqueue_script(
+                'csdt-prefix-rollback',
+                plugins_url( 'assets/cs-prefix-rollback.js', __FILE__ ),
+                [ 'csdt-vuln-scan' ],
+                self::VERSION,
+                true
+            );
         }
 
         if ( $active_tab === 'thumbnails' ) {
@@ -1319,7 +1368,15 @@ class CloudScale_DevTools {
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'nonce'   => wp_create_nonce( CloudScale_DevTools::OPTIMIZER_NONCE ),
                 'baseUrl' => admin_url( 'tools.php?page=' . self::TOOLS_SLUG ),
+                'hasAi'   => CSDT_AI_Dispatcher::has_key(),
             ] );
+            wp_enqueue_script(
+                'csdt-optimizer-panel',
+                plugins_url( 'assets/cs-optimizer-panel.js', __FILE__ ),
+                [ 'csdt-optimizer' ],
+                self::VERSION,
+                true
+            );
         }
 
         if ( $active_tab === 'site-audit' ) {
@@ -1342,6 +1399,7 @@ class CloudScale_DevTools {
         }
 
         if ( $active_tab === 'debug' || $active_tab === 'logs' ) {
+            wp_add_inline_style( 'csdt-admin-tabs', self::get_log_viewer_css() );
             $logs_js = plugin_dir_path( __FILE__ ) . 'assets/cs-server-logs.js';
             wp_enqueue_script(
                 'csdt-server-logs',
@@ -1569,18 +1627,18 @@ class CloudScale_DevTools {
         $modal_id = 'cs-explain-modal-' . $id;
         ?>
         <button type="button" id="<?php echo esc_attr( $btn_id ); ?>"
-            onclick="document.getElementById('<?php echo esc_attr( $modal_id ); ?>').style.display='flex'"
+            data-cs-modal-open="<?php echo esc_attr( $modal_id ); ?>"
             style="background:#2563eb!important;border:1px solid rgba(255,255,255,0.35)!important;border-radius:5px!important;color:#fff!important;font-size:12px!important;font-weight:700!important;padding:5px 14px!important;cursor:pointer!important;margin-left:auto!important;flex-shrink:0!important;display:block!important;box-shadow:none!important;text-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;line-height:1.4!important">
             Explain&hellip;
         </button>
         <div id="<?php echo esc_attr( $modal_id ); ?>"
              style="display:none;position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:16px;text-transform:none;letter-spacing:normal;font-weight:normal"
-             onclick="if(event.target===this)this.style.display='none'">
+             data-cs-modal-backdrop="true">
             <div style="background:#fff;border-radius:10px;max-width:600px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
                 <div style="padding:18px 22px 12px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:10px">
                     <strong style="font-size:15px;color:#111"><?php echo esc_html( $title ); ?></strong>
                     <button type="button"
-                        onclick="document.getElementById('<?php echo esc_attr( $modal_id ); ?>').style.display='none'"
+                        data-cs-modal-close="<?php echo esc_attr( $modal_id ); ?>"
                         style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;padding:0">&times;</button>
                 </div>
                 <div style="padding:16px 22px 20px">
@@ -1627,7 +1685,7 @@ class CloudScale_DevTools {
                 </div>
                 <div style="padding:10px 22px 16px;border-top:1px solid #e5e7eb;text-align:right">
                     <button type="button"
-                        onclick="document.getElementById('<?php echo esc_attr( $modal_id ); ?>').style.display='none'"
+                        data-cs-modal-close="<?php echo esc_attr( $modal_id ); ?>"
                         style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:5px;padding:6px 18px;font-size:12px;font-weight:600;cursor:pointer;color:#374151">
                         <?php esc_html_e( 'Got it', 'cloudscale-devtools' ); ?>
                     </button>
@@ -2411,23 +2469,6 @@ class CloudScale_DevTools {
 
             </div>
         </div>
-        <style>
-        .cs-log-src-btn.status-ok            { border-color:#22c55e; color:#22c55e; }
-        .cs-log-src-btn.status-not-found     { border-color:#555; color:#555; }
-        .cs-log-src-btn.status-permission-denied { border-color:#f59e0b; color:#f59e0b; }
-        .cs-log-src-btn.status-empty         { border-color:#6366f1; color:#6366f1; }
-        .cs-log-src-btn.active               { background:rgba(74,158,255,0.15); border-color:#4a9eff; color:#4a9eff; }
-        .cs-log-line                         { padding:1px 0; white-space:pre-wrap; word-break:break-all; border-bottom:1px solid rgba(255,255,255,0.03); }
-        .cs-log-line.level-emerg,
-        .cs-log-line.level-alert,
-        .cs-log-line.level-crit              { color:#ff6b6b; }
-        .cs-log-line.level-error             { color:#f87171; }
-        .cs-log-line.level-warn              { color:#fbbf24; }
-        .cs-log-line.level-notice            { color:#a78bfa; }
-        .cs-log-line.level-info              { color:#60a5fa; }
-        .cs-log-line.level-debug             { color:#6b7280; }
-        .cs-log-line.level-default           { color:#c9d1d9; }
-        </style>
         <?php
     }
 
@@ -3666,16 +3707,6 @@ class CloudScale_DevTools {
 
         $base_url = admin_url( 'tools.php?page=cloudscale-devtools' );
         ?>
-        <style>
-        #csdt_security_summary .cs-dw-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}
-        #csdt_security_summary .cs-dw-row:last-child{border-bottom:none;}
-        #csdt_security_summary .cs-dw-lbl{color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
-        #csdt_security_summary .cs-dw-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;padding:12px 0 6px;border-bottom:2px solid #e5e7eb;margin-bottom:4px;}
-        #csdt_security_summary .cs-dw-actions{margin-top:14px;display:flex;}
-        #csdt_security_summary .cs-dw-actions a{flex:1;text-align:center;padding:8px 10px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;transition:opacity .15s;}
-        #csdt_security_summary .cs-dw-btn-pri{background:linear-gradient(135deg,#1a3a8f,#1e6fd9);color:#fff!important;}
-        #csdt_security_summary .cs-dw-btn-pri:hover{opacity:.88;}
-        </style>
 
         <div class="cs-dw-section">🤖 <?php esc_html_e( 'AI Security', 'cloudscale-devtools' ); ?></div>
         <div class="cs-dw-row">
@@ -3944,32 +3975,6 @@ class CloudScale_DevTools {
             <button type="button" id="csdt-prefix-rollback-persistent-btn" class="cs-btn-secondary cs-btn-sm" style="border-color:#ef4444;color:#dc2626;white-space:nowrap;">&#x21A9; Rollback Now</button>
             <span id="csdt-prefix-rollback-persistent-msg" style="display:none;font-size:12px;"></span>
         </div>
-        <script>
-        (function(){
-            var btn = document.getElementById('csdt-prefix-rollback-persistent-btn');
-            if (!btn) { return; }
-            btn.addEventListener('click', function () {
-                if (!confirm('Roll back all renamed tables and restore wp-config.php?')) { return; }
-                btn.disabled = true; btn.textContent = '⏳ Rolling back…';
-                var msg = document.getElementById('csdt-prefix-rollback-persistent-msg');
-                var fd = new FormData();
-                fd.append('action', 'csdt_db_prefix_rollback');
-                fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( CloudScale_DevTools::SECURITY_NONCE ) ); ?>);
-                fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method:'POST', body:fd, credentials:'same-origin' })
-                    .then(function(r){ return r.json(); })
-                    .then(function(r){
-                        btn.disabled = false;
-                        if (msg) {
-                            msg.style.display = '';
-                            msg.style.color = r.success ? '#16a34a' : '#dc2626';
-                            msg.textContent = (r.data && r.data.message) || (r.success ? 'Rolled back.' : 'Failed.');
-                        }
-                        if (r.success) { btn.textContent = '✓ Done'; btn.disabled = true; btn.closest('div[style]').style.background='#f0fdf4'; }
-                        else { btn.textContent = '↩ Rollback Now'; }
-                    }).catch(function(){ btn.disabled=false; btn.textContent='↩ Rollback Now'; });
-            });
-        })();
-        </script>
         <?php endif; ?>
 
         <!-- ── Quick Fixes ─────────────────────────────────────────────────── -->
@@ -4002,7 +4007,7 @@ class CloudScale_DevTools {
                     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
                     <?php if ( ! empty( $fix['fix_modal'] ) ) : ?>
                         <button type="button" class="cs-btn-primary cs-btn-sm"
-                                onclick="document.getElementById('<?php echo esc_attr( $fix['fix_modal'] ); ?>').style.display='flex';">
+                                data-cs-modal-open="<?php echo esc_attr( $fix['fix_modal'] ); ?>">
                             <?php echo esc_html( $fix['fix_label'] ); ?>
                         </button>
                     <?php else : ?>
@@ -4220,308 +4225,6 @@ class CloudScale_DevTools {
                         <div id="csdt-trash-results"><span style="color:#9ca3af;font-size:13px;">⏳ <?php esc_html_e( 'Loading…', 'cloudscale-devtools' ); ?></span></div>
                     </div>
                 </div>
-                <?php
-                $ai_key_set = CSDT_AI_Dispatcher::has_key();
-                ?>
-                <script>
-                (function(){
-                    var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-                    var nonce   = <?php echo wp_json_encode( wp_create_nonce( CloudScale_DevTools::OPTIMIZER_NONCE ) ); ?>;
-                    var hasAi   = <?php echo $ai_key_set ? 'true' : 'false'; ?>;
-
-                    function post(action, data) {
-                        var params = 'action=' + encodeURIComponent(action) + '&nonce=' + encodeURIComponent(nonce);
-                        if (data) {
-                            Object.keys(data).forEach(function(k) {
-                                params += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(
-                                    typeof data[k] === 'object' ? JSON.stringify(data[k]) : data[k]
-                                );
-                            });
-                        }
-                        return fetch(ajaxUrl, {
-                            method: 'POST', credentials: 'same-origin',
-                            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                            body: params
-                        }).then(function(r){ return r.json(); });
-                    }
-
-                    function esc(s) {
-                        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-                    }
-
-                    function fmtKb(kb) {
-                        return kb >= 1024 ? (kb/1024).toFixed(1)+' MB' : kb+' KB';
-                    }
-
-                    /* ── Orphan Scan ───────────────────────────── */
-                    function runOrphanScan() {
-                        var btn = document.getElementById('csdt-orphan-scan-btn');
-                        var res = document.getElementById('csdt-orphan-results');
-                        if (!btn || !res) return;
-                        btn.disabled = true;
-                        btn.textContent = '⏳ Scanning…';
-                        res.innerHTML = '';
-                        post('csdt_db_orphaned_scan').then(function(r) {
-                            btn.disabled = false;
-                            btn.textContent = '🔍 Scan for Orphaned Tables';
-                            if (!r.success) { res.innerHTML = '<p style="color:#ef4444;font-size:13px;">' + esc(r.data||'Scan failed.') + '</p>'; return; }
-                            renderOrphanResults(r.data.tables||[], res);
-                        }).catch(function(e){
-                            btn.disabled = false;
-                            btn.textContent = '🔍 Scan for Orphaned Tables';
-                            res.innerHTML = '<p style="color:#ef4444;font-size:13px;">Error: ' + esc(e.message) + '</p>';
-                        });
-                    }
-
-                    function renderOrphanResults(tables, container) {
-                        if (!tables.length) {
-                            container.innerHTML = '<p style="color:#16a34a;font-size:13px;margin:0;">✅ No orphaned tables found.</p>';
-                            return;
-                        }
-                        var totalKb = tables.reduce(function(s,t){ return s + (t.size_kb||0); }, 0);
-                        var unknownTables = tables.filter(function(t){ return t.plugin === 'Unknown plugin'; });
-                        var emptyCount = tables.filter(function(t){ return !t.rows; }).length;
-                        var html = '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">'
-                            + '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 16px;text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:#92400e;">' + tables.length + '</div><div style="font-size:11px;color:#78350f;">tables found</div></div>'
-                            + '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:8px 16px;text-align:center;"><div style="font-size:1.3rem;font-weight:700;color:#166534;">' + fmtKb(totalKb) + '</div><div style="font-size:11px;color:#14532d;">total size</div></div>'
-                            + (emptyCount ? '<button id="csdt-select-empty-btn" type="button" style="background:#0f172a;color:#fff;border:1px solid #0f172a;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">☑ Select ' + emptyCount + ' Empty Tables</button>' : '')
-                            + (hasAi && unknownTables.length ? '<button id="csdt-orphan-ai-btn" type="button" style="background:#6366f1;color:#fff;border:1px solid #4f46e5;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto;">🤖 Identify ' + unknownTables.length + ' Unknown with AI</button>' : '')
-                            + '</div>';
-                        html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;">'
-                            + '<thead><tr style="background:#f1f5f9;text-align:left;">'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;width:36px;"><input type="checkbox" id="csdt-orphan-chk-all"></th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;width:50px;"></th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;">Table</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;">Plugin</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;">Description</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;">URL</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">Confidence</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;">Created</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;">Rows</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #e2e8f0;">Size</th>'
-                            + '</tr></thead><tbody>';
-                        tables.forEach(function(t){
-                            var isUnknown = t.plugin === 'Unknown plugin';
-                            var typeTag = (t.table_type && t.table_type !== 'BASE TABLE') ? ' <span style="background:#fde68a;color:#92400e;font-size:10px;padding:1px 4px;border-radius:3px;">' + esc(t.table_type) + '</span>' : '';
-                            var pluginCell = isUnknown
-                                ? '<span class="csdt-plugin-label" data-table="' + esc(t.table) + '" style="color:#9ca3af;font-style:italic;">Unknown</span>' + typeTag
-                                : esc(t.plugin) + typeTag;
-                            var descCell = '<span class="csdt-desc-label" data-table="' + esc(t.table) + '" style="color:#9ca3af;">—</span>';
-                            var urlCell  = '<span class="csdt-url-label"  data-table="' + esc(t.table) + '" style="color:#9ca3af;">—</span>';
-                            var confCell = '<span class="csdt-conf-label" data-table="' + esc(t.table) + '" style="color:#9ca3af;">—</span>';
-                            html += '<tr>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;"><input type="checkbox" class="csdt-orphan-cb" value="' + esc(t.table) + '" data-rows="' + (t.rows||0) + '"></td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;"><button type="button" class="csdt-row-archive-btn" data-table="' + esc(t.table) + '" style="background:#f59e0b;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;" title="Move to Recycle Bin">📦 Bin</button></td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;font-family:monospace;font-size:11px;">' + esc(t.table) + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;">' + pluginCell + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;max-width:240px;font-size:11px;">' + descCell + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;font-size:11px;">' + urlCell + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;">' + confCell + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;color:#6b7280;font-size:11px;">' + esc(t.created_date||'—') + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;">' + Number(t.rows).toLocaleString() + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #e2e8f0;">' + fmtKb(t.size_kb||0) + '</td>'
-                                + '</tr>';
-                        });
-                        html += '</tbody></table></div>'
-                            + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'
-                            + '<button id="csdt-orphan-archive-btn" type="button" class="cs-btn-primary" style="background:#f59e0b;border-color:#d97706;">📦 Move Selected to Recycle Bin</button>'
-                            + '</div>'
-                            + '<span id="csdt-orphan-archive-msg" style="display:block;margin-top:8px;font-size:12px;color:#6b7280;"></span>';
-                        container.innerHTML = html;
-
-                        var chkAll = container.querySelector('#csdt-orphan-chk-all');
-                        chkAll.addEventListener('change', function(){
-                            container.querySelectorAll('.csdt-orphan-cb').forEach(function(c){ c.checked = chkAll.checked; });
-                        });
-
-                        var selectEmptyBtn = container.querySelector('#csdt-select-empty-btn');
-                        if (selectEmptyBtn) {
-                            selectEmptyBtn.addEventListener('click', function() {
-                                container.querySelectorAll('.csdt-orphan-cb').forEach(function(c){
-                                    c.checked = c.dataset.rows === '0';
-                                });
-                            });
-                        }
-
-                        // Single batch AI identify
-                        var aiIdentifyBtn = container.querySelector('#csdt-orphan-ai-btn');
-                        if (aiIdentifyBtn) {
-                            aiIdentifyBtn.addEventListener('click', function() {
-                                var names = unknownTables.map(function(t){ return t.table; });
-                                aiIdentifyBtn.disabled = true;
-                                aiIdentifyBtn.textContent = '⏳ Asking AI…';
-                                post('csdt_db_identify_table', {table_names: names}).then(function(r){
-                                    aiIdentifyBtn.disabled = false;
-                                    aiIdentifyBtn.textContent = '🤖 Identify Unknown with AI';
-                                    if (!r.success || !r.data || !r.data.map) {
-                                        var errMsg = (r.data && r.data.message) ? r.data.message : (typeof r.data === 'string' ? r.data : 'AI identification failed — check console.');
-                                        aiIdentifyBtn.insertAdjacentHTML('afterend', '<span id="csdt-ai-err" style="margin-left:10px;font-size:12px;color:#ef4444;">' + esc(errMsg) + '</span>');
-                                        return;
-                                    }
-                                    var errEl = container.querySelector('#csdt-ai-err');
-                                    if (errEl) errEl.remove();
-                                    var map = r.data.map;
-                                    var confColor = {'High':'#16a34a','Medium':'#d97706','Low':'#ef4444'};
-                                    container.querySelectorAll('.csdt-plugin-label').forEach(function(cell){
-                                        var tbl = cell.dataset.table;
-                                        var info = map[tbl];
-                                        if (!info) return;
-                                        cell.style.cssText = 'color:#6366f1;font-weight:600;font-style:normal;';
-                                        cell.textContent = info.plugin || info;
-                                    });
-                                    container.querySelectorAll('.csdt-desc-label').forEach(function(cell){
-                                        var info = map[cell.dataset.table];
-                                        if (info && info.description) { cell.style.color='#374151'; cell.textContent = info.description; }
-                                    });
-                                    container.querySelectorAll('.csdt-url-label').forEach(function(cell){
-                                        var info = map[cell.dataset.table];
-                                        if (info && info.url) {
-                                            cell.innerHTML = '<a href="' + esc(info.url) + '" target="_blank" rel="noopener" style="color:#2563eb;font-size:11px;">' + esc(info.url.replace(/^https?:\/\//, '')) + '</a>';
-                                        }
-                                    });
-                                    container.querySelectorAll('.csdt-conf-label').forEach(function(cell){
-                                        var info = map[cell.dataset.table];
-                                        if (info && info.confidence) {
-                                            var c = info.confidence;
-                                            cell.style.cssText = 'font-weight:600;color:' + (confColor[c]||'#6b7280') + ';';
-                                            cell.textContent = c;
-                                        }
-                                    });
-                                }).catch(function(){
-                                    aiIdentifyBtn.disabled = false;
-                                    aiIdentifyBtn.textContent = '🤖 Identify Unknown with AI';
-                                });
-                            });
-                        }
-
-                        container.querySelector('#csdt-orphan-archive-btn').addEventListener('click', function(){
-                            var sel = Array.from(container.querySelectorAll('.csdt-orphan-cb:checked')).map(function(c){ return c.value; });
-                            if (!sel.length) { alert('Select at least one table.'); return; }
-                            var btn = this, msg = container.querySelector('#csdt-orphan-archive-msg');
-                            btn.disabled = true; btn.textContent = '⏳ Archiving…'; msg.textContent = '';
-                            post('csdt_db_archive_tables', {tables: sel}).then(function(r){
-                                btn.disabled = false; btn.textContent = '📦 Move Selected to Recycle Bin';
-                                msg.style.color = r.success ? '#16a34a' : '#ef4444';
-                                msg.textContent = (r.data && r.data.message) || (r.success ? 'Done.' : 'Failed.');
-                                runOrphanScan(); loadTrash();
-                            }).catch(function(e){ btn.disabled=false; btn.textContent='📦 Move Selected to Recycle Bin'; msg.style.color='#ef4444'; msg.textContent='Error: '+e.message; });
-                        });
-
-                        // Per-row archive buttons — direct listeners added right after innerHTML
-                        container.querySelectorAll('.csdt-row-archive-btn').forEach(function(rowBtn) {
-                            rowBtn.addEventListener('click', function() {
-                                var tbl = rowBtn.dataset.table;
-                                var msg = container.querySelector('#csdt-orphan-archive-msg');
-                                rowBtn.disabled = true; rowBtn.textContent = '⏳';
-                                if (msg) { msg.style.color='#6b7280'; msg.textContent = 'Archiving ' + tbl + '…'; }
-                                post('csdt_db_archive_tables', {tables: [tbl]}).then(function(r){
-                                    rowBtn.disabled = false; rowBtn.textContent = '📦 Bin';
-                                    if (r.success) {
-                                        if (msg) { msg.style.color='#16a34a'; msg.textContent = (r.data && r.data.message) || 'Done.'; }
-                                        runOrphanScan(); loadTrash();
-                                    } else {
-                                        var errText = (r.data && r.data.message) || JSON.stringify(r.data) || 'Archive failed';
-                                        if (msg) { msg.style.color='#ef4444'; msg.textContent = '❌ ' + errText; }
-                                    }
-                                }).catch(function(err){
-                                    rowBtn.disabled=false; rowBtn.textContent='📦 Bin';
-                                    if (msg) { msg.style.color='#ef4444'; msg.textContent = '❌ Network error: ' + err.message; }
-                                });
-                            });
-                        });
-
-                    }
-
-                    /* ── Recycle Bin ───────────────────────────── */
-                    function loadTrash() {
-                        var res = document.getElementById('csdt-trash-results');
-                        if (!res) return;
-                        res.innerHTML = '<span style="color:#9ca3af;font-size:12px;">⏳ Loading…</span>';
-                        post('csdt_db_trash_scan').then(function(r){
-                            if (!r.success) { res.innerHTML = '<p style="color:#ef4444;font-size:13px;">' + esc(r.data||'Failed.') + '</p>'; return; }
-                            renderTrashResults(r.data.tables||[], res);
-                        }).catch(function(e){ res.innerHTML = '<p style="color:#ef4444;font-size:13px;">Error: ' + esc(e.message) + '</p>'; });
-                    }
-
-                    function renderTrashResults(tables, container) {
-                        if (!tables.length) {
-                            container.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">Recycle bin is empty.</p>';
-                            return;
-                        }
-                        var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;">'
-                            + '<thead><tr style="background:#fef2f2;text-align:left;">'
-                            + '<th style="padding:6px 8px;border:1px solid #fecaca;width:36px;"><input type="checkbox" id="csdt-trash-chk-all"></th>'
-                            + '<th style="padding:6px 8px;border:1px solid #fecaca;">Original Table</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #fecaca;">Plugin</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #fecaca;">Created</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #fecaca;">Archived On</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #fecaca;">Rows</th>'
-                            + '<th style="padding:6px 8px;border:1px solid #fecaca;">Size</th>'
-                            + '</tr></thead><tbody>';
-                        tables.forEach(function(t){
-                            var m = t.trash_table.match(/_trash_(\d{4})(\d{2})(\d{2})_/);
-                            var dated = m ? m[1]+'-'+m[2]+'-'+m[3] : '—';
-                            var isUnknown = !t.plugin || t.plugin === 'Unknown plugin';
-                            var pluginCell = isUnknown
-                                ? '<span style="color:#9ca3af;font-style:italic;">Unknown</span>'
-                                : (t.plugin_url ? '<a href="' + esc(t.plugin_url) + '" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:none;">' + esc(t.plugin) + '</a>' : esc(t.plugin));
-                            html += '<tr><td style="padding:5px 8px;border:1px solid #fecaca;"><input type="checkbox" class="csdt-trash-cb" value="' + esc(t.trash_table) + '"></td>'
-                                + '<td style="padding:5px 8px;border:1px solid #fecaca;font-family:monospace;font-size:11px;">' + esc(t.original_table) + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #fecaca;font-size:11px;">' + pluginCell + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #fecaca;color:#6b7280;font-size:11px;">' + esc(t.created_date||'—') + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #fecaca;">' + esc(dated) + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #fecaca;">' + Number(t.rows||0).toLocaleString() + '</td>'
-                                + '<td style="padding:5px 8px;border:1px solid #fecaca;">' + fmtKb(t.size_kb||0) + '</td></tr>';
-                        });
-                        html += '</tbody></table>'
-                            + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-                            + '<button id="csdt-trash-restore-btn" type="button" class="cs-btn-secondary">↩ Restore Selected</button>'
-                            + '<button id="csdt-trash-delete-btn" type="button" style="background:#ef4444;color:#fff;border:1px solid #dc2626;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">🗑 Delete Forever</button>'
-                            + '</div>'
-                            + '<span id="csdt-trash-msg" style="display:block;margin-top:8px;font-size:12px;color:#6b7280;"></span>';
-                        container.innerHTML = html;
-
-                        var chkAll = container.querySelector('#csdt-trash-chk-all');
-                        chkAll.addEventListener('change', function(){
-                            container.querySelectorAll('.csdt-trash-cb').forEach(function(c){ c.checked = chkAll.checked; });
-                        });
-
-                        container.querySelector('#csdt-trash-restore-btn').addEventListener('click', function(){
-                            var sel = Array.from(container.querySelectorAll('.csdt-trash-cb:checked')).map(function(c){ return c.value; });
-                            if (!sel.length) { alert('Select at least one table.'); return; }
-                            if (!confirm('Restore ' + sel.length + ' table(s) to their original names?')) return;
-                            var btn = this, msg = container.querySelector('#csdt-trash-msg');
-                            btn.disabled=true; btn.textContent='⏳ Restoring…'; msg.textContent='';
-                            post('csdt_db_restore_tables', {tables: sel}).then(function(r){
-                                btn.disabled=false; btn.textContent='↩ Restore Selected';
-                                msg.style.color = r.success ? '#16a34a' : '#ef4444';
-                                msg.textContent = (r.data && r.data.message) || (r.success ? 'Restored.' : 'Failed.');
-                                loadTrash(); runOrphanScan();
-                            }).catch(function(e){ btn.disabled=false; btn.textContent='↩ Restore Selected'; msg.style.color='#ef4444'; msg.textContent='Error: '+e.message; });
-                        });
-
-                        container.querySelector('#csdt-trash-delete-btn').addEventListener('click', function(){
-                            var sel = Array.from(container.querySelectorAll('.csdt-trash-cb:checked')).map(function(c){ return c.value; });
-                            if (!sel.length) { alert('Select at least one table.'); return; }
-                            if (!confirm('⚠️ Permanently delete ' + sel.length + ' table(s)? This CANNOT be undone.')) return;
-                            var btn = this, msg = container.querySelector('#csdt-trash-msg');
-                            btn.disabled=true; btn.textContent='⏳ Deleting…'; msg.textContent='';
-                            post('csdt_db_drop_tables', {tables: sel}).then(function(r){
-                                btn.disabled=false; btn.textContent='🗑 Delete Forever';
-                                msg.style.color = r.success ? '#16a34a' : '#ef4444';
-                                msg.textContent = (r.data && r.data.message) || (r.success ? 'Deleted.' : 'Failed.');
-                                loadTrash();
-                            }).catch(function(e){ btn.disabled=false; btn.textContent='🗑 Delete Forever'; msg.style.color='#ef4444'; msg.textContent='Error: '+e.message; });
-                        });
-                    }
-
-                    /* ── Init ──────────────────────────────────── */
-                    document.getElementById('csdt-orphan-scan-btn').addEventListener('click', runOrphanScan);
-                    document.getElementById('csdt-trash-refresh-btn').addEventListener('click', loadTrash);
-
-                    loadTrash();
-                })();
-                </script>
 
             </div>
         </div>

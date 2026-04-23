@@ -93,3 +93,47 @@
     var active = bar && bar.querySelector( '.cs-tab.active' );
     if ( active ) { active.scrollIntoView( { block: 'nearest', inline: 'center' } ); }
 } )();
+
+// Modal open/close event delegation — handles data-cs-modal-open, data-cs-modal-close,
+// data-cs-modal-backdrop (backdrop click), and data-cs-copy-from (clipboard copy).
+( function () {
+    'use strict';
+    document.addEventListener( 'click', function ( e ) {
+        var t = e.target;
+
+        // Open modal
+        var opener = t.closest( '[data-cs-modal-open]' );
+        if ( opener ) {
+            var m = document.getElementById( opener.dataset.csModalOpen );
+            if ( m ) { m.style.display = 'flex'; }
+            return;
+        }
+
+        // Close modal via button
+        var closer = t.closest( '[data-cs-modal-close]' );
+        if ( closer ) {
+            var m = document.getElementById( closer.dataset.csModalClose );
+            if ( m ) { m.style.display = 'none'; }
+            return;
+        }
+
+        // Backdrop click — close when the backdrop element itself is clicked
+        if ( t.dataset && t.dataset.csModalBackdrop === 'true' ) {
+            t.style.display = 'none';
+            return;
+        }
+
+        // Clipboard copy from a named element
+        var copyBtn = t.closest( '[data-cs-copy-from]' );
+        if ( copyBtn ) {
+            var src = document.getElementById( copyBtn.dataset.csCopyFrom );
+            if ( ! src ) { return; }
+            var text = src.textContent;
+            var orig = copyBtn.textContent;
+            navigator.clipboard.writeText( text ).then( function () {
+                copyBtn.textContent = 'Copied!';
+                setTimeout( function () { copyBtn.textContent = orig; }, 2000 );
+            } );
+        }
+    } );
+} )();

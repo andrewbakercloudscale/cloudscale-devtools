@@ -347,6 +347,7 @@ class CSDT_DevTools_Passkey {
               &larr; <?php esc_html_e( 'Back to login', 'cloudscale-devtools' ); ?>
             </a>
           </p>
+        <?php // phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedScript -- login_footer() has already fired; wp_enqueue_script() is unavailable at this point in the passkey challenge page. PHP options ($opts, $fallback_url) must be inlined. ?>
         <script>
         (function () {
             const opts = <?php echo wp_json_encode( $opts ); ?>;

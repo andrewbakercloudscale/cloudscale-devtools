@@ -152,6 +152,10 @@ rsync -a \
   --exclude='node_modules/' --exclude='svn-assets/' \
   --exclude='playwright-report/' --exclude='playwright.config.js' \
   --exclude='*.backup' --exclude='*.config.js' \
+  --exclude='migrate-prefix-csdt.php' \
+  --exclude='generate-help-docs.js' \
+  --exclude='update-help-page.php' \
+  --exclude='pi-crontabs.txt' \
   "$REPO_DIR/" "$TEMP_DIR/$PLUGIN_NAME/"
 
 # Build zip with correct structure

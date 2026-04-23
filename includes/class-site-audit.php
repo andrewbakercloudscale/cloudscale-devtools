@@ -415,7 +415,7 @@ class CSDT_Site_Audit {
                     } else {
                         // Nothing found — check if we're in a container before declaring "not installed"
                         $in_container = file_exists( '/.dockerenv' )
-                            || ( is_readable( '/proc/1/cgroup' ) && str_contains( (string) file_get_contents( '/proc/1/cgroup' ), 'docker' ) );
+                            || ( is_readable( '/proc/1/cgroup' ) && str_contains( (string) file_get_contents( '/proc/1/cgroup' ), 'docker' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
                         $state = $in_container ? 'undetectable' : 'not_installed';
                     }
                 }
@@ -565,7 +565,7 @@ class CSDT_Site_Audit {
         <!-- fail2ban config modal -->
         <div id="csdt-fail2ban-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
             <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:600px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
-                <button id="csdt-f2b-close" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">&#x2715;</button>
+                <button id="csdt-f2b-close" data-cs-modal-close="csdt-fail2ban-modal" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">&#x2715;</button>
                 <h3 style="margin:0 0 6px;font-size:16px;">SSH Brute-Force Protection &#x2014; fail2ban</h3>
                 <p style="margin:0 0 16px;font-size:13px;color:#50575e;">fail2ban monitors SSH login failures and automatically blocks offending IPs at the firewall level. Install it on your server, then use the config below.</p>
                 <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">1. Install &amp; enable</p>
@@ -586,14 +586,8 @@ backend  = %(sshd_backend)s
 maxretry = 3
 bantime  = 86400</pre>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <button id="csdt-f2b-copy" class="cs-btn-primary cs-btn-sm" onclick="
-                        navigator.clipboard.writeText(document.getElementById('csdt-f2b-config').textContent).then(function(){
-                            var b=document.getElementById('csdt-f2b-copy');
-                            b.textContent='Copied!';
-                            setTimeout(function(){b.textContent='Copy Config';},2000);
-                        });
-                    ">Copy Config</button>
-                    <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';">Close</button>
+                    <button id="csdt-f2b-copy" class="cs-btn-primary cs-btn-sm" data-cs-copy-from="csdt-f2b-config">Copy Config</button>
+                    <button class="cs-btn-secondary cs-btn-sm" data-cs-modal-close="csdt-fail2ban-modal">Close</button>
                 </div>
                 <p style="margin:16px 0 0;font-size:12px;color:#64748b;">After saving <code>/etc/fail2ban/jail.local</code> run: <code>sudo systemctl restart fail2ban</code> &#x2014; verify with: <code>sudo fail2ban-client status sshd</code></p>
             </div>
@@ -602,26 +596,22 @@ bantime  = 86400</pre>
         <!-- fail2ban Docker detection modal -->
         <div id="csdt-fail2ban-docker-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
             <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:620px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
-                <button onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">&#x2715;</button>
+                <button data-cs-modal-close="csdt-fail2ban-docker-modal" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">&#x2715;</button>
                 <h3 style="margin:0 0 6px;font-size:16px;">Enable fail2ban Detection</h3>
                 <p style="margin:0 0 16px;font-size:13px;color:#50575e;">WordPress is running inside a Docker container that cannot see host services. To prove whether fail2ban is installed and running, expose its log file into the container &#x2014; a read-only mount, one line in your docker-compose.yml.</p>
                 <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 1 &#x2014; Add this to your docker-compose.yml (under WordPress <code>volumes:</code>)</p>
                 <pre id="csdt-f2b-docker-vol" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro</pre>
-                <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
-                    navigator.clipboard.writeText('      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy line';},2000); }.bind(this));
-                ">Copy line</button>
+                <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" data-cs-copy-from="csdt-f2b-docker-vol">Copy line</button>
                 <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 2 &#x2014; Restart the WordPress container</p>
                 <pre id="csdt-f2b-docker-restart" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">docker compose up -d wordpress</pre>
-                <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
-                    navigator.clipboard.writeText('docker compose up -d wordpress').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy command';},2000); }.bind(this));
-                ">Copy command</button>
+                <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" data-cs-copy-from="csdt-f2b-docker-restart">Copy command</button>
                 <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 3 &#x2014; Refresh this page</p>
                 <p style="margin:0 0 16px;font-size:13px;color:#50575e;">The plugin will now read <code>/var/log/fail2ban.log</code> directly and report whether fail2ban is installed and running.</p>
                 <div style="background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#713f12;">
                     <strong>fail2ban not installed?</strong> Click Close and use the "Copy fail2ban config" button to install it on your host first.
                 </div>
                 <div style="display:flex;justify-content:flex-end;">
-                    <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';">Close</button>
+                    <button class="cs-btn-secondary cs-btn-sm" data-cs-modal-close="csdt-fail2ban-docker-modal">Close</button>
                 </div>
             </div>
         </div>
@@ -845,10 +835,10 @@ bantime  = 86400</pre>
                 // 1. Migrate existing content and delete from web root.
                 if ( file_exists( $old_log ) ) {
                     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-                    $existing = file_get_contents( $old_log );
+                    $existing = file_get_contents( $old_log ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
                     if ( $existing !== false && $existing !== '' ) {
                         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-                        file_put_contents( $new_log, $existing, FILE_APPEND );
+                        file_put_contents( $new_log, $existing, FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
                     }
                     wp_delete_file( $old_log );
                 }
@@ -875,7 +865,7 @@ bantime  = 86400</pre>
                         );
                     }
                     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-                    if ( $cfg && file_put_contents( $cfg_file, $cfg ) !== false ) {
+                    if ( $cfg && file_put_contents( $cfg_file, $cfg ) !== false ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
                         $cfg_updated = true;
                     }
                 }
@@ -942,7 +932,7 @@ bantime  = 86400</pre>
                     );
                 }
                 // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-                if ( ! $cfg || file_put_contents( $cfg_file, $cfg ) === false ) {
+                if ( ! $cfg || file_put_contents( $cfg_file, $cfg ) === false ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
                     wp_send_json_error( 'Failed to write wp-config.php' );
                     return;
                 }
@@ -1118,7 +1108,7 @@ bantime  = 86400</pre>
         }
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-        if ( file_put_contents( $cfg_file, $new_cfg ) === false ) {
+        if ( file_put_contents( $cfg_file, $new_cfg ) === false ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
             if ( $needs_chmod ) { @chmod( $cfg_file, $original_perms ); }
             foreach ( $renamed as $pair ) {
                 // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -1209,7 +1199,7 @@ bantime  = 86400</pre>
             $needs_chmod    = ! is_writable( $cfg_file );
             if ( $needs_chmod ) { @chmod( $cfg_file, 0644 ); }
             // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-            file_put_contents( $cfg_file, $info['cfg_original'] );
+            file_put_contents( $cfg_file, $info['cfg_original'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
             if ( $needs_chmod ) { @chmod( $cfg_file, $original_perms ); }
         }
 
@@ -2517,7 +2507,7 @@ PROMPT;
         $sshd_config       = '';
         $sshd_config_paths = [ '/etc/ssh/sshd_config', '/etc/sshd_config' ];
         foreach ( $sshd_config_paths as $cp ) {
-            if ( is_readable( $cp ) ) { $sshd_config = file_get_contents( $cp ); break; }
+            if ( is_readable( $cp ) ) { $sshd_config = file_get_contents( $cp ); break; } // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
         }
         $password_auth  = 'unknown'; // yes | no | unknown
         $root_login     = 'unknown'; // yes | no | prohibit-password | unknown
@@ -2952,7 +2942,7 @@ PROMPT;
                     break; // cap per plugin
                 }
                 $files_scanned++;
-                $content = is_readable( $file->getPathname() ) ? file_get_contents( $file->getPathname() ) : false;
+                $content = is_readable( $file->getPathname() ) ? file_get_contents( $file->getPathname() ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
                 if ( $content === false ) {
                     continue;
                 }
@@ -3694,7 +3684,6 @@ PROMPT;
             ], JSON_PRETTY_PRINT );
 
             if ( function_exists( 'curl_multi_init' ) ) {
-                error_log( '[CSDT-DEEP] firing two parallel AI calls, model=' . $model );
                 $texts    = CSDT_AI_Dispatcher::call_parallel( [
                     [ 'system' => self::default_internal_scan_prompt(), 'user' => $msg_internal, 'model' => $model, 'max_tokens' => 4096 ],
                     [ 'system' => self::default_external_scan_prompt(), 'user' => $msg_external, 'model' => $model, 'max_tokens' => 4096 ],
@@ -3702,7 +3691,6 @@ PROMPT;
                 $report = CSDT_AI_Dispatcher::merge_reports( CSDT_AI_Dispatcher::parse_json_report( $texts[0] ), CSDT_AI_Dispatcher::parse_json_report( $texts[1] ) );
             } else {
                 // Fallback: single sequential call
-                error_log( '[CSDT-DEEP] curl_multi unavailable, falling back to sequential, model=' . $model );
                 $text   = CSDT_AI_Dispatcher::call( self::default_deep_scan_prompt(), 'WordPress site full security data (JSON):' . "\n\n" . wp_json_encode( [ 'internal' => $base_data, 'external_checks' => $external, 'plugin_code_scan' => $code_scan, 'code_triage' => $code_triage ], JSON_PRETTY_PRINT ), $model, 8192 );
                 $report = CSDT_AI_Dispatcher::parse_json_report( $text );
             }
@@ -3728,7 +3716,6 @@ PROMPT;
         update_option( 'csdt_deep_scan_v1', $output, false );
         set_transient( 'csdt_deep_scan_status', [ 'status' => 'complete', 'completed_at' => time() ], 900 );
         self::append_scan_history( 'deep', $report, $output['model_used'], $output['scanned_at'] );
-        error_log( '[CSDT-DEEP] cron complete (parallel), score=' . $report['score'] );
     }
 
     public static function append_scan_history( string $type, array $report, string $model_used, int $scanned_at ): void {
