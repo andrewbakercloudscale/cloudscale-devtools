@@ -11,15 +11,31 @@ class CSDT_Uptime {
 
     // ── REST API — Readiness Probe ───────────────────────────────────────────
 
+    public static function get_readiness_url(): string { return self::readiness_url(); }
+
+    private static function readiness_url(): string {
+        $slug = sanitize_key( (string) get_option( 'csdt_readiness_slug', '' ) );
+        return $slug ? rest_url( 'csdt/v1/ready/' . $slug ) : rest_url( 'csdt/v1/ready' );
+    }
+
     public static function register_rest_routes(): void {
-        register_rest_route( 'csdt/v1', '/ready', [
+        $args = [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [ __CLASS__, 'rest_readiness_probe' ],
             'permission_callback' => '__return_true',
-        ] );
+        ];
+        register_rest_route( 'csdt/v1', '/ready', $args );
+        register_rest_route( 'csdt/v1', '/ready/(?P<slug>[a-zA-Z0-9_-]+)', $args );
     }
 
     public static function rest_readiness_probe( \WP_REST_Request $request ): \WP_REST_Response {
+        // Slug guard — if a path slug is configured, only the slugged URL is valid
+        $stored_slug = sanitize_key( (string) get_option( 'csdt_readiness_slug', '' ) );
+        $url_slug    = sanitize_key( (string) ( $request->get_param( 'slug' ) ?? '' ) );
+        if ( $stored_slug !== '' && $url_slug !== $stored_slug ) {
+            return new \WP_REST_Response( null, 404 );
+        }
+
         $stored_token = (string) get_option( 'csdt_uptime_token', '' );
 
         // Accept Bearer token in Authorization header or ?token= query param
@@ -242,12 +258,13 @@ class CSDT_Uptime {
 
         $site_url  = get_site_url();
         $ping_url  = admin_url( 'admin-ajax.php' );
-        $ready_url = rest_url( 'csdt/v1/ready' );
+        $ready_url = self::readiness_url();
         $ntfy_url  = (string) get_option( 'csdt_uptime_ntfy_url', get_option( 'csdt_scan_schedule_ntfy_url', '' ) );
 
         wp_send_json_success( [
             'token'         => $token,
             'ready_url'     => $ready_url,
+            'ready_slug'    => get_option( 'csdt_readiness_slug', '' ),
             'worker_js'     => self::uptime_worker_js(),
             'wrangler_toml' => self::uptime_wrangler_toml( $site_url, $ping_url, $ready_url, $token, $ntfy_url ),
         ] );
@@ -307,7 +324,8 @@ class CSDT_Uptime {
             'uptime_7d'          => $uptime_7d,
             'avg_ms_24h'         => $avg_ms_24h,
             'enabled'            => get_option( 'csdt_uptime_enabled', '0' ) === '1',
-            'ready_url'          => rest_url( 'csdt/v1/ready' ),
+            'ready_url'          => self::readiness_url(),
+            'ready_slug'         => get_option( 'csdt_readiness_slug', '' ),
             'readiness_last'     => $readiness_last ?: null,
             'readiness_bad'      => $readiness_bad  ?: null,
             'readiness_checks'   => $readiness_checks,
@@ -320,7 +338,9 @@ class CSDT_Uptime {
 
         $ntfy_url = esc_url_raw( wp_unslash( $_POST['ntfy_url'] ?? '' ) );
         update_option( 'csdt_uptime_ntfy_url', $ntfy_url, false );
-        wp_send_json_success( [ 'saved' => true ] );
+        $slug = sanitize_key( wp_unslash( $_POST['ready_slug'] ?? '' ) );
+        update_option( 'csdt_readiness_slug', $slug, false );
+        wp_send_json_success( [ 'saved' => true, 'ready_url' => self::readiness_url() ] );
     }
 
     public static function ajax_uptime_deploy_worker(): void {
@@ -347,7 +367,7 @@ class CSDT_Uptime {
 
         $site_url  = get_site_url();
         $ping_url  = admin_url( 'admin-ajax.php' );
-        $ready_url = rest_url( 'csdt/v1/ready' );
+        $ready_url = self::readiness_url();
 
         // Step 1: Resolve Account ID from zone
         $zone_resp = wp_remote_get(

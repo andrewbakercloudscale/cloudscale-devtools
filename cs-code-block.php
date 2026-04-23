@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.392
+ * Version: 1.9.393
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.392';
+    const VERSION      = '1.9.393';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -4075,7 +4075,7 @@ class CloudScale_DevTools {
                     [ 'name' => 'Plugin Stack Scanner',    'rec' => 'Overview',    'html' => 'Compares your active plugins against a curated list of functionality that CloudScale already provides. Plugins flagged as redundant can usually be deactivated — reducing page load time, update surface area, and conflict risk.' ],
                     [ 'name' => 'Plugin health check',     'rec' => 'Recommended', 'html' => 'Checks each active plugin against the WordPress.org API for last-updated date, compatibility with your WordPress version, and known vulnerabilities. Plugins not updated in over 2 years are flagged as high risk.' ],
                     [ 'name' => 'Update Risk Scorer',           'rec' => 'Recommended', 'html' => 'Before applying plugin updates, scan for available updates and click Assess on any plugin to get an AI risk rating: 🟢 Patch (safe, apply now), 🟡 Minor (new features, low risk), or 🔴 Breaking (major changes — review changelog before updating).' ],
-                    [ 'name' => 'Uptime Monitor',               'rec' => 'Recommended', 'html' => 'Deploys a Cloudflare Worker that pings your site every 60 seconds from the edge — completely independent of your server. If the site goes down, the Worker sends an ntfy.sh push notification immediately, even if your server is completely offline. Requires your Cloudflare Zone ID and an API token with Workers:Edit scope (set in Thumbnails tab).' ],
+                    [ 'name' => 'Uptime Monitor',               'rec' => 'Recommended', 'html' => 'Deploys a Cloudflare Worker that probes your readiness endpoint every 60 seconds from the edge — completely independent of your server. If any check fails (PHP-FPM, DB, or WP boot) the Worker sends an ntfy.sh push notification immediately, even if your server is offline. Requires Cloudflare Zone ID and an API token with Workers:Edit scope (set in Thumbnails tab). <strong>Dynamic endpoint path</strong>: set a custom path suffix (e.g. <code>abc123</code>) to prevent your readiness URL from being enumerated or DoS-targeted — only requests to the exact slugged path are answered; the plain <code>/ready</code> route returns 404 if a slug is configured.' ],
                     [ 'name' => 'Database Intelligence Engine', 'rec' => 'Recommended', 'html' => 'Scans your WordPress database for hidden bloat: oversized autoload cache, expired transients, post revisions, and orphaned postmeta. Each issue found includes a one-click Fix It button that cleans up directly — no plugin needed.' ],
                     [ 'name' => 'AI Debugging',                 'rec' => 'Optional',    'html' => 'Paste any PHP error, JavaScript console error, or plugin conflict description into the AI Debugging Assistant. It identifies the root cause and gives specific numbered steps to fix it — no need to search Stack Overflow or support forums.' ],
                     [ 'name' => 'Inactive plugins',             'rec' => 'Important',   'html' => 'Inactive plugins still execute their autoloaded code and are still scanned for vulnerabilities. Deactivate and delete plugins you are not actively using — do not just deactivate them.' ],
@@ -4170,11 +4170,8 @@ class CloudScale_DevTools {
                         <?php esc_html_e( 'Requires Cloudflare Zone ID and API Token (saved in Thumbnails tab). The API token needs Workers:Edit permission.', 'cloudscale-devtools' ); ?>
                     </p>
                     <p style="color:#9ca3af;margin:0 0 16px;font-size:.88em;">
-                        <?php echo wp_kses( sprintf(
-                            /* translators: %s: readiness endpoint URL */
-                            __( 'Readiness endpoint: <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">%s</code>', 'cloudscale-devtools' ),
-                            esc_html( rest_url( 'csdt/v1/ready' ) )
-                        ), [ 'code' => [ 'style' => [] ] ] ); ?>
+                        <?php esc_html_e( 'Readiness endpoint:', 'cloudscale-devtools' ); ?>
+                        <code id="csdt-ready-url-display" style="background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:.92em;"><?php echo esc_html( CSDT_Uptime::get_readiness_url() ); ?></code>
                     </p>
                     <div id="csdt-uptime-setup-wrap">
                         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
@@ -4184,6 +4181,19 @@ class CloudScale_DevTools {
                             <div id="csdt-uptime-token-wrap" style="display:none;flex:1;max-width:420px;">
                                 <input id="csdt-uptime-token-display" type="text" readonly class="cs-input" style="font-family:monospace;font-size:.82em;" value="">
                             </div>
+                        </div>
+                        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:16px;">
+                            <p style="margin:0 0 10px;font-weight:700;color:#0f172a;font-size:.9em;">
+                                <?php esc_html_e( 'Endpoint path suffix', 'cloudscale-devtools' ); ?>
+                                <span style="font-weight:400;color:#6b7280;">(<?php esc_html_e( 'optional — makes the URL unguessable to prevent DDoS targeting', 'cloudscale-devtools' ); ?>)</span>
+                            </p>
+                            <div style="display:flex;align-items:center;gap:8px;max-width:480px;">
+                                <span style="color:#9ca3af;font-size:.88em;white-space:nowrap;"><?php echo esc_html( rest_url( 'csdt/v1/ready/' ) ); ?></span>
+                                <input id="csdt-uptime-ready-slug" type="text" class="cs-input" style="width:160px;font-family:monospace;"
+                                       placeholder="e.g. abc123xyz"
+                                       value="<?php echo esc_attr( get_option( 'csdt_readiness_slug', '' ) ); ?>">
+                            </div>
+                            <p style="margin:8px 0 0;font-size:.82em;color:#9ca3af;"><?php esc_html_e( 'Leave blank to use the plain /ready endpoint. Set a random string (letters/numbers) to restrict access to the slugged URL only.', 'cloudscale-devtools' ); ?></p>
                         </div>
                         <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:16px;">
                             <p style="margin:0 0 10px;font-weight:700;color:#0f172a;font-size:.9em;">ntfy.sh Alert URL <span style="font-weight:400;color:#6b7280;">(optional — sent directly from the Worker when your site is down)</span></p>
