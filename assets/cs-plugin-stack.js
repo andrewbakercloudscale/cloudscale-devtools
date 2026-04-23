@@ -407,15 +407,12 @@
             '</div>';
     }
 
-    // Auto-load history if already enabled
+    // Auto-load history — always show so readiness timestamps are visible
     (function () {
         post('csdt_uptime_history').then(function (res) {
             if (!res.success) return;
-            var d = res.data;
-            if (d.enabled || d.last_ping) {
-                renderUptimeStatus(d);
-                if (uptimeStatusWrap) uptimeStatusWrap.style.display = '';
-            }
+            renderUptimeStatus(res.data);
+            if (uptimeStatusWrap) uptimeStatusWrap.style.display = '';
         }).catch(function () {});
     }());
 
