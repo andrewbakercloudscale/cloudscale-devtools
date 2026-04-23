@@ -9,6 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class CSDT_SMTP {
 
+    /** @var array|null Pending email log entry for the in-flight wp_mail() call. */
+    private static $smtp_log_pending = null;
+
     /**
      * Renders the Mail / SMTP settings panel.
      *
