@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.393
+ * Version: 1.9.395
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.393';
+    const VERSION      = '1.9.395';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -4081,11 +4081,19 @@ class CloudScale_DevTools {
                     [ 'name' => 'Inactive plugins',             'rec' => 'Important',   'html' => 'Inactive plugins still execute their autoloaded code and are still scanned for vulnerabilities. Deactivate and delete plugins you are not actively using — do not just deactivate them.' ],
                 ] ); ?>
             </div>
-            <div class="cs-panel-body">
+        </div>
 
-                <!-- ── Plugin Stack Scanner ──────────────────────────────── -->
-                <div style="margin-bottom:36px;">
-                    <h2 class="cs-panel-heading">🔍 <?php esc_html_e( 'Plugin Stack Scanner', 'cloudscale-devtools' ); ?></h2>
+        <!-- ── Plugin Stack Scanner ──────────────────────────────────────── -->
+        <div class="cs-panel">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#1a3a8f 0%,#1e6fd9 100%);border-left:3px solid #60a5fa;">
+                <span>🔍 <?php esc_html_e( 'Plugin Stack Scanner', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Find plugins CloudScale already replaces — reduce bloat and attack surface', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'plugin-stack', 'Plugin Stack Scanner', [
+                    [ 'name' => 'What it scans',      'rec' => 'Overview',   'html' => 'Compares your active plugins against a curated list of functionality that CloudScale already provides. Plugins flagged as redundant can usually be deactivated — reducing page load time, update surface area, and conflict risk.' ],
+                    [ 'name' => 'Inactive plugins',   'rec' => 'Important',  'html' => 'Inactive plugins still execute their autoloaded code on every page load and are still scanned for vulnerabilities. Deactivate <em>and delete</em> plugins you are not actively using — do not just deactivate them.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'CloudScale replaces entire categories of WordPress plugins — security scanners, 2FA plugins, SMTP mailers, code block plugins, SQL tools, and log viewers. Scan to find out which of your installed plugins you can safely remove.', 'cloudscale-devtools' ); ?>
                     </p>
@@ -4101,11 +4109,21 @@ class CloudScale_DevTools {
                         </span>
                     </div>
                     <div id="csdt-optimizer-results" style="display:none;margin-top:20px;"></div>
-                </div>
+            </div>
+        </div>
 
-                <!-- ── AI Debugging Assistant ────────────────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
-                    <h2 class="cs-panel-heading">🤖 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></h2>
+        <!-- ── AI Debugging Assistant ─────────────────────────────────────── -->
+        <div class="cs-panel">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#3730a3 0%,#6366f1 100%);border-left:3px solid #a5b4fc;">
+                <span>🤖 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Paste any PHP error or stack trace — AI pinpoints the root cause and fix', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'ai-debug', 'AI Debugging Assistant', [
+                    [ 'name' => 'How it works',  'rec' => 'Overview',  'html' => 'Paste any PHP error, JavaScript console error, or plugin conflict description. The AI identifies the root cause and gives numbered steps to fix it — no need to search Stack Overflow or support forums.' ],
+                    [ 'name' => 'What it covers','rec' => 'Overview',  'html' => 'Works with PHP fatal errors, WordPress notices, plugin conflicts, database errors, white screens (500s), and memory exhaustion. Supports all AI providers configured on the Home tab.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Paste an error message, PHP warning, or stack trace. The AI identifies the root cause and gives you specific steps to fix it — no more hunting through Stack Overflow.', 'cloudscale-devtools' ); ?>
                     </p>
@@ -4139,10 +4157,21 @@ class CloudScale_DevTools {
 
                     <div id="csdt-debug-result" style="display:none;margin-top:20px;"></div>
                 </div>
+            </div>
+        </div>
 
-                <!-- ── Update Risk Scorer ────────────────────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
-                    <h2 class="cs-panel-heading">🔄 <?php esc_html_e( 'Update Risk Scorer', 'cloudscale-devtools' ); ?></h2>
+        <!-- ── Update Risk Scorer ────────────────────────────────────────── -->
+        <div class="cs-panel">
+            <div class="cs-section-header cs-section-header-teal">
+                <span>🔄 <?php esc_html_e( 'Update Risk Scorer', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'AI-rates pending plugin updates: Patch / Minor / Breaking before you apply them', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'update-risk', 'Update Risk Scorer', [
+                    [ 'name' => 'Risk ratings',   'rec' => 'Recommended', 'html' => '🟢 <strong>Patch</strong> — safe to apply immediately (security fix or bug fix with no API changes). 🟡 <strong>Minor</strong> — new features, low risk but review changelog. 🔴 <strong>Breaking</strong> — major version or significant API changes, test on staging first.' ],
+                    [ 'name' => 'How it works',   'rec' => 'Overview',    'html' => 'Reads the plugin changelog from WordPress.org and sends it to the configured AI provider to assess change type. Requires an AI API key (configure on the Home tab).' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Before applying plugin updates, get an AI risk rating for each one: Patch (safe now), Minor (new features), or Breaking (review first). Prevents update-caused site breakage.', 'cloudscale-devtools' ); ?>
                     </p>
@@ -4159,10 +4188,23 @@ class CloudScale_DevTools {
                     </div>
                     <div id="csdt-update-risk-results" style="display:none;margin-top:20px;"></div>
                 </div>
+            </div>
+        </div>
 
-                <!-- ── Uptime Monitor ────────────────────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
-                    <h2 class="cs-panel-heading">⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></h2>
+        <!-- ── Uptime Monitor ────────────────────────────────────────────── -->
+        <div class="cs-panel">
+            <div class="cs-section-header cs-section-header-green">
+                <span>⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Cloudflare Worker probes DB + PHP-FPM + WP every 60 seconds from the edge', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'uptime-monitor', 'Uptime Monitor', [
+                    [ 'name' => 'How it works',          'rec' => 'Overview',    'html' => 'Deploys a Cloudflare Worker that probes your readiness endpoint every 60 seconds from outside your server. The endpoint checks: DB connectivity (SELECT 1), PHP-FPM worker saturation, and WordPress boot. Returns 200 OK when healthy, 503 when degraded.' ],
+                    [ 'name' => 'Dynamic endpoint path', 'rec' => 'Recommended', 'html' => 'Set a random path suffix (e.g. <code>abc123</code>) to make your readiness URL unguessable. Without a suffix, the <code>/ready</code> endpoint is publicly discoverable. With a suffix, the plain <code>/ready</code> route returns 404 — only the exact slugged URL is valid.' ],
+                    [ 'name' => 'Alert notifications',   'rec' => 'Recommended', 'html' => 'Enter your ntfy.sh topic URL to receive instant push notifications when the site goes down. Alerts fire from the Cloudflare edge, so they arrive even if your entire server is offline.' ],
+                    [ 'name' => 'Last queried / failed', 'rec' => 'Overview',    'html' => 'The status panel shows when the endpoint was last probed successfully (with token) and the last time a probe arrived with a bad or missing token — useful to confirm the worker is running and to detect unauthorised probing attempts.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Deploys a Cloudflare Worker that probes your site every 60 seconds from the edge — independent of your server. Each probe calls the built-in readiness endpoint, which checks PHP-FPM saturation, database connectivity, and WordPress boot. If any check fails, the Worker alerts you immediately via ntfy.sh, even if your server is completely offline.', 'cloudscale-devtools' ); ?>
                     </p>
@@ -4220,10 +4262,21 @@ class CloudScale_DevTools {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <!-- ── Database Intelligence Engine ──────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
-                    <h2 class="cs-panel-heading">🗄️ <?php esc_html_e( 'Database Intelligence Engine', 'cloudscale-devtools' ); ?></h2>
+        <!-- ── Database Intelligence Engine ─────────────────────────────── -->
+        <div class="cs-panel">
+            <div class="cs-section-header cs-section-header-orange">
+                <span>🗄️ <?php esc_html_e( 'Database Intelligence Engine', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Scan for DB bloat — transients, revisions, orphaned meta — then one-click fix', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'db-intelligence', 'Database Intelligence Engine', [
+                    [ 'name' => 'What it finds',  'rec' => 'Recommended', 'html' => 'Oversized autoload cache (slows every page load), expired transients (uncleaned remnants from plugins), post revisions (can accumulate thousands of rows), and orphaned post/user metadata left behind by deleted plugins.' ],
+                    [ 'name' => 'One-click fixes','rec' => 'Recommended', 'html' => 'Each issue found includes a Fix It button that runs the cleanup directly in the database. The operation is logged. Take a backup first if you want a safety net — CloudScale Backup &amp; Restore can do this in one click.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Scans your WordPress database for hidden bloat — oversized autoload cache, expired transients, post revisions, and orphaned metadata — then gives you one-click cleanup actions for each issue found.', 'cloudscale-devtools' ); ?>
                     </p>
@@ -4240,10 +4293,21 @@ class CloudScale_DevTools {
                     </div>
                     <div id="csdt-db-intelligence-results" style="display:none;margin-top:20px;"></div>
                 </div>
+            </div>
+        </div>
 
-                <!-- ── Orphaned Table Cleanup ────────────────────────────── -->
-                <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
-                    <h2 class="cs-panel-heading">🗑️ <?php esc_html_e( 'Orphaned Table Cleanup', 'cloudscale-devtools' ); ?></h2>
+        <!-- ── Orphaned Table Cleanup ────────────────────────────────────── -->
+        <div class="cs-panel">
+            <div class="cs-section-header cs-section-header-red">
+                <span>🗑️ <?php esc_html_e( 'Orphaned Table Cleanup', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Find and safely remove database tables left behind by deleted plugins', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'orphaned-tables', 'Orphaned Table Cleanup', [
+                    [ 'name' => 'What gets flagged', 'rec' => 'Overview',   'html' => 'Non-core database tables that have no active plugin claiming them. WordPress core tables are always protected. Tables are identified by comparing your database against a list of known core tables.' ],
+                    [ 'name' => 'Recycle Bin',       'rec' => 'Important',  'html' => 'Tables are never deleted immediately. They are renamed with a <code>_trash_</code> prefix (moved to the Recycle Bin) first. You can restore them to their original name or permanently delete from the Recycle Bin.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                         <?php esc_html_e( 'Scans for database tables left behind by removed plugins. WordPress core tables are always protected — only non-core tables appear here.', 'cloudscale-devtools' ); ?>
                     </p>
