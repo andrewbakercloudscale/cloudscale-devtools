@@ -198,6 +198,8 @@
     var uptimeTokenDisplay= document.getElementById('csdt-uptime-token-display');
     var uptimeManualWrap  = document.getElementById('csdt-uptime-manual-wrap');
     var uptimeNtfyInput   = document.getElementById('csdt-uptime-ntfy-url');
+    var uptimeSlugInput   = document.getElementById('csdt-uptime-ready-slug');
+    var uptimeUrlDisplay  = document.getElementById('csdt-ready-url-display');
     var uptimeRefreshBtn  = document.getElementById('csdt-uptime-refresh-btn');
 
     if (uptimeGenBtn) {
@@ -231,14 +233,34 @@
             '<textarea readonly style="width:100%;height:120px;font-family:monospace;font-size:.78em;border:1px solid #e5e7eb;border-radius:6px;padding:10px;resize:vertical;background:#f8fafc;">' + escHtml(wranglerToml) + '</textarea>';
     }
 
+    if (uptimeSlugInput && uptimeUrlDisplay) {
+        uptimeSlugInput.addEventListener('input', function () {
+            var slug = uptimeSlugInput.value.trim();
+            var base = uptimeUrlDisplay.textContent.replace(/\/ready(\/.*)?$/, '/ready');
+            uptimeUrlDisplay.textContent = slug ? base + '/' + slug : base;
+        });
+        uptimeSlugInput.addEventListener('change', function () {
+            var ntfy = uptimeNtfyInput ? uptimeNtfyInput.value.trim() : '';
+            post('csdt_uptime_save_settings', { ntfy_url: ntfy, ready_slug: uptimeSlugInput.value.trim() }).then(function (res) {
+                if (res.success && res.data.ready_url && uptimeUrlDisplay) {
+                    uptimeUrlDisplay.textContent = res.data.ready_url;
+                }
+            });
+        });
+    }
+
     if (uptimeDeployBtn) {
         uptimeDeployBtn.addEventListener('click', function () {
             var ntfy = uptimeNtfyInput ? uptimeNtfyInput.value.trim() : '';
+            var slug = uptimeSlugInput ? uptimeSlugInput.value.trim() : '';
             uptimeDeployBtn.disabled = true;
             uptimeDeployBtn.textContent = '⏳ Deploying…';
             if (uptimeDeploying) uptimeDeploying.style.display = '';
             if (uptimeDeployRes) uptimeDeployRes.innerHTML = '';
 
+            // Save slug before deploy so the worker gets the correct READY_URL
+            var saveFirst = slug ? post('csdt_uptime_save_settings', { ntfy_url: ntfy, ready_slug: slug }) : Promise.resolve();
+            saveFirst.then(function () {
             post('csdt_uptime_deploy_worker', { ntfy_url: ntfy }).then(function (res) {
                 uptimeDeployBtn.disabled = false;
                 uptimeDeployBtn.textContent = '🚀 Deploy Worker to Cloudflare';
@@ -273,6 +295,7 @@
                 if (uptimeDeploying) uptimeDeploying.style.display = 'none';
                 if (uptimeDeployRes) uptimeDeployRes.innerHTML = '<p style="color:#dc2626;font-size:.9em;">Request failed — please reload.</p>';
             });
+            }); // saveFirst
         });
     }
 
