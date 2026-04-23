@@ -167,7 +167,10 @@
                 ? '<span style="background:#f0fdf4;border:1px solid #86efac;color:#15803d;font-size:.75em;font-weight:600;padding:2px 8px;border-radius:20px;">🤖 AI analysis</span>'
                 : '<span style="background:#f0f9ff;border:1px solid #7dd3fc;color:#0369a1;font-size:.75em;font-weight:600;padding:2px 8px;border-radius:20px;">Rule-based</span>' ) +
             runLabel +
-            '<button id="csdt-audit-pdf-btn" style="margin-left:auto;background:#0f172a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78em;font-weight:600;cursor:pointer;">⬇ Download PDF</button>' +
+            '<div style="display:flex;gap:8px;margin-left:auto;">' +
+            '<button id="cs-copy-all-btn" class="cs-copy-all-btn" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78em;font-weight:600;cursor:pointer;">📋 Copy All</button>' +
+            '<button id="csdt-audit-pdf-btn" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78em;font-weight:600;cursor:pointer;">⬇ Download PDF</button>' +
+            '</div>' +
             '</div>';
 
         // Scorecard

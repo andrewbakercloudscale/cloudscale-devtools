@@ -2,8 +2,8 @@
 /**
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
- * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.293
+ * Description: AI security scanner and developer toolkit. Replaces your security scanner, 2FA plugin, SMTP mailer, SQL tool, and log viewer — one free plugin, no cloud dependency.
+ * Version: 1.9.362
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -21,6 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-cs-passkey.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-ai-dispatcher.php';
 
 // Enable DB query saving only when CS Monitor is active (avoids memory overhead when disabled).
 if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0' ) {
@@ -38,7 +39,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.293';
+    const VERSION      = '1.9.350';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -275,12 +276,15 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_sql_run', [ __CLASS__, 'ajax_sql_run' ] );
 
         // Settings AJAX
-        add_action( 'wp_ajax_csdt_devtools_save_theme_setting', [ __CLASS__, 'ajax_save_theme_setting' ] );
+        add_action( 'wp_ajax_csdt_devtools_save_theme_setting',  [ __CLASS__, 'ajax_save_theme_setting' ] );
+        add_action( 'wp_ajax_csdt_devtools_save_perf_monitor',   [ __CLASS__, 'ajax_save_perf_monitor' ] );
 
         // Login security AJAX
         add_action( 'wp_ajax_csdt_devtools_login_save',          [ __CLASS__, 'ajax_login_save' ] );
         add_action( 'wp_ajax_csdt_devtools_bf_log_fetch',        [ __CLASS__, 'ajax_bf_log_fetch' ] );
         add_action( 'wp_ajax_csdt_ssh_monitor_save',             [ __CLASS__, 'ajax_ssh_monitor_save' ] );
+        add_action( 'wp_ajax_csdt_ssh_log_clear',               [ __CLASS__, 'ajax_ssh_log_clear' ] );
+        add_action( 'wp_ajax_csdt_bf_self_test',                [ __CLASS__, 'ajax_bf_self_test' ] );
         add_action( 'wp_ajax_csdt_devtools_totp_setup_start',    [ __CLASS__, 'ajax_totp_setup_start' ] );
         add_action( 'wp_ajax_csdt_devtools_totp_setup_verify',   [ __CLASS__, 'ajax_totp_setup_verify' ] );
         add_action( 'wp_ajax_csdt_devtools_2fa_disable',         [ __CLASS__, 'ajax_2fa_disable' ] );
@@ -346,6 +350,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_sec_headers_save',            [ __CLASS__, 'ajax_sec_headers_save' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_save',           [ __CLASS__, 'ajax_csp_save' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_rollback',       [ __CLASS__, 'ajax_csp_rollback' ] );
+        add_action( 'wp_ajax_csdt_devtools_csp_restore',        [ __CLASS__, 'ajax_csp_restore' ] );
         add_action( 'wp_ajax_csdt_scan_headers',                 [ __CLASS__, 'ajax_scan_headers' ] );
         add_action( 'wp_ajax_csdt_scan_history_item',            [ __CLASS__, 'ajax_scan_history_item' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_violations_get',  [ __CLASS__, 'ajax_csp_violations_get' ] );
@@ -364,6 +369,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_fpm_setup_detect',             [ __CLASS__, 'ajax_fpm_setup_detect' ] );
         add_action( 'wp_ajax_csdt_fpm_setup_patch',              [ __CLASS__, 'ajax_fpm_setup_patch' ] );
         add_action( 'wp_ajax_csdt_fpm_worker_detail',            [ __CLASS__, 'ajax_fpm_worker_detail' ] );
+        add_action( 'wp_ajax_csdt_sql_http_fix',                  [ __CLASS__, 'ajax_sql_http_fix' ] );
         add_action( 'wp_ajax_nopriv_csdt_fpm_report',            [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'wp_ajax_csdt_fpm_report',                   [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'csdt_threat_monitor',                      [ __CLASS__, 'monitor_threats' ] );
@@ -395,6 +401,8 @@ class CloudScale_DevTools {
             add_filter( 'style_loader_tag',           [ __CLASS__, 'csp_nonce_style_tag' ],  10, 1 );
             // WP 6.3+ inline script attributes filter
             add_filter( 'wp_inline_script_attributes', [ __CLASS__, 'csp_nonce_inline_attrs' ], 10, 1 );
+            // Output buffer to catch scripts that bypass wp_enqueue (AdSense, theme inline scripts, etc.)
+            add_action( 'template_redirect', [ __CLASS__, 'csp_ob_start' ], 0 );
         }
 
         // Schedule SSH monitor (default on) — ensure cron is running if enabled
@@ -450,6 +458,7 @@ class CloudScale_DevTools {
         }
 
         // Login security — URL intercept / 2FA flow (early, priority 1 on init).
+        add_action( 'init',        [ __CLASS__, 'login_admin_intercept' ], 0 );
         add_action( 'init',        [ __CLASS__, 'login_serve_custom_slug' ], 1 );
         add_action( 'login_init',  [ __CLASS__, 'login_redirect_authenticated' ], 0 );
         add_action( 'login_init',  [ __CLASS__, 'login_block_direct_access' ], 1 );
@@ -470,6 +479,12 @@ class CloudScale_DevTools {
         add_action( 'login_init', [ __CLASS__, 'login_force_remember' ], 5 );
         // Security monitor — always track failed logins regardless of monitor toggle.
         add_action( 'wp_login_failed', [ __CLASS__, 'perf_track_failed_login' ] );
+        // Style the login error panel.
+        add_action( 'login_enqueue_scripts', [ __CLASS__, 'login_error_styles' ] );
+        // Username enumeration protection — only register if option is enabled (default on).
+        if ( get_option( 'csdt_devtools_enum_protect', '1' ) === '1' ) {
+            add_filter( 'wp_login_errors', [ __CLASS__, 'generic_login_errors' ] );
+        }
 
         // Custom 404 page + hiscore leaderboard.
         add_action( 'template_redirect',                        [ __CLASS__, 'maybe_custom_404' ], 1 );
@@ -1083,10 +1098,6 @@ class CloudScale_DevTools {
      * @return void
      */
     public static function enqueue_admin_assets( $hook ) {
-        if ( $hook !== 'tools_page_' . self::TOOLS_SLUG ) {
-            return;
-        }
-
         // Tabs CSS
         wp_enqueue_style(
             'csdt-admin-tabs',
@@ -1199,7 +1210,7 @@ class CloudScale_DevTools {
             ] );
         }
 
-        if ( $active_tab === '404' ) {
+        if ( $active_tab === 'debug' || $active_tab === '404' ) {
             wp_enqueue_script(
                 'csdt-404-admin',
                 plugins_url( 'assets/cs-404-admin.js', __FILE__ ),
@@ -1303,7 +1314,7 @@ class CloudScale_DevTools {
             ] );
         }
 
-        if ( $active_tab === 'logs' ) {
+        if ( $active_tab === 'debug' || $active_tab === 'logs' ) {
             $logs_js = plugin_dir_path( __FILE__ ) . 'assets/cs-server-logs.js';
             wp_enqueue_script(
                 'csdt-server-logs',
@@ -1328,12 +1339,14 @@ class CloudScale_DevTools {
                 true
             );
             wp_localize_script( 'csdt-debug', 'csdtDebug', [
-                'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
-                'logsNonce'  => wp_create_nonce( 'csdt_devtools_server_logs' ),
-                'aiNonce'    => wp_create_nonce( 'csdt_optimizer_nonce' ),
-                'debugNonce' => wp_create_nonce( 'csdt_debug_nonce' ),
-                'fpmNonce'   => wp_create_nonce( 'csdt_fpm_nonce' ),
-                'sources'    => self::get_log_sources(),
+                'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+                'logsNonce'     => wp_create_nonce( 'csdt_devtools_server_logs' ),
+                'aiNonce'       => wp_create_nonce( 'csdt_optimizer_nonce' ),
+                'debugNonce'    => wp_create_nonce( 'csdt_debug_nonce' ),
+                'fpmNonce'      => wp_create_nonce( 'csdt_fpm_nonce' ),
+                'perfNonce'     => wp_create_nonce( 'csdt_devtools_perf_monitor_nonce' ),
+                'perfEnabled'   => get_option( 'csdt_devtools_perf_monitor_enabled', '1' ),
+                'sources'       => self::get_log_sources(),
             ] );
         }
 
@@ -1375,7 +1388,7 @@ class CloudScale_DevTools {
             <div id="cs-banner">
                 <div>
                     <div id="cs-banner-title">🔐 CloudScale Cyber and Devtools</div>
-                    <div id="cs-banner-sub"><?php esc_html_e( 'Code blocks, SQL tools, code migrator, site monitor &amp; login security', 'cloudscale-devtools' ); ?> &middot; v<?php echo esc_html( self::VERSION ); ?></div>
+                    <div id="cs-banner-sub"><?php esc_html_e( 'AI security scanner, 2FA, SMTP mailer, SQL tools &amp; developer toolkit', 'cloudscale-devtools' ); ?> &middot; v<?php echo esc_html( self::VERSION ); ?></div>
                 </div>
                 <div id="cs-banner-right">
                     <span class="cs-badge cs-badge-green">✅ <?php esc_html_e( 'Totally Free', 'cloudscale-devtools' ); ?></span>
@@ -1422,18 +1435,6 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'thumbnails' ? 'active' : ''; ?>">
                     🖼️ <?php esc_html_e( 'Thumbnails', 'cloudscale-devtools' ); ?>
                 </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=sql' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'sql' ? 'active' : ''; ?>">
-                    🗄️ <?php esc_html_e( 'SQL Command', 'cloudscale-devtools' ); ?>
-                </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=404' ); ?>"
-                   class="cs-tab <?php echo $active_tab === '404' ? 'active' : ''; ?>">
-                    🎮 <?php esc_html_e( '404 Games', 'cloudscale-devtools' ); ?>
-                </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=logs' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'logs' ? 'active' : ''; ?>">
-                    📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?>
-                </a>
             </div>
             <script>
             (function(){
@@ -1459,10 +1460,6 @@ class CloudScale_DevTools {
                     <?php self::render_settings_panel(); ?>
                     <?php self::render_migrate_panel(); ?>
                 </div>
-            <?php elseif ( $active_tab === 'sql' ) : ?>
-                <div class="cs-tab-content active">
-                    <?php self::render_sql_panel(); ?>
-                </div>
             <?php elseif ( $active_tab === 'login' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_login_panel(); ?>
@@ -1470,10 +1467,6 @@ class CloudScale_DevTools {
             <?php elseif ( $active_tab === 'mail' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_smtp_panel(); ?>
-                </div>
-            <?php elseif ( $active_tab === '404' ) : ?>
-                <div class="cs-tab-content active">
-                    <?php self::render_404_panel(); ?>
                 </div>
             <?php elseif ( $active_tab === 'thumbnails' ) : ?>
                 <div class="cs-tab-content active">
@@ -1491,15 +1484,13 @@ class CloudScale_DevTools {
                 <div class="cs-tab-content active">
                     <?php self::render_site_audit_panel(); ?>
                 </div>
-            <?php elseif ( $active_tab === 'logs' ) : ?>
-                <div class="cs-tab-content active">
-                    <?php self::render_server_logs_panel(); ?>
-                </div>
-            <?php elseif ( $active_tab === 'debug' ) : ?>
+            <?php elseif ( in_array( $active_tab, [ 'debug', 'logs', 'sql', '404' ], true ) ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_debug_panel(); ?>
                 </div>
             <?php endif; ?>
+
+            <?php self::render_quick_fix_modals(); ?>
 
         </div>
         </div>
@@ -1630,16 +1621,14 @@ class CloudScale_DevTools {
     private static function render_settings_panel() {
         $theme       = get_option( 'csdt_devtools_code_default_theme', 'dark' );
         $pair_slug   = get_option( 'csdt_devtools_code_theme_pair', 'atom-one' );
-        $perf_on     = get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0';
         $registry    = self::get_theme_registry();
         ?>
         <div class="cs-panel" id="cs-panel-code-settings">
             <div class="cs-section-header cs-section-header-teal">
                 <span>🎨 CODE BLOCK SETTINGS</span>
                 <?php self::render_explain_btn( 'code-settings', 'Code Block Settings', [
-                    [ 'name' => 'Theme Pair',           'rec' => 'Recommended', 'desc' => 'Choose a light/dark colour-scheme pair for syntax-highlighted code blocks. The pair is applied automatically based on the visitor\'s OS colour preference.' ],
-                    [ 'name' => 'Default Mode',         'rec' => 'Optional',    'desc' => 'Force all code blocks to always use light or dark mode, ignoring the visitor\'s system preference. Leave unset to follow the OS setting.' ],
-                    [ 'name' => 'Performance Monitor',  'rec' => 'Optional',    'desc' => 'Enables the CS Monitor DevTools panel, which tracks database queries, HTTP requests, and PHP errors on every page load. Keep disabled in production unless actively debugging.' ],
+                    [ 'name' => 'Theme Pair',   'rec' => 'Recommended', 'desc' => 'Choose a light/dark colour-scheme pair for syntax-highlighted code blocks. The pair is applied automatically based on the visitor\'s OS colour preference.' ],
+                    [ 'name' => 'Default Mode', 'rec' => 'Optional',    'desc' => 'Force all code blocks to always use light or dark mode, ignoring the visitor\'s system preference. Leave unset to follow the OS setting.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1664,15 +1653,7 @@ class CloudScale_DevTools {
                         <span class="cs-hint"><?php esc_html_e( 'Visitors can still toggle per block.', 'cloudscale-devtools' ); ?></span>
                     </div>
                 </div>
-                <div class="cs-field" style="margin-top:14px">
-                    <label class="cs-label"><?php esc_html_e( 'CS Monitor panel:', 'cloudscale-devtools' ); ?></label>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                        <input type="checkbox" id="cs-settings-perf-enabled" name="csdt_devtools_perf_monitor_enabled" value="1" <?php checked( $perf_on ); ?>>
-                        <span style="font-size:13px;color:#555"><?php esc_html_e( 'Show the ⚡ CS Monitor performance panel', 'cloudscale-devtools' ); ?></span>
-                    </label>
-                    <span class="cs-hint"><?php esc_html_e( 'Visible to admins only. Uncheck to hide the panel on all pages.', 'cloudscale-devtools' ); ?></span>
-                </div>
-                <div style="margin-top:14px;display:flex;align-items:center;gap:10px">
+<div style="margin-top:14px;display:flex;align-items:center;gap:10px">
                     <button type="button" class="cs-btn-primary" id="cs-settings-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-settings-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 </div>
@@ -1871,7 +1852,28 @@ class CloudScale_DevTools {
         $has_key   = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) )
                   || ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
         $key_url   = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        $perf_on   = get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0';
         ?>
+
+        <!-- ── CS Monitor toggle ── -->
+        <div class="cs-panel" style="margin-bottom:12px;">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#0f4c75 0%,#1b6ca8 100%);border-left:3px solid #38bdf8;">
+                <span>⚡ <?php esc_html_e( 'CS Monitor', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Frontend performance overlay panel', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div class="cs-panel-body" style="padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;">
+                    <input type="checkbox" id="cs-perf-monitor-toggle" <?php checked( $perf_on ); ?>>
+                    <span style="font-size:13px;color:#1d2327;"><?php esc_html_e( 'Show the ⚡ CS Monitor performance panel on all pages', 'cloudscale-devtools' ); ?></span>
+                </label>
+                <span class="cs-hint" style="flex:2;min-width:200px;"><?php esc_html_e( 'Visible to admins only. Tracks DB queries, HTTP requests, PHP errors, and hook counts. Disable in production when not debugging.', 'cloudscale-devtools' ); ?></span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button type="button" id="cs-perf-monitor-save" class="cs-btn-primary cs-btn-sm">💾 <?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?></button>
+                    <span id="cs-perf-monitor-saved" class="cs-settings-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                </div>
+            </div>
+        </div>
+
         <div class="cs-panel" id="cs-panel-debug">
             <div class="cs-section-header" style="background:linear-gradient(90deg,#3b0764 0%,#6d28d9 100%);border-left:3px solid #a78bfa;">
                 <span>🧠 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></span>
@@ -2261,7 +2263,11 @@ class CloudScale_DevTools {
 
             </div>
         </div>
+
         <?php
+        self::render_server_logs_panel();
+        self::render_sql_panel();
+        self::render_404_panel();
     }
 
     private static function render_server_logs_panel(): void {
@@ -2286,25 +2292,24 @@ class CloudScale_DevTools {
 
                 <?php if ( ! $php_configured ) : ?>
                 <?php $mu_dir = WP_CONTENT_DIR . '/mu-plugins'; $mu_writable = is_dir( $mu_dir ) && is_writable( $mu_dir ); ?>
-                <div id="cs-logs-php-setup" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;margin-bottom:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;">
-                    <div style="flex:1;font-size:13px;color:#92400e;line-height:1.5;">
-                        <strong><?php esc_html_e( 'PHP Error Log not writing to a file', 'cloudscale-devtools' ); ?></strong><br>
-                        <?php esc_html_e( 'PHP is currently logging to a system stream (e.g. /dev/stderr) that cannot be read here. Click Enable to install a mu-plugin that redirects PHP errors to wp-content/php-error.log.', 'cloudscale-devtools' ); ?>
-                        <?php if ( ! $mu_writable ) : ?>
-                        <br><span id="cs-logs-perm-warning" style="display:inline-block;margin-top:6px;padding:6px 10px;background:#fef3c7;border-radius:4px;font-size:12px;color:#78350f;">
-                            ⚠️ <?php esc_html_e( 'wp-content/mu-plugins is not writable by the web server.', 'cloudscale-devtools' ); ?>
-                            <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-logs-fix-perm-btn"
-                                    style="margin-left:8px;font-size:11px;vertical-align:middle;">
-                                🔧 <?php esc_html_e( 'Fix Permissions', 'cloudscale-devtools' ); ?>
-                            </button>
-                        </span>
-                        <?php endif; ?>
+                <div id="cs-logs-php-setup" style="padding:14px 16px;margin-bottom:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+                        <strong style="font-size:13px;color:#92400e;"><?php esc_html_e( 'PHP Error Log not writing to a file', 'cloudscale-devtools' ); ?></strong>
+                        <button type="button" class="cs-btn-primary cs-btn-sm" id="cs-logs-php-setup-btn"
+                                style="white-space:nowrap;flex-shrink:0;"
+                                <?php echo ! $mu_writable ? 'disabled title="' . esc_attr__( 'Fix the permissions warning first', 'cloudscale-devtools' ) . '"' : ''; ?>>
+                            ⚡ <?php esc_html_e( 'Enable', 'cloudscale-devtools' ); ?>
+                        </button>
                     </div>
-                    <button type="button" class="cs-btn-primary cs-btn-sm" id="cs-logs-php-setup-btn"
-                            style="flex-shrink:0;white-space:nowrap;"
-                            <?php echo ! $mu_writable ? 'disabled title="' . esc_attr__( 'Fix the permissions warning first', 'cloudscale-devtools' ) . '"' : ''; ?>>
-                        ⚡ <?php esc_html_e( 'Enable', 'cloudscale-devtools' ); ?>
-                    </button>
+                    <p style="margin:0 0 0;font-size:12px;color:#78350f;line-height:1.5;"><?php esc_html_e( 'PHP is currently logging to a system stream (e.g. /dev/stderr) that cannot be read here. Click Enable to install a mu-plugin that redirects PHP errors to wp-content/php-error.log.', 'cloudscale-devtools' ); ?></p>
+                    <?php if ( ! $mu_writable ) : ?>
+                    <div id="cs-logs-perm-warning" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:8px 12px;background:#fef3c7;border-radius:4px;font-size:12px;color:#78350f;">
+                        <span style="flex:1;">⚠️ <?php esc_html_e( 'wp-content/mu-plugins is not writable by the web server.', 'cloudscale-devtools' ); ?></span>
+                        <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-logs-fix-perm-btn" style="flex-shrink:0;white-space:nowrap;">
+                            🔧 <?php esc_html_e( 'Fix Permissions', 'cloudscale-devtools' ); ?>
+                        </button>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
 
@@ -2665,6 +2670,17 @@ class CloudScale_DevTools {
                         📝 <?php esc_html_e( 'Posts missing meta descriptions', 'cloudscale-devtools' ); ?>
                     </button>
                 </div>
+
+                <div style="margin-top:12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:14px 18px;">
+                    <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#92400e;">🔧 <?php esc_html_e( 'Fix HTTP → HTTPS', 'cloudscale-devtools' ); ?></p>
+                    <p style="margin:0 0 12px;font-size:12px;color:#78350f;line-height:1.5;"><?php esc_html_e( 'Runs WP-CLI search-replace server-side — safely handles serialised data. Dry Run previews the count without making changes.', 'cloudscale-devtools' ); ?></p>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <button type="button" id="cs-http-fix-dry" class="cs-btn-secondary cs-btn-sm" style="border-color:#f59e0b;color:#92400e;">🔍 <?php esc_html_e( 'Dry Run', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" id="cs-http-fix-run" class="cs-btn-primary cs-btn-sm" style="background:#d97706;border-color:#d97706;">⚡ <?php esc_html_e( 'Fix It', 'cloudscale-devtools' ); ?></button>
+                        <span id="cs-http-fix-status" style="font-size:12px;color:#92400e;"></span>
+                    </div>
+                    <pre id="cs-http-fix-output" style="display:none;margin-top:12px;background:#1e293b;color:#e2e8f0;padding:10px 14px;border-radius:6px;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;"></pre>
+                </div>
             </div>
         </div>
 
@@ -2759,7 +2775,7 @@ class CloudScale_DevTools {
                 </div>
 
                 <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
-                    <button type="button" class="cs-btn-primary" id="cs-hide-save">💾 <?php esc_html_e( 'Save Hide Login Settings', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-btn-primary" id="cs-hide-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-hide-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 </div>
             </div>
@@ -2800,7 +2816,7 @@ class CloudScale_DevTools {
                     </div>
                 </div>
                 <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
-                    <button type="button" class="cs-btn-primary" id="cs-session-save">💾 <?php esc_html_e( 'Save Session Settings', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-btn-primary" id="cs-session-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-session-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 </div>
             </div>
@@ -2808,18 +2824,22 @@ class CloudScale_DevTools {
 
         <!-- ── Brute-Force Protection ───────────────── -->
         <?php
-        $bf_enabled  = get_option( 'csdt_devtools_brute_force_enabled', '1' );
-        $bf_attempts = get_option( 'csdt_devtools_brute_force_attempts', '5' );
-        $bf_lockout  = get_option( 'csdt_devtools_brute_force_lockout', '5' );
+        $bf_enabled       = get_option( 'csdt_devtools_brute_force_enabled', '1' );
+        $bf_attempts      = get_option( 'csdt_devtools_brute_force_attempts', '5' );
+        $bf_lockout       = get_option( 'csdt_devtools_brute_force_lockout', '10' );
+        $bf_enum_protect  = get_option( 'csdt_devtools_enum_protect', '1' );
+        $wplogin_stats    = get_option( 'csdt_wplogin_blocked_stats', [] );
+        $invalid_user_log = get_option( 'csdt_invalid_user_log', [] );
         ?>
         <div class="cs-panel" id="cs-panel-brute-force">
             <div class="cs-section-header cs-section-header-red">
                 <span>🔒 BRUTE-FORCE PROTECTION</span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Temporarily lock accounts after repeated failed logins', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'brute-force', 'Brute-Force Protection', [
-                    [ 'name' => 'How it works',   'rec' => 'Info',        'html' => 'After <em>N</em> consecutive failed login attempts for the same username, the account is locked for the configured duration. The lock is <strong>per-username, not per-IP</strong> — it also stops distributed attacks spread across multiple IPs. The counter resets automatically after the lockout period expires.' ],
-                    [ 'name' => 'Failed attempts', 'rec' => 'Recommended', 'html' => '<ul><li><code>3</code> — tighter security, but risks locking out users who mistype their password</li><li><code>5</code> — default, good balance</li><li><code>10</code> — more forgiving for sites with non-technical users</li></ul>To unlock an account immediately, delete the transient key <code>csdt_devtools_lockout_{username}</code> from the database.' ],
-                    [ 'name' => 'Lockout period',  'rec' => 'Recommended', 'html' => 'Default is <code>5</code> minutes. The lock lifts automatically — no admin action needed.<br><br><ul><li><strong>5 min</strong> — default, enough to stop most automated attacks</li><li><strong>15–30 min</strong> — slows attacks further, slight UX delay for forgotten-password users</li></ul>' ],
+                    [ 'name' => 'How it works',        'rec' => 'Info',        'html' => 'After <em>N</em> consecutive failed login attempts for the same username, the account is locked for the configured duration. The lock is <strong>per-username, not per-IP</strong> — it also stops distributed attacks spread across many IPs. The counter resets automatically after the lockout period expires.' ],
+                    [ 'name' => 'Failed attempts',     'rec' => 'Recommended', 'html' => '<ul><li><code>3</code> — tighter security, but risks locking out users who mistype their password</li><li><code>5</code> — default, good balance</li><li><code>10</code> — more forgiving for sites with non-technical users</li></ul>To unlock an account immediately, delete the transient key <code>csdt_devtools_lockout_{username}</code> from the database.' ],
+                    [ 'name' => 'Lockout period',      'rec' => 'Recommended', 'html' => 'Default is <code>10</code> minutes. The lock lifts automatically — no admin action needed.<br><br><ul><li><strong>10 min</strong> — default, enough to stop most automated attacks</li><li><strong>30–60 min</strong> — slows targeted attacks further, slight UX delay for legitimate forgotten-password users</li></ul>' ],
+                    [ 'name' => 'Account enumeration', 'rec' => 'Critical',    'html' => '<p>By default, WordPress gives away whether a username exists. Try logging in with a made-up username and you see <em>"The username xyz is not registered on this site."</em> — try a real one and you see <em>"The password you entered is incorrect."</em> An attacker can automate this to build a full list of your site\'s usernames in minutes, then target those accounts with focused password attacks.</p><p>When this option is enabled, <strong>both errors return the same message: "Invalid username or password."</strong> The attacker learns nothing — a wrong username looks exactly like a wrong password. This is the same pattern used by banks and any serious web application.</p><p>There is no downside to enabling this. Legitimate users who forget their username can use the <em>Lost your password?</em> link to recover via their email address.</p>' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -2843,12 +2863,38 @@ class CloudScale_DevTools {
                         <label class="cs-label" for="cs-bf-lockout"><?php esc_html_e( 'Lockout duration (minutes):', 'cloudscale-devtools' ); ?></label>
                         <input type="number" id="cs-bf-lockout" class="cs-input" min="1" max="1440"
                                value="<?php echo esc_attr( $bf_lockout ); ?>" style="max-width:100px">
-                        <span class="cs-hint"><?php esc_html_e( 'How long the account stays locked. Default: 5.', 'cloudscale-devtools' ); ?></span>
+                        <span class="cs-hint"><?php esc_html_e( 'How long the account stays locked. Default: 10.', 'cloudscale-devtools' ); ?></span>
                     </div>
                 </div>
-                <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
-                    <button type="button" class="cs-btn-primary" id="cs-bf-save">💾 <?php esc_html_e( 'Save Brute-Force Settings', 'cloudscale-devtools' ); ?></button>
+                <div class="cs-field-row" style="margin-top:14px;">
+                    <div class="cs-field">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#334155;">
+                            <input type="checkbox" id="cs-bf-enum-protect" <?php checked( $bf_enum_protect, '1' ); ?>>
+                            <?php esc_html_e( 'Prevent account enumeration by using generic login error messages', 'cloudscale-devtools' ); ?>
+                        </label>
+                        <span class="cs-hint" style="margin-top:4px;display:block;"><?php esc_html_e( 'Returns "Invalid username or password." for all credential failures — prevents attackers from discovering which usernames are registered on this site.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+                <div style="margin-top:18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <button type="button" class="cs-btn-primary" id="cs-bf-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-bf-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                    <button type="button" id="cs-bf-test-btn" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;">🧪 <?php esc_html_e( 'Test BF Protection', 'cloudscale-devtools' ); ?></button>
+                    <span id="cs-bf-test-result" style="display:none;font-size:13px;font-weight:600;padding:5px 12px;border-radius:6px;"></span>
+                </div>
+
+                <?php if ( $bf_enum_protect === '1' ) : ?>
+                <div style="margin-top:10px;font-size:12px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 12px;line-height:1.5;">
+                    🛡️ <strong><?php esc_html_e( 'Username enumeration protection: Active', 'cloudscale-devtools' ); ?></strong>
+                    — <?php esc_html_e( 'Login errors always say "Invalid username or password." so attackers cannot tell whether a username exists.', 'cloudscale-devtools' ); ?>
+                </div>
+                <?php endif; ?>
+                <div style="margin-top:8px;font-size:12px;color:#64748b;line-height:1.6;">
+                    <strong><?php esc_html_e( 'Account lock, not IP lock:', 'cloudscale-devtools' ); ?></strong>
+                    <?php esc_html_e( 'Lockout is per-username. Distributed attacks using many IPs against the same account are still caught.', 'cloudscale-devtools' ); ?><br>
+                    <strong><?php esc_html_e( 'Unlock via SSH:', 'cloudscale-devtools' ); ?></strong>
+                    <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;">wp transient delete csdt_devtools_bf_lock_$(php -r "echo md5(strtolower('USERNAME'));") --path=/var/www/html</code>
+                    <?php esc_html_e( 'or to unlock all:', 'cloudscale-devtools' ); ?>
+                    <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;">wp eval 'global $wpdb; $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"%csdt_devtools_bf_lock%\"");' --path=/var/www/html</code>
                 </div>
 
                 <div id="cs-bf-log-wrap" class="cs-bf-log-wrap">
@@ -2861,6 +2907,79 @@ class CloudScale_DevTools {
                         <div class="cs-bf-loading"><?php esc_html_e( 'Loading…', 'cloudscale-devtools' ); ?></div>
                     </div>
                 </div>
+
+                <?php
+                // ── wp-login.php blocked hits ─────────────────────────────────
+                $daily_hits = isset( $wplogin_stats['daily'] ) && is_array( $wplogin_stats['daily'] ) ? $wplogin_stats['daily'] : [];
+                // Keep only last 7 days
+                $today = gmdate( 'Y-m-d' );
+                $days  = [];
+                for ( $i = 6; $i >= 0; $i-- ) {
+                    $d        = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
+                    $days[$d] = $daily_hits[$d] ?? 0;
+                }
+                $total_hits  = array_sum( $days );
+                $last_hit_ts = $wplogin_stats['last_ts'] ?? 0;
+                $last_hit_ip = $wplogin_stats['last_ip'] ?? '';
+                ?>
+                <div style="margin-top:22px;">
+                    <div style="font-weight:600;font-size:13px;margin-bottom:10px;">🚫 <?php esc_html_e( 'wp-login.php Blocked — Last 7 Days', 'cloudscale-devtools' ); ?>
+                        <span style="font-weight:400;font-size:11px;color:#64748b;margin-left:8px;"><?php echo (int) $total_hits; ?> blocked</span>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:flex-end;height:48px;margin-bottom:6px;">
+                        <?php foreach ( $days as $d => $cnt ) :
+                            $max = max( 1, max( array_values( $days ) ) );
+                            $pct = $cnt > 0 ? max( 8, (int) round( $cnt / $max * 100 ) ) : 2;
+                        ?>
+                        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                            <div title="<?php echo esc_attr( $cnt ); ?>" style="width:100%;background:<?php echo $cnt > 0 ? '#ef4444' : '#e2e8f0'; ?>;height:<?php echo $pct; ?>%;border-radius:3px 3px 0 0;min-height:3px;"></div>
+                            <span style="font-size:10px;color:#94a3b8;"><?php echo esc_html( gmdate( 'M j', strtotime( $d ) ) ); ?></span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if ( $last_hit_ts > 0 ) : ?>
+                    <div style="font-size:12px;color:#475569;margin-top:4px;">
+                        <?php esc_html_e( 'Last attempt:', 'cloudscale-devtools' ); ?>
+                        <strong><?php echo esc_html( human_time_diff( $last_hit_ts ) . ' ago' ); ?></strong>
+                        <?php if ( $last_hit_ip ) : ?>
+                        &nbsp;from&nbsp;<code style="font-size:11px;"><?php echo esc_html( $last_hit_ip ); ?></code>
+                        <?php endif; ?>
+                    </div>
+                    <?php else : ?>
+                    <div style="font-size:12px;color:#94a3b8;"><?php esc_html_e( 'No direct wp-login.php hits recorded yet.', 'cloudscale-devtools' ); ?></div>
+                    <?php endif; ?>
+                </div>
+
+                <?php
+                // ── Invalid username attempts at hidden login URL ──────────────
+                // Last 20 entries, newest first
+                $inv_recent = array_reverse( array_slice( $invalid_user_log, -20 ) );
+                ?>
+                <?php if ( ! empty( $inv_recent ) ) : ?>
+                <div style="margin-top:22px;">
+                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">👤 <?php esc_html_e( 'Invalid Username Attempts at Login URL', 'cloudscale-devtools' ); ?>
+                        <span style="font-weight:400;font-size:11px;color:#64748b;margin-left:8px;"><?php echo count( $invalid_user_log ); ?> total</span>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;"><?php esc_html_e( 'When', 'cloudscale-devtools' ); ?></th>
+                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;"><?php esc_html_e( 'Username tried', 'cloudscale-devtools' ); ?></th>
+                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;"><?php esc_html_e( 'IP address', 'cloudscale-devtools' ); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ( $inv_recent as $entry ) : ?>
+                            <tr style="border-bottom:1px solid #f1f5f9;">
+                                <td style="padding:5px 10px;white-space:nowrap;color:#64748b;"><?php echo esc_html( human_time_diff( $entry[0] ) . ' ago' ); ?></td>
+                                <td style="padding:5px 10px;font-weight:600;color:#0f172a;"><?php echo esc_html( $entry[1] ); ?></td>
+                                <td style="padding:5px 10px;color:#475569;"><?php echo esc_html( $entry[2] ); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -2870,6 +2989,7 @@ class CloudScale_DevTools {
         $ssh_mon_threshold = get_option( 'csdt_ssh_monitor_threshold', '10' );
         $ssh_last_check    = get_option( 'csdt_ssh_monitor_last_check', null );
         $ssh_last_alert    = (int) get_option( 'csdt_ssh_monitor_last_alert', 0 );
+        $ssh_alert_log     = get_option( 'csdt_ssh_monitor_alert_log', [] );
         $auth_log_readable = false;
         foreach ( [ '/var/log/auth.log', '/var/log/secure', '/var/log/messages' ] as $_p ) {
             if ( is_readable( $_p ) ) { $auth_log_readable = true; break; }
@@ -2933,9 +3053,43 @@ class CloudScale_DevTools {
                 <?php endif; ?>
                 <?php endif; ?>
                 <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
-                    <button type="button" class="cs-btn-primary" id="cs-ssh-mon-save">💾 <?php esc_html_e( 'Save SSH Monitor Settings', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-btn-primary" id="cs-ssh-mon-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-ssh-mon-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 </div>
+
+                <?php if ( ! empty( $ssh_alert_log ) ) : ?>
+                <div style="margin-top:22px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <span style="font-weight:600;font-size:13px;">🚨 <?php esc_html_e( 'Alert History', 'cloudscale-devtools' ); ?></span>
+                        <button type="button" id="cs-ssh-log-clear" style="background:none;border:none;color:#94a3b8;font-size:11px;cursor:pointer;padding:0;"><?php esc_html_e( 'Clear log', 'cloudscale-devtools' ); ?></button>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;font-weight:600;"><?php esc_html_e( 'Time', 'cloudscale-devtools' ); ?></th>
+                                <th style="text-align:center;padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;font-weight:600;"><?php esc_html_e( 'Attempts', 'cloudscale-devtools' ); ?></th>
+                                <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;font-weight:600;"><?php esc_html_e( 'Targeted accounts', 'cloudscale-devtools' ); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( array_reverse( $ssh_alert_log ) as $entry ) :
+                                $users = $entry['users'] ?? [];
+                                arsort( $users );
+                                $user_parts = [];
+                                foreach ( array_slice( $users, 0, 5, true ) as $u => $c ) {
+                                    $user_parts[] = esc_html( $u ) . ( $c > 1 ? ' &times;' . $c : '' );
+                                }
+                            ?>
+                            <tr style="border-bottom:1px solid #f1f5f9;">
+                                <td style="padding:6px 10px;white-space:nowrap;color:#475569;"><?php echo esc_html( human_time_diff( $entry['ts'] ) . ' ago' ); ?></td>
+                                <td style="padding:6px 10px;text-align:center;font-weight:700;color:#dc2626;"><?php echo (int) $entry['count']; ?></td>
+                                <td style="padding:6px 10px;color:#334155;"><?php echo $user_parts ? implode( ', ', $user_parts ) : '&mdash;'; ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -3129,7 +3283,7 @@ class CloudScale_DevTools {
                 </div>
 
                 <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
-                    <button type="button" class="cs-btn-primary" id="cs-2fa-save">💾 <?php esc_html_e( 'Save 2FA Settings', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-btn-primary" id="cs-2fa-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-2fa-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 </div>
             </div>
@@ -3365,6 +3519,113 @@ class CloudScale_DevTools {
         ] );
     }
 
+    public static function ajax_sql_http_fix(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+        }
+        if ( ! check_ajax_referer( 'csdt_devtools_sql_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
+        }
+
+        $dry_run = isset( $_POST['dry_run'] ) && '1' === $_POST['dry_run'];
+        $host    = wp_parse_url( home_url(), PHP_URL_HOST );
+        $from    = 'http://' . $host;
+        $to      = 'https://' . $host;
+
+        global $wpdb;
+
+        $tables      = $wpdb->get_col( 'SHOW TABLES' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $total_cells = 0;
+        $lines       = [];
+
+        foreach ( $tables as $table ) {
+            if ( strpos( $table, '_trash_' ) !== false ) {
+                continue;
+            }
+            // Get primary key and all text-like columns.
+            $columns   = $wpdb->get_results( "DESCRIBE `{$table}`", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+            $pk        = null;
+            $text_cols = [];
+            foreach ( $columns as $col ) {
+                if ( strtolower( $col['Key'] ) === 'pri' && ! $pk ) {
+                    $pk = $col['Field'];
+                }
+                $type = strtolower( $col['Type'] );
+                if ( strpos( $type, 'char' ) !== false || strpos( $type, 'text' ) !== false
+                    || strpos( $type, 'blob' ) !== false || strpos( $type, 'json' ) !== false ) {
+                    // Skip guid column.
+                    if ( $col['Field'] !== 'guid' ) {
+                        $text_cols[] = $col['Field'];
+                    }
+                }
+            }
+            if ( empty( $text_cols ) || ! $pk ) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            $rows = $wpdb->get_results( "SELECT `{$pk}`, `" . implode( '`, `', $text_cols ) . "` FROM `{$table}`", ARRAY_A );
+            $changed = 0;
+            foreach ( (array) $rows as $row ) {
+                $pk_val  = $row[ $pk ];
+                $updates = [];
+                foreach ( $text_cols as $col ) {
+                    $orig = $row[ $col ];
+                    if ( $orig === null || strpos( $orig, $from ) === false ) {
+                        continue;
+                    }
+                    $new = self::recursive_str_replace( $from, $to, $orig );
+                    if ( $new !== $orig ) {
+                        $updates[ $col ] = $new;
+                    }
+                }
+                if ( $updates ) {
+                    ++$changed;
+                    ++$total_cells;
+                    if ( ! $dry_run ) {
+                        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                        $wpdb->update( $table, $updates, [ $pk => $pk_val ] );
+                    }
+                }
+            }
+            if ( $changed ) {
+                $lines[] = sprintf( '%s: %d row(s) updated', $table, $changed );
+            }
+        }
+
+        $lines[] = sprintf( '--- Total: %d cell(s) %s', $total_cells, $dry_run ? 'would be updated (dry run)' : 'updated' );
+
+        wp_send_json_success( [
+            'output'  => implode( "\n", $lines ),
+            'dry_run' => $dry_run,
+            'from'    => $from,
+            'to'      => $to,
+            'total'   => $total_cells,
+        ] );
+    }
+
+    /**
+     * Recursively replaces $from with $to in a value, correctly handling
+     * PHP serialised strings by adjusting byte-length prefixes.
+     */
+    private static function recursive_str_replace( string $from, string $to, $data ) {
+        if ( is_array( $data ) ) {
+            foreach ( $data as $k => $v ) {
+                $data[ $k ] = self::recursive_str_replace( $from, $to, $v );
+            }
+            return $data;
+        }
+        if ( ! is_string( $data ) ) {
+            return $data;
+        }
+        $unserialized = @unserialize( $data ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
+        if ( $unserialized !== false && $data !== 'b:0;' ) {
+            $replaced = self::recursive_str_replace( $from, $to, $unserialized );
+            return serialize( $replaced ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
+        }
+        return str_replace( $from, $to, $data );
+    }
+
     /* ==================================================================
        6a. Settings AJAX save
        ================================================================== */
@@ -3401,6 +3662,19 @@ class CloudScale_DevTools {
 
         wp_send_json_success( [ 'theme' => $theme, 'theme_pair' => $pair, 'perf_enabled' => $perf_enabled ] );
     }
+
+    public static function ajax_save_perf_monitor(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden' );
+        }
+        if ( ! check_ajax_referer( 'csdt_devtools_perf_monitor_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce' );
+        }
+        $enabled = isset( $_POST['enabled'] ) && '1' === $_POST['enabled'] ? '1' : '0'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        update_option( 'csdt_devtools_perf_monitor_enabled', $enabled );
+        wp_send_json_success( [ 'perf_enabled' => $enabled ] );
+    }
+
     /* ==================================================================
        7. MIGRATION TOOL
 
@@ -4974,15 +5248,68 @@ class CloudScale_DevTools {
         if ( count( $log ) >= 500 ) {
             array_shift( $log );
         }
-        $log[] = [ time(), sanitize_user( $username, true ), self::get_client_ip() ];
+        $ip  = self::get_client_ip();
+        $log[] = [ time(), sanitize_user( $username, true ), $ip ];
         update_option( 'csdt_devtools_bf_log', $log, false );
+
+        // Per-IP failed login index — keyed by IP for future dashboard use.
+        if ( $ip ) {
+            $ip_index = get_option( 'csdt_devtools_failed_login_ips', [] );
+            if ( ! is_array( $ip_index ) ) {
+                $ip_index = [];
+            }
+            $clean_user = sanitize_user( $username, true );
+            $now = time();
+            if ( isset( $ip_index[ $ip ] ) ) {
+                $ip_index[ $ip ]['count']++;
+                $ip_index[ $ip ]['last_seen'] = $now;
+                $ip_index[ $ip ]['times'][]   = $now;
+                if ( count( $ip_index[ $ip ]['times'] ) > 50 ) {
+                    array_shift( $ip_index[ $ip ]['times'] );
+                }
+                if ( ! in_array( $clean_user, $ip_index[ $ip ]['usernames'], true ) ) {
+                    $ip_index[ $ip ]['usernames'][] = $clean_user;
+                    if ( count( $ip_index[ $ip ]['usernames'] ) > 20 ) {
+                        array_shift( $ip_index[ $ip ]['usernames'] );
+                    }
+                }
+            } else {
+                $ip_index[ $ip ] = [
+                    'count'      => 1,
+                    'first_seen' => $now,
+                    'last_seen'  => $now,
+                    'times'      => [ $now ],
+                    'usernames'  => [ $clean_user ],
+                ];
+            }
+            // Purge IPs not seen in the last 90 days.
+            $cutoff_ip = time() - 90 * DAY_IN_SECONDS;
+            $ip_index  = array_filter( $ip_index, fn( $e ) => $e['last_seen'] >= $cutoff_ip );
+            // Cap at 1000 unique IPs — drop the oldest by last_seen.
+            if ( count( $ip_index ) > 1000 ) {
+                uasort( $ip_index, fn( $a, $b ) => $a['last_seen'] <=> $b['last_seen'] );
+                $ip_index = array_slice( $ip_index, -1000, null, true );
+            }
+            update_option( 'csdt_devtools_failed_login_ips', $ip_index, false );
+        }
+
+        // Track invalid (nonexistent) username attempts separately
+        if ( ! username_exists( $username ) ) {
+            $inv = get_option( 'csdt_invalid_user_log', [] );
+            if ( ! is_array( $inv ) ) $inv = [];
+            $inv[] = [ time(), sanitize_user( $username, true ), $ip ];
+            if ( count( $inv ) > 200 ) {
+                $inv = array_slice( $inv, -200 );
+            }
+            update_option( 'csdt_invalid_user_log', $inv, false );
+        }
 
         // ── Brute-force per-account lockout ──────────────────────────────────
         if ( get_option( 'csdt_devtools_brute_force_enabled', '1' ) !== '1' || empty( $username ) ) {
             return;
         }
         $max_attempts = max( 1, (int) get_option( 'csdt_devtools_brute_force_attempts', '5' ) );
-        $lockout_secs = max( 60, (int) get_option( 'csdt_devtools_brute_force_lockout', '5' ) * MINUTE_IN_SECONDS );
+        $lockout_secs = max( 60, (int) get_option( 'csdt_devtools_brute_force_lockout', '10' ) * MINUTE_IN_SECONDS );
         $slug         = md5( strtolower( $username ) );
         $count_key    = 'csdt_devtools_bf_count_' . $slug;
         $lock_key     = 'csdt_devtools_bf_lock_' . $slug;
@@ -4991,6 +5318,25 @@ class CloudScale_DevTools {
             // Threshold reached — lock the account and clear the counter.
             set_transient( $lock_key, time() + $lockout_secs, $lockout_secs );
             delete_transient( $count_key );
+
+            // Send throttled alert — only for valid accounts (real attack vector), at most once per 2 hrs.
+            if ( username_exists( $username ) ) {
+                $notif_key = 'csdt_devtools_bf_notif_' . $slug;
+                if ( ! get_transient( $notif_key ) ) {
+                    set_transient( $notif_key, 1, 2 * HOUR_IN_SECONDS );
+                    $site      = wp_specialchars_decode( get_bloginfo( 'name' ) ?: home_url(), ENT_QUOTES );
+                    $admin_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=login' );
+                    $subject   = sprintf( '[%s] REAL ACCOUNT under brute-force attack: %s', $site, $username );
+                    $body      = sprintf(
+                        "Account '%s' is a valid WordPress account and has been locked after %d consecutive failed login attempts.\n\nThis is an active credential-stuffing or brute-force attack targeting a real account.\n\nAccount will be locked for %d minutes. If this recurs, enable 2FA immediately.\n\nView login attempts: %s",
+                        $username,
+                        $max_attempts,
+                        $lockout_secs / MINUTE_IN_SECONDS,
+                        $admin_url
+                    );
+                    self::send_threat_alert( $subject, $body, 'urgent', 'skull,warning', $admin_url );
+                }
+            }
         } else {
             // Still within the window — keep counting.
             set_transient( $count_key, $attempts, $lockout_secs * 2 );
@@ -5918,6 +6264,52 @@ class CloudScale_DevTools {
      * @since  1.9.4
      * @return void
      */
+    /**
+     * Replaces credential-specific login errors with a generic message to prevent
+     * username enumeration. Lockout and 2FA errors are left unchanged.
+     */
+    public static function generic_login_errors( \WP_Error $errors ): \WP_Error {
+        $enum_codes = [ 'invalid_username', 'invalid_email', 'incorrect_password', 'invalidcombo' ];
+        $replaced   = false;
+        foreach ( $enum_codes as $code ) {
+            if ( $errors->get_error_message( $code ) ) {
+                $errors->remove( $code );
+                $replaced = true;
+            }
+        }
+        if ( $replaced ) {
+            $errors->add(
+                'authentication_failed',
+                '<strong>' . esc_html__( 'Error:', 'cloudscale-devtools' ) . '</strong> ' .
+                esc_html__( 'Invalid username or password.', 'cloudscale-devtools' ) .
+                '<br><small style="color:#6b7280;">Protected by <a href="https://andrewbaker.ninja" target="_blank" rel="noopener noreferrer" style="color:#6b7280;">CloudScale Cyber and Devtools</a>.</small>'
+            );
+        }
+        return $errors;
+    }
+
+    public static function login_error_styles(): void {
+        echo '<style>
+#login_error,
+div.error {
+    background: #0f172a !important;
+    border-left: 4px solid #ef4444 !important;
+    border-radius: 6px !important;
+    color: #f1f5f9 !important;
+    padding: 12px 16px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35) !important;
+}
+#login_error a,
+div.error a {
+    color: #93c5fd !important;
+}
+#login_error strong,
+div.error strong {
+    color: #fca5a5 !important;
+}
+</style>';
+    }
+
     public static function login_block_direct_access(): void {
         if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return;
@@ -5949,6 +6341,23 @@ class CloudScale_DevTools {
         if ( in_array( $action, $safe, true ) ) {
             return;
         }
+        // Record this blocked hit for the BF panel stats.
+        $ip    = self::get_client_ip();
+        $today = gmdate( 'Y-m-d' );
+        $stats = get_option( 'csdt_wplogin_blocked_stats', [] );
+        if ( ! isset( $stats['daily'] ) || ! is_array( $stats['daily'] ) ) {
+            $stats['daily'] = [];
+        }
+        $stats['daily'][ $today ] = ( $stats['daily'][ $today ] ?? 0 ) + 1;
+        // Prune keys older than 7 days
+        $cutoff = gmdate( 'Y-m-d', strtotime( '-7 days' ) );
+        foreach ( array_keys( $stats['daily'] ) as $k ) {
+            if ( $k < $cutoff ) unset( $stats['daily'][ $k ] );
+        }
+        $stats['last_ts'] = time();
+        $stats['last_ip'] = $ip;
+        update_option( 'csdt_wplogin_blocked_stats', $stats, false );
+
         // Block — redirect direct /wp-login.php access to home.
         wp_safe_redirect( home_url( '/' ) );
         exit;
@@ -5963,6 +6372,97 @@ class CloudScale_DevTools {
      * @param  bool   $force_reauth
      * @return string
      */
+    /**
+     * Intercepts unauthenticated wp-admin requests when Hide Login is enabled.
+     * Renders a branded 403 page so the custom login slug is never revealed via redirect.
+     */
+    public static function login_admin_intercept(): void {
+        if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
+            return;
+        }
+        if ( ! is_admin() || defined( 'DOING_AJAX' ) || defined( 'DOING_CRON' ) ) {
+            return;
+        }
+        if ( is_user_logged_in() ) {
+            return;
+        }
+
+        $ip        = self::get_client_ip();
+        $site_name = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+
+        // Log the probe attempt.
+        $log   = get_option( 'csdt_devtools_admin_probe_log', [] );
+        $log[] = [ 'ts' => time(), 'ip' => $ip ];
+        if ( count( $log ) > 200 ) {
+            $log = array_slice( $log, -200 );
+        }
+        update_option( 'csdt_devtools_admin_probe_log', $log, false );
+        status_header( 403 );
+        header( 'Content-Type: text/html; charset=utf-8' );
+        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo '<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Access Protected</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f172a;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+.card{text-align:center;max-width:460px;padding:48px 40px;background:#1e293b;border:1px solid #334155;border-radius:16px;box-shadow:0 25px 60px rgba(0,0,0,.5);}
+.shield{width:80px;height:80px;margin:0 auto 28px;}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#f87171;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:20px;padding:4px 12px;margin-bottom:20px;}
+h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.3;}
+.site-name{font-size:13px;color:#94a3b8;margin-bottom:28px;}
+.divider{height:1px;background:#475569;margin:24px 0;}
+.protected-by{font-size:12px;color:#94a3b8;margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em;}
+.brand{font-size:17px;font-weight:700;color:#f1f5f9;text-decoration:none;transition:color .2s;}
+.brand:hover{color:#60a5fa;}
+.brand span{color:#ef4444;}
+.help-link{display:inline-block;margin-top:18px;font-size:12px;color:#cbd5e1;text-decoration:none;border:1px solid #475569;border-radius:6px;padding:6px 14px;transition:all .2s;}
+.help-link:hover{color:#f1f5f9;border-color:#94a3b8;}
+.tracking{margin-top:20px;font-size:12px;color:#cbd5e1;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:6px;padding:10px 14px;line-height:1.7;}
+.tracking strong{color:#fca5a5;}
+</style>
+</head>
+<body>
+<div class="card">
+  <svg class="shield" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="sg" x1="40" y1="8" x2="40" y2="72" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#f87171"/>
+        <stop offset="100%" stop-color="#b91c1c"/>
+      </linearGradient>
+    </defs>
+    <path d="M40 8 L68 20 L68 42 C68 57 55 68 40 72 C25 68 12 57 12 42 L12 20 Z" fill="url(#sg)" opacity=".15"/>
+    <path d="M40 8 L68 20 L68 42 C68 57 55 68 40 72 C25 68 12 57 12 42 L12 20 Z" stroke="#ef4444" stroke-width="2" fill="none"/>
+    <path d="M30 40 L37 47 L52 32" stroke="#f87171" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="40" cy="40" r="8" fill="none" stroke="#ef4444" stroke-width="1" stroke-dasharray="3 3" opacity=".5"/>
+  </svg>
+  <div class="badge">Access Protected</div>
+  <h1>Admin access is restricted</h1>
+  <p class="site-name">' . esc_html( $site_name ) . '</p>
+  <div class="divider"></div>
+  <p class="protected-by">This site is secured by</p>
+  <a href="https://andrewbaker.ninja" target="_blank" rel="noopener noreferrer" class="brand">
+    CloudScale <span>Cyber</span> and Devtools
+  </a>
+  <br>
+  <a href="https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-cyber-devtools-help/" target="_blank" rel="noopener noreferrer" class="help-link">
+    &#x2753; Plugin Help &amp; Documentation
+  </a>
+  <div class="tracking">
+    &#x26A0; This access attempt has been logged.<br>
+    <strong>Your IP address (' . esc_html( $ip ) . ') is now being tracked.</strong>
+  </div>
+</div>
+</body>
+</html>';
+        // phpcs:enable
+        exit;
+    }
+
     public static function login_custom_url( string $url, string $redirect, bool $force_reauth ): string {
         if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return $url;
@@ -5970,6 +6470,11 @@ class CloudScale_DevTools {
         $slug = get_option( 'csdt_devtools_login_slug', '' );
         if ( empty( $slug ) ) {
             return $url;
+        }
+        // If WordPress is trying to redirect to the login page because someone hit /wp-admin/
+        // while unauthenticated, send them to the home page instead — never reveal the slug.
+        if ( ! empty( $redirect ) && strpos( $redirect, '/wp-admin' ) !== false && ! is_user_logged_in() ) {
+            return home_url( '/' );
         }
         $custom = home_url( '/' . $slug . '/' );
         if ( ! empty( $redirect ) ) {
@@ -6497,9 +7002,11 @@ class CloudScale_DevTools {
         if ( ! is_array( $log ) ) {
             $log = [];
         }
-        $cutoff = time() - 14 * DAY_IN_SECONDS;
-        $log    = array_values( array_filter( $log, fn( $e ) => isset( $e[0] ) && $e[0] >= $cutoff ) );
-        wp_send_json_success( [ 'log' => $log, 'now' => time() ] );
+        $cutoff      = time() - 14 * DAY_IN_SECONDS;
+        $log         = array_values( array_filter( $log, fn( $e ) => isset( $e[0] ) && $e[0] >= $cutoff ) );
+        $today_start = mktime( 0, 0, 0 );
+        $today_count = count( array_filter( $log, fn( $e ) => $e[0] >= $today_start ) );
+        wp_send_json_success( [ 'log' => $log, 'now' => time(), 'today_count' => $today_count ] );
     }
 
     /**
@@ -6544,12 +7051,14 @@ class CloudScale_DevTools {
         // Brute-force protection
         $bf_enabled  = isset( $_POST['bf_enabled'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['bf_enabled'] ) ) ? '1' : '0';
         $bf_attempts = isset( $_POST['bf_attempts'] ) ? (int) sanitize_text_field( wp_unslash( $_POST['bf_attempts'] ) ) : 5;
-        $bf_lockout  = isset( $_POST['bf_lockout'] )  ? (int) sanitize_text_field( wp_unslash( $_POST['bf_lockout'] ) )  : 5;
+        $bf_lockout  = isset( $_POST['bf_lockout'] )  ? (int) sanitize_text_field( wp_unslash( $_POST['bf_lockout'] ) )  : 10;
         if ( $bf_attempts < 1 || $bf_attempts > 100 )   { $bf_attempts = 5; }
-        if ( $bf_lockout  < 1 || $bf_lockout  > 1440 )  { $bf_lockout  = 5; }
+        if ( $bf_lockout  < 1 || $bf_lockout  > 1440 )  { $bf_lockout  = 10; }
+        $bf_enum_protect = isset( $_POST['bf_enum_protect'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['bf_enum_protect'] ) ) ? '1' : '0';
         update_option( 'csdt_devtools_brute_force_enabled',  $bf_enabled );
         update_option( 'csdt_devtools_brute_force_attempts', (string) $bf_attempts );
         update_option( 'csdt_devtools_brute_force_lockout',  (string) $bf_lockout );
+        update_option( 'csdt_devtools_enum_protect',         $bf_enum_protect );
 
         // Grace logins
         $grace_logins = isset( $_POST['grace_logins'] ) ? (int) sanitize_text_field( wp_unslash( $_POST['grace_logins'] ) ) : 0;
@@ -7133,7 +7642,7 @@ class CloudScale_DevTools {
                 </div><!-- /#cs-smtp-fields -->
 
                 <div style="margin-top:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                    <button type="button" class="cs-btn-primary" id="cs-smtp-save">💾 <?php esc_html_e( 'Save SMTP Settings', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-btn-primary" id="cs-smtp-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-smtp-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                     <button type="button" class="cs-btn-primary" id="cs-smtp-test-btn" style="margin-left:6px">📨 <?php esc_html_e( 'Send Test Email', 'cloudscale-devtools' ); ?></button>
                     <span id="cs-smtp-test-result" style="font-size:13px"></span>
@@ -8299,7 +8808,7 @@ class CloudScale_DevTools {
                         <input type="url" id="cs-cf-purge-url" class="cs-input cs-input-light-placeholder" style="max-width:420px;flex:1"
                                placeholder="<?php esc_attr_e( 'https://yoursite.com/your-post/ (leave blank to purge everything)', 'cloudscale-devtools' ); ?>">
                         <button type="button" class="cs-btn-primary" id="cs-cf-purge-btn">🗑️ <?php esc_html_e( 'Purge Cache', 'cloudscale-devtools' ); ?></button>
-                        <button type="button" class="cs-btn-secondary" id="cs-cf-save-btn" style="background:#555;color:#fff;padding:7px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px">💾 <?php esc_html_e( 'Save CF Settings', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" class="cs-btn-secondary" id="cs-cf-save-btn" style="background:#555;color:#fff;padding:7px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                     </div>
                     <div id="cs-cf-purge-result" style="display:none;margin-top:8px"></div>
                     <span class="cs-settings-saved" id="cs-cf-saved">✓ <?php esc_html_e( 'CF Settings Saved', 'cloudscale-devtools' ); ?></span>
@@ -10046,10 +10555,10 @@ class CloudScale_DevTools {
                 'connect-src' => [ 'https://www.google-analytics.com', 'https://analytics.google.com', 'https://stats.g.doubleclick.net', 'https://region1.google-analytics.com' ],
             ],
             'google_adsense'      => [
-                'script-src'  => [ 'https://pagead2.googlesyndication.com', 'https://partner.googleadservices.com', 'https://tpc.googlesyndication.com', 'https://fundingchoicesmessages.google.com' ],
-                'frame-src'   => [ 'https://googleads.g.doubleclick.net', 'https://tpc.googlesyndication.com' ],
-                'img-src'     => [ 'https://pagead2.googlesyndication.com' ],
-                'connect-src' => [ 'https://pagead2.googlesyndication.com', 'https://ep1.adtrafficquality.google' ],
+                'script-src'  => [ 'https://*.googlesyndication.com', 'https://*.googletagservices.com', 'https://*.googleadservices.com', 'https://adservice.google.com', 'https://fundingchoicesmessages.google.com' ],
+                'frame-src'   => [ 'blob:', 'https://*.googlesyndication.com', 'https://*.safeframe.googlesyndication.com', 'https://googleads.g.doubleclick.net' ],
+                'img-src'     => [ 'https://*.googlesyndication.com', 'https://googleads.g.doubleclick.net' ],
+                'connect-src' => [ 'https://*.googlesyndication.com', 'https://*.googletagservices.com', 'https://adservice.google.com', 'https://ep1.adtrafficquality.google' ],
             ],
             'google_fonts'        => [
                 'style-src'   => [ 'https://fonts.googleapis.com' ],
@@ -10119,6 +10628,29 @@ class CloudScale_DevTools {
     public static function csp_nonce_inline_attrs( array $attrs ): array {
         $attrs['nonce'] = self::get_csp_nonce();
         return $attrs;
+    }
+
+    public static function csp_ob_start(): void {
+        ob_start( [ __CLASS__, 'csp_ob_inject_nonces' ] );
+    }
+
+    /**
+     * Output buffer callback: injects the page nonce into every <script> tag
+     * that doesn't already have one. Catches AdSense, theme scripts, and any
+     * other markup that bypasses wp_enqueue_scripts.
+     */
+    public static function csp_ob_inject_nonces( string $html ): string {
+        $nonce = self::get_csp_nonce();
+        if ( ! $nonce ) {
+            return $html;
+        }
+        return preg_replace_callback(
+            '/<script(?=[>\s])(?![^>]*\bnonce\s*=)([^>]*)>/i',
+            static function ( array $m ) use ( $nonce ): string {
+                return '<script nonce="' . esc_attr( $nonce ) . '"' . $m[1] . '>';
+            },
+            $html
+        ) ?? $html;
     }
 
     private static function render_security_headers_panel(): void {
@@ -10220,6 +10752,8 @@ class CloudScale_DevTools {
         $csp_custom   = get_option( 'csdt_devtools_csp_custom', '' );
         $csp_backup   = json_decode( get_option( 'csdt_devtools_csp_backup', '' ), true );
         $backup_time  = is_array( $csp_backup ) ? ( $csp_backup['saved_at'] ?? 0 ) : 0;
+        $csp_history  = json_decode( get_option( 'csdt_csp_history', '[]' ), true );
+        if ( ! is_array( $csp_history ) ) { $csp_history = []; }
 
         $services = [
             'google_analytics'    => 'Google Analytics (GA4 / gtag.js)',
@@ -10304,12 +10838,15 @@ class CloudScale_DevTools {
 
             <!-- Live preview -->
             <div style="margin-bottom:14px;">
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;"><?php esc_html_e( 'Preview', 'cloudscale-devtools' ); ?></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;"><?php esc_html_e( 'Preview', 'cloudscale-devtools' ); ?></div>
+                    <button type="button" id="cs-csp-copy-btn" style="background:none;border:1px solid #334155;color:#94a3b8;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;">📋 Copy</button>
+                </div>
                 <pre id="cs-csp-preview" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0;max-height:140px;overflow-y:auto;"></pre>
             </div>
 
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <button type="button" id="cs-csp-save-btn" class="cs-btn-primary cs-btn-sm"><?php esc_html_e( 'Save CSP Settings', 'cloudscale-devtools' ); ?></button>
+                <button type="button" id="cs-csp-save-btn" class="cs-btn-primary cs-btn-sm"><?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                 <?php if ( $backup_time ) : ?>
                 <button type="button" id="cs-csp-rollback-btn" class="cs-btn-secondary cs-btn-sm" style="border-color:#f87171;color:#dc2626;">
                     ↩ <?php esc_html_e( 'Rollback to previous settings', 'cloudscale-devtools' ); ?>
@@ -10319,6 +10856,28 @@ class CloudScale_DevTools {
                 <span id="cs-csp-saved"    style="display:none;color:#16a34a;font-size:13px;font-weight:600;">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 <span id="cs-csp-rolledback" style="display:none;color:#d97706;font-size:13px;font-weight:600;">↩ <?php esc_html_e( 'Rolled back', 'cloudscale-devtools' ); ?></span>
             </div>
+
+            <?php if ( ! empty( $csp_history ) ) : ?>
+            <div id="cs-csp-history-wrap" style="margin-top:18px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px;"><?php echo esc_html( sprintf( __( 'Change History (%d saves)', 'cloudscale-devtools' ), count( $csp_history ) ) ); ?></div>
+                <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+                <?php foreach ( $csp_history as $idx => $entry ) :
+                    $ts    = $entry['saved_at'] ?? 0;
+                    $label = esc_html( $entry['label'] ?? 'Settings saved' );
+                    $age   = $ts ? esc_html( human_time_diff( $ts ) . ' ago' ) : '';
+                    $bg    = $idx % 2 === 0 ? '#fff' : '#f8fafc';
+                ?>
+                    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:<?php echo esc_attr( $bg ); ?>;<?php echo $idx > 0 ? 'border-top:1px solid #e2e8f0;' : ''; ?>">
+                        <span style="color:#94a3b8;font-size:11px;white-space:nowrap;min-width:95px;"><?php echo $age; ?></span>
+                        <span style="flex:1;font-size:12px;color:#334155;"><?php echo $label; ?></span>
+                        <button type="button" class="cs-csp-restore-btn" data-index="<?php echo (int) $idx; ?>"
+                                style="background:none;border:1px solid #94a3b8;color:#475569;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;">↩ Restore</button>
+                    </div>
+                <?php endforeach; ?>
+                </div>
+                <div id="cs-csp-restore-msg" style="display:none;margin-top:6px;font-size:12px;font-weight:600;color:#d97706;"></div>
+            </div>
+            <?php endif; ?>
 
             <!-- Violation log — only visible in report-only mode -->
             <div id="cs-csp-violation-wrap" style="<?php echo $csp_on && $csp_mode === 'report_only' ? '' : 'display:none;'; ?>margin-top:20px;">
@@ -10362,7 +10921,7 @@ class CloudScale_DevTools {
             };
             var serviceMap = {
                 google_analytics:    { 'script-src':['https://www.googletagmanager.com','https://www.google-analytics.com'], 'img-src':['https://www.google-analytics.com','https://www.googletagmanager.com'], 'connect-src':['https://www.google-analytics.com','https://analytics.google.com','https://stats.g.doubleclick.net','https://region1.google-analytics.com'] },
-                google_adsense:      { 'script-src':['https://pagead2.googlesyndication.com','https://partner.googleadservices.com','https://tpc.googlesyndication.com','https://fundingchoicesmessages.google.com'], 'frame-src':['https://googleads.g.doubleclick.net','https://tpc.googlesyndication.com'], 'img-src':['https://pagead2.googlesyndication.com'], 'connect-src':['https://pagead2.googlesyndication.com','https://ep1.adtrafficquality.google'] },
+                google_adsense:      { 'script-src':['https://*.googlesyndication.com','https://*.googletagservices.com','https://*.googleadservices.com','https://adservice.google.com','https://fundingchoicesmessages.google.com'], 'frame-src':['blob:','https://*.googlesyndication.com','https://*.safeframe.googlesyndication.com','https://googleads.g.doubleclick.net'], 'img-src':['https://*.googlesyndication.com','https://googleads.g.doubleclick.net'], 'connect-src':['https://*.googlesyndication.com','https://*.googletagservices.com','https://adservice.google.com','https://ep1.adtrafficquality.google'] },
                 google_tag_manager:  { 'script-src':['https://www.googletagmanager.com'], 'img-src':['https://www.googletagmanager.com'] },
                 google_fonts:        { 'style-src':['https://fonts.googleapis.com'], 'font-src':['https://fonts.gstatic.com'] },
                 cloudflare_insights: { 'script-src':['https://static.cloudflareinsights.com'], 'connect-src':['https://cloudflareinsights.com'] },
@@ -10391,6 +10950,17 @@ class CloudScale_DevTools {
             var customIn = document.getElementById('cs-csp-custom');
             if (customIn) customIn.addEventListener('input', buildPreview);
             buildPreview();
+
+            var copyBtn = document.getElementById('cs-csp-copy-btn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', function(){
+                    var text = document.getElementById('cs-csp-preview').textContent;
+                    navigator.clipboard.writeText(text).then(function(){
+                        copyBtn.textContent = '✅ Copied';
+                        setTimeout(function(){ copyBtn.textContent = '📋 Copy'; }, 2000);
+                    });
+                });
+            }
 
             var saveBtn  = document.getElementById('cs-csp-save-btn');
             var savedMsg = document.getElementById('cs-csp-saved');
@@ -10464,6 +11034,38 @@ class CloudScale_DevTools {
                 });
             }
             wireRollback(document.getElementById('cs-csp-rollback-btn'));
+
+            // ── Change history restore ────────────────────────────────────
+            document.querySelectorAll('.cs-csp-restore-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var idx = btn.getAttribute('data-index');
+                    if (!confirm('Restore this CSP configuration? The current settings will be pushed to history first.')) { return; }
+                    btn.disabled = true; btn.textContent = '⏳';
+                    var fd = new FormData();
+                    fd.append('action', 'csdt_devtools_csp_restore');
+                    fd.append('nonce',  csdtVulnScan.nonce);
+                    fd.append('index',  idx);
+                    fetch(csdtVulnScan.ajaxUrl, { method:'POST', body:fd })
+                        .then(function(r){ return r.json(); })
+                        .then(function(resp) {
+                            if (!resp.success) { alert('Restore failed: ' + (resp.data || 'unknown error')); btn.disabled = false; btn.textContent = '↩ Restore'; return; }
+                            var d = resp.data;
+                            var en = document.getElementById('cs-csp-enabled');
+                            if (en) en.checked = d.enabled === '1';
+                            var modeEl = document.querySelector('input[name="cs-csp-mode"][value="' + (d.mode || 'enforce') + '"]');
+                            if (modeEl) modeEl.checked = true;
+                            document.querySelectorAll('.cs-csp-service').forEach(function(cb) {
+                                cb.checked = Array.isArray(d.services) && d.services.indexOf(cb.value) !== -1;
+                            });
+                            if (customIn) customIn.value = d.custom || '';
+                            buildPreview();
+                            var msg = document.getElementById('cs-csp-restore-msg');
+                            if (msg) { msg.style.display = 'block'; msg.textContent = '↩ Restored — click Save CSP Settings to apply.'; }
+                            btn.textContent = '✅ Restored';
+                        })
+                        .catch(function() { btn.disabled = false; btn.textContent = '↩ Restore'; });
+                });
+            });
 
             // ── Violation log ────────────────────────────────────────────
             var violWrap    = document.getElementById('cs-csp-violation-wrap');
@@ -11003,20 +11605,104 @@ class CloudScale_DevTools {
         $allowed_services = [ 'google_analytics', 'google_adsense', 'google_tag_manager', 'google_fonts', 'cloudflare_insights', 'facebook_pixel', 'recaptcha', 'youtube', 'vimeo' ];
         $services = array_values( array_intersect( $services, $allowed_services ) );
 
-        // Snapshot current settings before overwriting so rollback is always possible.
-        update_option( 'csdt_devtools_csp_backup', wp_json_encode( [
+        $old = [
             'enabled'  => get_option( 'csdt_devtools_csp_enabled', '0' ),
             'mode'     => get_option( 'csdt_devtools_csp_mode', 'enforce' ),
-            'services' => get_option( 'csdt_devtools_csp_services', '[]' ),
+            'services' => json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true ),
+            'custom'   => get_option( 'csdt_devtools_csp_custom', '' ),
+        ];
+        $new = [ 'enabled' => $enabled, 'mode' => $mode, 'services' => $services, 'custom' => $custom ];
+
+        // Push current state to rolling 10-entry history before overwriting.
+        $history = json_decode( get_option( 'csdt_csp_history', '[]' ), true );
+        if ( ! is_array( $history ) ) { $history = []; }
+        array_unshift( $history, array_merge( $old, [
+            'saved_at' => time(),
+            'label'    => self::csp_history_label( $old, $new ),
+            'services' => wp_json_encode( $old['services'] ),
+        ] ) );
+        update_option( 'csdt_csp_history', wp_json_encode( array_slice( $history, 0, 10 ) ) );
+
+        // Single-step rollback backup (legacy).
+        update_option( 'csdt_devtools_csp_backup', wp_json_encode( array_merge( $old, [
+            'saved_at' => time(),
+            'services' => wp_json_encode( $old['services'] ),
+        ] ) ) );
+
+        update_option( 'csdt_devtools_csp_enabled',  $enabled === '1' ? '1' : '0' );
+        update_option( 'csdt_devtools_csp_mode',     in_array( $mode, [ 'enforce', 'report_only' ], true ) ? $mode : 'enforce' );
+        update_option( 'csdt_devtools_csp_services', wp_json_encode( $services ) );
+        update_option( 'csdt_devtools_csp_custom',   $custom );
+        wp_send_json_success( [ 'has_backup' => true ] );
+    }
+
+    private static function csp_history_label( array $old, array $new ): string {
+        $labels   = [];
+        $old_svcs = is_array( $old['services'] ) ? $old['services'] : (array) json_decode( $old['services'] ?? '[]', true );
+        $new_svcs = is_array( $new['services'] ) ? $new['services'] : (array) json_decode( $new['services'] ?? '[]', true );
+        $names    = [
+            'google_analytics' => 'Google Analytics', 'google_adsense' => 'Google AdSense',
+            'google_tag_manager' => 'Google Tag Manager', 'google_fonts' => 'Google Fonts',
+            'cloudflare_insights' => 'Cloudflare Insights', 'facebook_pixel' => 'Facebook Pixel',
+            'recaptcha' => 'reCAPTCHA', 'youtube' => 'YouTube', 'vimeo' => 'Vimeo',
+        ];
+        if ( $old['enabled'] !== $new['enabled'] ) {
+            $labels[] = $new['enabled'] === '1' ? 'CSP enabled' : 'CSP disabled';
+        }
+        if ( $old['mode'] !== $new['mode'] ) {
+            $labels[] = $new['mode'] === 'report_only' ? 'Switched to report-only' : 'Switched to enforce';
+        }
+        foreach ( array_diff( $new_svcs, $old_svcs ) as $s ) {
+            $labels[] = 'Added ' . ( $names[ $s ] ?? $s );
+        }
+        foreach ( array_diff( $old_svcs, $new_svcs ) as $s ) {
+            $labels[] = 'Removed ' . ( $names[ $s ] ?? $s );
+        }
+        if ( trim( $old['custom'] ?? '' ) !== trim( $new['custom'] ?? '' ) ) {
+            $labels[] = 'Custom directives updated';
+        }
+        return $labels ? implode( '; ', $labels ) : 'Settings saved';
+    }
+
+    public static function ajax_csp_restore(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+
+        $idx = isset( $_POST['index'] ) ? (int) wp_unslash( $_POST['index'] ) : -1;
+        $history = json_decode( get_option( 'csdt_csp_history', '[]' ), true );
+        if ( ! is_array( $history ) || ! isset( $history[ $idx ] ) ) {
+            wp_send_json_error( 'History entry not found.' );
+        }
+
+        $entry = $history[ $idx ];
+
+        // Push current live state to the top of history before restoring.
+        $current_services = json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true );
+        $current = [
+            'enabled'  => get_option( 'csdt_devtools_csp_enabled', '0' ),
+            'mode'     => get_option( 'csdt_devtools_csp_mode', 'enforce' ),
+            'services' => wp_json_encode( is_array( $current_services ) ? $current_services : [] ),
             'custom'   => get_option( 'csdt_devtools_csp_custom', '' ),
             'saved_at' => time(),
-        ] ) );
+            'label'    => 'Before restore to: ' . ( $entry['label'] ?? 'previous state' ),
+        ];
+        array_unshift( $history, $current );
+        update_option( 'csdt_csp_history', wp_json_encode( array_slice( $history, 0, 10 ) ) );
 
-        update_option( 'csdt_devtools_csp_enabled',       $enabled === '1' ? '1' : '0' );
-        update_option( 'csdt_devtools_csp_mode',          in_array( $mode, [ 'enforce', 'report_only' ], true ) ? $mode : 'enforce' );
-        update_option( 'csdt_devtools_csp_services',      wp_json_encode( $services ) );
-        update_option( 'csdt_devtools_csp_custom',        $custom );
-        wp_send_json_success( [ 'has_backup' => true ] );
+        $entry_services = json_decode( $entry['services'] ?? '[]', true );
+        if ( ! is_array( $entry_services ) ) { $entry_services = []; }
+
+        update_option( 'csdt_devtools_csp_enabled',  $entry['enabled'] ?? '0' );
+        update_option( 'csdt_devtools_csp_mode',     $entry['mode']    ?? 'enforce' );
+        update_option( 'csdt_devtools_csp_services', wp_json_encode( $entry_services ) );
+        update_option( 'csdt_devtools_csp_custom',   $entry['custom']  ?? '' );
+
+        wp_send_json_success( [
+            'enabled'  => $entry['enabled']  ?? '0',
+            'mode'     => $entry['mode']     ?? 'enforce',
+            'services' => $entry_services,
+            'custom'   => $entry['custom']   ?? '',
+        ] );
     }
 
     public static function ajax_csp_rollback(): void {
@@ -11122,15 +11808,27 @@ class CloudScale_DevTools {
             }
             $headers     = wp_remote_retrieve_headers( $resp );
             $status_code = (int) wp_remote_retrieve_response_code( $resp );
-            $sec         = [];
+            // Build a raw map of all header values to reliably catch duplicates.
+            // WordPress's CaseInsensitiveDictionary sometimes concatenates duplicate
+            // headers with a newline rather than returning an array.
+            $raw_multi = [];
+            foreach ( $headers->getAll() as $raw_line ) {
+                if ( strpos( $raw_line, ':' ) !== false ) {
+                    [ $k, $v ] = explode( ':', $raw_line, 2 );
+                    $raw_multi[ strtolower( trim( $k ) ) ][] = trim( $v );
+                }
+            }
+            $sec = [];
             foreach ( $sec_keys as $hkey ) {
                 $val = $headers[ $hkey ] ?? null;
-                if ( null === $val ) {
+                // Prefer raw_multi count for accurate duplicate detection.
+                $all_vals = $raw_multi[ $hkey ] ?? ( null !== $val ? ( is_array( $val ) ? $val : [ $val ] ) : [] );
+                if ( empty( $all_vals ) ) {
                     $sec[ $hkey ] = [ 'status' => 'missing', 'values' => [] ];
-                } elseif ( is_array( $val ) ) {
-                    $sec[ $hkey ] = [ 'status' => count( $val ) > 1 ? 'duplicate' : 'present', 'values' => $val ];
+                } elseif ( count( $all_vals ) > 1 ) {
+                    $sec[ $hkey ] = [ 'status' => 'duplicate', 'values' => $all_vals ];
                 } else {
-                    $sec[ $hkey ] = [ 'status' => 'present', 'values' => [ $val ] ];
+                    $sec[ $hkey ] = [ 'status' => 'present', 'values' => $all_vals ];
                 }
             }
             return [
@@ -11171,12 +11869,44 @@ class CloudScale_DevTools {
                     $warnings[] = [ 'header' => 'Content-Security-Policy', 'msg' => "This policy contains 'unsafe-eval' which allows dynamic code execution." ];
                     if ( in_array( $grade, [ 'A+', 'A' ], true ) ) { $grade = 'B'; }
                 }
+                // When strict-dynamic is active, only nonce'd scripts load — check that
+                // every <script> tag in the page HTML actually carries a nonce.
+                if ( str_contains( $csp_val, "'strict-dynamic'" ) ) {
+                    $page_resp = wp_remote_get( $home_url, [
+                        'timeout'   => 10,
+                        'sslverify' => false,
+                        'user-agent'=> 'CloudScale-Header-Scanner/1.0',
+                    ] );
+                    if ( ! is_wp_error( $page_resp ) ) {
+                        $body = wp_remote_retrieve_body( $page_resp );
+                        preg_match_all( '/<script(?=[>\s])([^>]*)>/i', $body, $all_scripts );
+                        $missing = 0;
+                        foreach ( $all_scripts[1] as $attrs ) {
+                            if ( ! preg_match( '/\bnonce\s*=/i', $attrs ) ) {
+                                $missing++;
+                            }
+                        }
+                        if ( $missing > 0 ) {
+                            $warnings[] = [ 'header' => 'Content-Security-Policy', 'msg' => "{$missing} <script> tag(s) on the homepage have no nonce. With 'strict-dynamic' active, these scripts will be blocked — third-party tags (AdSense, analytics) are common culprits. Enable the CloudScale nonce output buffer or add them via wp_enqueue_scripts." ];
+                            if ( in_array( $grade, [ 'A+', 'A' ], true ) ) { $grade = 'B'; }
+                        }
+                    }
+                }
             }
             // Duplicate headers
             foreach ( $sec as $hk => $hdata ) {
                 if ( $hdata['status'] === 'duplicate' ) {
-                    $warnings[] = [ 'header' => $hk, 'msg' => count( $hdata['values'] ) . ' duplicate headers detected — likely a plugin conflict. Browser uses only the first.' ];
-                    if ( $grade === 'A+' ) { $grade = 'A'; }
+                    $count = count( $hdata['values'] );
+                    if ( $hk === 'content-security-policy' ) {
+                        // For CSP, the browser enforces the INTERSECTION of all policies —
+                        // AdSense, analytics, and other third-party scripts can be silently
+                        // blocked if the two policies have different allowlists.
+                        $warnings[] = [ 'header' => $hk, 'msg' => $count . ' Content-Security-Policy headers detected. The browser enforces ALL of them simultaneously (intersection, not first-wins) — AdSense and third-party scripts may be blocked by the stricter policy. One source must be removed. Common causes: Nginx/Apache adding a static CSP while the plugin also sends one.' ];
+                        if ( in_array( $grade, [ 'A+', 'A', 'B' ], true ) ) { $grade = 'C'; }
+                    } else {
+                        $warnings[] = [ 'header' => $hk, 'msg' => $count . ' duplicate headers detected — browser behaviour is undefined. Check nginx/Apache config and plugin settings for conflicts.' ];
+                        if ( $grade === 'A+' ) { $grade = 'A'; }
+                    }
                 }
             }
             // Optional headers missing
@@ -11331,210 +12061,295 @@ class CloudScale_DevTools {
     }
 
     private static function render_home_panel(): void {
-        // ── Gather data ───────────────────────────────────────────────────────
-        $ai_provider   = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
-        $anthropic_key = get_option( 'csdt_devtools_anthropic_key', '' );
-        $gemini_key    = get_option( 'csdt_devtools_gemini_key', '' );
-        $has_key       = $ai_provider === 'gemini' ? ! empty( $gemini_key ) : ! empty( $anthropic_key );
-
-        $history   = get_option( 'csdt_scan_history', [] );
-        $last_scan = ! empty( $history ) ? $history[0] : null;
-        $score_cls = 'cs-hv-neutral';
-        if ( $last_scan ) {
-            $s = (int) ( $last_scan['score'] ?? 0 );
-            if ( $s >= 75 )     { $score_cls = 'cs-hv-green'; }
-            elseif ( $s >= 55 ) { $score_cls = 'cs-hv-orange'; }
-            else                { $score_cls = 'cs-hv-red'; }
-        }
-
-        $fixes      = self::get_quick_fixes();
-        $fixes_tot  = count( $fixes );
-        $fixes_done = count( array_filter( $fixes, function ( $f ) { return ! empty( $f['fixed'] ); } ) );
-        $fixes_cls  = $fixes_done === $fixes_tot ? 'cs-hv-green' : ( $fixes_done >= $fixes_tot - 1 ? 'cs-hv-orange' : 'cs-hv-red' );
-
-        $bf_on     = get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1';
-
-        $admins      = get_users( [ 'role' => 'administrator' ] );
-        $adm_tot     = count( $admins );
-        $email_2fa   = get_option( 'csdt_devtools_2fa_method', 'off' ) === 'email';
-        $adm_2fa     = 0;
-        foreach ( $admins as $u ) {
-            if ( get_user_meta( $u->ID, 'csdt_devtools_totp_enabled', true ) === '1'
-                 || ! empty( get_user_meta( $u->ID, 'csdt_devtools_passkeys', true ) )
-                 || $email_2fa ) {
-                $adm_2fa++;
-            }
-        }
-
-        $login_slug  = get_option( 'csdt_devtools_login_slug', '' );
-        $sched_on    = get_option( 'csdt_scan_schedule_enabled', '0' ) === '1';
-        $sched_freq  = get_option( 'csdt_scan_schedule_freq', 'weekly' );
-        $base_url    = admin_url( 'tools.php?page=cloudscale-devtools' );
-        ?>
-        <style>
-        .cs-home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;padding:20px 20px 0;}
-        .cs-home-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;}
-        .cs-home-card-hd{background:#f8fafc;border-bottom:1px solid #e5e7eb;padding:11px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;display:flex;align-items:center;justify-content:space-between;gap:6px;text-decoration:none;}
-        a.cs-home-card-hd:hover{background:#f1f5f9;color:#0e6b8f;}
-        .cs-home-card-hd-lft{display:flex;align-items:center;gap:6px;}
-        .cs-home-card-hd-arrow{font-size:11px;color:#94a3b8;}
-        a.cs-home-card-hd:hover .cs-home-card-hd-arrow{color:#0e6b8f;}
-        .cs-home-row{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;border-bottom:1px solid #f1f5f9;font-size:13px;}
-        .cs-home-row:last-child{border-bottom:none;}
-        .cs-home-lbl{color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;flex-shrink:0;}
-        .cs-home-rval{display:flex;align-items:center;gap:8px;}
-        .cs-hv-green{color:#16a34a;font-weight:600;}
-        .cs-hv-red{color:#dc2626;font-weight:600;}
-        .cs-hv-orange{color:#d97706;font-weight:600;}
-        .cs-hv-neutral{color:#1e293b;font-weight:600;}
-        .cs-hv-muted{color:#94a3b8;}
-        .cs-home-nav{font-size:11px;font-weight:600;color:#0e6b8f;text-decoration:none;white-space:nowrap;padding:2px 6px;border-radius:4px;background:#eff6ff;}
-        .cs-home-nav:hover{background:#dbeafe;color:#1d4ed8;}
-        .cs-home-actions{display:flex;gap:10px;padding:16px 20px 20px;}
-        .cs-home-actions .cs-btn-primary,.cs-home-actions .cs-btn-secondary{flex:1;text-align:center;justify-content:center;}
-        </style>
-
-        <?php
-        $sec_url   = $base_url . '&tab=security';
-        $login_url = $base_url . '&tab=login';
+        $ai_provider    = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
+        $anthropic_key  = get_option( 'csdt_devtools_anthropic_key', '' );
+        $gemini_key     = get_option( 'csdt_devtools_gemini_key', '' );
+        $has_key        = $ai_provider === 'gemini' ? ! empty( $gemini_key ) : ! empty( $anthropic_key );
+        $sched_enabled  = get_option( 'csdt_scan_schedule_enabled', '0' ) === '1';
+        $sched_freq     = get_option( 'csdt_scan_schedule_freq',    'weekly' );
+        $sched_type     = get_option( 'csdt_scan_schedule_type',    'deep' );
+        $sched_email    = get_option( 'csdt_scan_schedule_email',   '1' ) === '1';
+        $sched_ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
+        $sched_ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
+        $next_run       = wp_next_scheduled( 'csdt_scheduled_scan' );
+        $sec_url        = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        $rollback_info  = get_option( 'csdt_db_prefix_rollback' );
         ?>
         <div id="cs-panel-home" class="cs-panel" style="margin-bottom:0;">
-        <div class="cs-home-grid">
 
-            <!-- AI Security -->
-            <div class="cs-home-card">
-                <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-card-hd">
-                    <span class="cs-home-card-hd-lft">🤖 <?php esc_html_e( 'AI Security', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-card-hd-arrow">Security Scan →</span>
-                </a>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'STATUS', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo $has_key ? 'cs-hv-green' : 'cs-hv-red'; ?>">
-                            <?php echo $has_key ? '✅ ' . esc_html__( 'Configured', 'cloudscale-devtools' ) : '⚠️ ' . esc_html__( 'Not set', 'cloudscale-devtools' ); ?>
-                        </span>
-                        <?php if ( ! $has_key ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Set up API key', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'PROVIDER', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-hv-neutral"><?php echo $has_key ? esc_html( $provider_lbl ) : '<span class="cs-hv-muted">—</span>'; ?></span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'SCHEDULED SCANS', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo $sched_on ? 'cs-hv-green' : 'cs-hv-muted'; ?>">
-                            <?php echo $sched_on ? esc_html( ucfirst( $sched_freq ) ) : esc_html__( 'Disabled', 'cloudscale-devtools' ); ?>
-                        </span>
-                        <?php if ( ! $sched_on ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Schedule', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
+        <!-- ── Intro ────────────────────────────────────────────────────── -->
+        <div class="cs-tab-intro" style="margin-bottom:0;">
+            <p><?php echo wp_kses( __( 'WordPress powers over <strong>40% of the internet</strong>, making it the single largest attack surface on the web. Automated scanners probe every exposed WordPress site every day, looking for unpatched plugins, exposed admin pages, weak credentials, and misconfigured headers. The attackers are tooled up. Most defenders aren&#8217;t.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
+            <p><?php echo wp_kses( __( '<strong>CloudScale Cyber &amp; Devtools</strong> is a free, all-in-one security and developer plugin that puts frontier AI in your corner. The built-in <strong>AI Cyber Audit</strong> performs a full <strong>AI-powered WordPress penetration test</strong>, analysing your entire installation and producing a prioritised, scored security report in under 60 seconds. The kind of assessment that used to require hiring a consultant or running a manual pen test is now instant and free. It runs locally inside your own server using your own API key: no third-party cloud, no subscription, no data leaving your site except the call to your chosen AI provider. A <strong>free Gemini tier</strong> is available with no credit card required.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
+            <p><?php echo wp_kses( __( 'Beyond the AI audit, the plugin replaces a stack of paid tools you may already be running: a <strong>security scanner</strong> with one-click Quick Fixes, a <strong>2FA &amp; login protection</strong> layer, an <strong>SMTP mailer</strong>, a <strong>SQL query tool</strong>, <strong>PHP-FPM monitoring</strong>, a <strong>server log viewer</strong>, and a <strong>plugin vulnerability scanner</strong>. All in one place, all free.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
+            <p><?php echo wp_kses( __( '<strong>To get started:</strong> select an AI provider and paste your API key below, then apply the one-click <strong>Quick Fixes</strong> to resolve common misconfigurations. Head to the <strong>Security</strong> tab to run your first scan.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
+        </div>
+
+        <!-- ── AI Cyber Audit Settings ──────────────────────────────────── -->
+        <div class="cs-section-header cs-section-header-red" style="margin-top:18px;">
+            <span>&#x1F916; <?php esc_html_e( 'AI Cyber Audit — Setup', 'cloudscale-devtools' ); ?></span>
+            <span class="cs-header-hint"><?php esc_html_e( 'Select a provider and paste your API key to enable AI-powered security scans', 'cloudscale-devtools' ); ?></span>
+            <?php self::render_explain_btn( 'cyber-audit', 'AI Cyber Audit', [
+                [ 'name' => 'AI Providers',        'rec' => 'Info',         'html' => '<p>Two AI providers are supported. You supply your own API key — stored only in your WordPress database (<code>wp_options</code>) and sent only to the provider&#39;s own API endpoint.</p><p><strong>Anthropic Claude</strong> — recommended for best results.<br>Get your key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a><br>Models: <code>claude-sonnet-4-6</code> (fast) · <code>claude-opus-4-7</code> (most capable)</p><p><strong>Google Gemini</strong> — free tier available.<br>Get your key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a><br>Models: <code>gemini-2.0-flash</code> (fast, free tier) · <code>gemini-2.5-pro</code> (most capable)</p>' ],
+                [ 'name' => 'Standard Scan',       'rec' => 'Recommended',  'html' => 'Checks your WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php for common misconfigurations. Results are scored as Critical / High / Medium / Low with specific fix steps. Takes a few seconds.' ],
+                [ 'name' => 'Deep Dive Scan',      'rec' => 'Recommended',  'html' => 'Extends the Standard scan with live HTTP probes, DNS checks (SPF, DMARC, DKIM), weak TLS detection, PHP end-of-life status, static PHP code analysis across your plugins, and AI-powered triage of suspicious code patterns.' ],
+                [ 'name' => 'Scheduled Scans',     'rec' => 'Optional',     'html' => 'Run a scan automatically on a daily or weekly schedule. Results are stored in scan history. Enable email and ntfy.sh alerts to receive the AI summary when a scan completes.' ],
+            ] ); ?>
+        </div>
+        <div class="cs-panel-body">
+        <div class="cs-sec-settings">
+
+            <div class="cs-sec-row">
+                <span class="cs-sec-label"><?php esc_html_e( 'AI Provider:', 'cloudscale-devtools' ); ?></span>
+                <div class="cs-sec-control">
+                    <select id="cs-sec-provider" class="cs-sec-select">
+                        <option value="anthropic"><?php esc_html_e( 'Anthropic Claude', 'cloudscale-devtools' ); ?></option>
+                        <option value="gemini"><?php esc_html_e( 'Google Gemini', 'cloudscale-devtools' ); ?></option>
+                    </select>
                 </div>
             </div>
 
-            <!-- Last Scan -->
-            <div class="cs-home-card">
-                <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-card-hd">
-                    <span class="cs-home-card-hd-lft">🛡️ <?php esc_html_e( 'Last Security Scan', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-card-hd-arrow"><?php echo $last_scan ? esc_html__( 'View report', 'cloudscale-devtools' ) : esc_html__( 'Run scan', 'cloudscale-devtools' ); ?> →</span>
-                </a>
-                <?php if ( $last_scan ) : ?>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'SCORE', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo esc_attr( $score_cls ); ?>"><?php echo esc_html( ( $last_scan['score_label'] ?? '' ) . ' · ' . ( $last_scan['score'] ?? '' ) ); ?></span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'CRITICAL', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo (int) ( $last_scan['critical_count'] ?? 0 ) > 0 ? 'cs-hv-red' : 'cs-hv-green'; ?>"><?php echo (int) ( $last_scan['critical_count'] ?? 0 ); ?></span>
-                        <?php if ( (int) ( $last_scan['critical_count'] ?? 0 ) > 0 ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'View', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'HIGH', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo (int) ( $last_scan['high_count'] ?? 0 ) > 0 ? 'cs-hv-orange' : 'cs-hv-green'; ?>"><?php echo (int) ( $last_scan['high_count'] ?? 0 ); ?></span>
-                        <?php if ( (int) ( $last_scan['high_count'] ?? 0 ) > 0 ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'View', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'TYPE', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-hv-neutral"><?php echo ( $last_scan['type'] ?? '' ) === 'deep' ? esc_html__( 'Deep Dive', 'cloudscale-devtools' ) : esc_html__( 'Standard', 'cloudscale-devtools' ); ?></span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'SCANNED', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-hv-muted"><?php echo esc_html( human_time_diff( (int) ( $last_scan['scanned_at'] ?? 0 ) ) . ' ' . __( 'ago', 'cloudscale-devtools' ) ); ?></span>
-                </div>
-                <?php else : ?>
-                <div class="cs-home-row">
-                    <span class="cs-hv-muted"><?php esc_html_e( 'No scans run yet', 'cloudscale-devtools' ); ?></span>
-                    <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Run now', 'cloudscale-devtools' ); ?> →</a>
-                </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Quick Fixes -->
-            <div class="cs-home-card">
-                <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-card-hd">
-                    <span class="cs-home-card-hd-lft">⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-card-hd-arrow"><?php esc_html_e( 'Fix all', 'cloudscale-devtools' ); ?> →</span>
-                </a>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'RESOLVED', 'cloudscale-devtools' ); ?></span>
-                    <span class="<?php echo esc_attr( $fixes_cls ); ?>"><?php echo esc_html( $fixes_done . ' / ' . $fixes_tot ); ?></span>
-                </div>
-                <?php foreach ( $fixes as $fix ) : ?>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl" style="max-width:55%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?php echo esc_attr( $fix['title'] ); ?>"><?php echo esc_html( strtoupper( $fix['title'] ) ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo ! empty( $fix['fixed'] ) ? 'cs-hv-green' : 'cs-hv-red'; ?>"><?php echo ! empty( $fix['fixed'] ) ? '✅' : '⚠️'; ?></span>
-                        <?php if ( empty( $fix['fixed'] ) ) : ?><a href="<?php echo esc_url( $sec_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Fix', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
-                </div>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Login Security -->
-            <div class="cs-home-card">
-                <a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-card-hd">
-                    <span class="cs-home-card-hd-lft">🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-card-hd-arrow"><?php esc_html_e( 'Settings', 'cloudscale-devtools' ); ?> →</span>
-                </a>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'BRUTE FORCE', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo $bf_on ? 'cs-hv-green' : 'cs-hv-red'; ?>"><?php echo $bf_on ? '✅ ' . esc_html__( 'Enabled', 'cloudscale-devtools' ) : '⚠️ ' . esc_html__( 'Disabled', 'cloudscale-devtools' ); ?></span>
-                        <?php if ( ! $bf_on ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Enable', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( '2FA ADMINS', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo $adm_2fa === $adm_tot ? 'cs-hv-green' : 'cs-hv-orange'; ?>"><?php echo esc_html( $adm_2fa . ' / ' . $adm_tot ); ?></span>
-                        <?php if ( $adm_2fa < $adm_tot ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Set up 2FA', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'HIDE LOGIN', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo $login_slug ? 'cs-hv-green' : 'cs-hv-orange'; ?>"><?php echo $login_slug ? '✅ /' . esc_html( $login_slug ) : '⚠️ ' . esc_html__( 'Default URL', 'cloudscale-devtools' ); ?></span>
-                        <?php if ( ! $login_slug ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Set up', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
-                </div>
-                <div class="cs-home-row">
-                    <span class="cs-home-lbl"><?php esc_html_e( 'FORCE 2FA', 'cloudscale-devtools' ); ?></span>
-                    <?php $force_2fa = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1'; ?>
-                    <span class="cs-home-rval">
-                        <span class="<?php echo $force_2fa ? 'cs-hv-green' : 'cs-hv-muted'; ?>"><?php echo $force_2fa ? '✅ ' . esc_html__( 'Enforced', 'cloudscale-devtools' ) : esc_html__( 'Optional', 'cloudscale-devtools' ); ?></span>
-                        <?php if ( ! $force_2fa ) : ?><a href="<?php echo esc_url( $login_url ); ?>" class="cs-home-nav"><?php esc_html_e( 'Enforce', 'cloudscale-devtools' ); ?> →</a><?php endif; ?>
-                    </span>
+            <div class="cs-sec-row" id="cs-row-anthropic-key">
+                <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
+                <div class="cs-sec-control">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <input type="password" id="cs-sec-api-key" class="cs-text-input cs-sec-key-input"
+                               autocomplete="off" placeholder="sk-ant-api03-…">
+                        <button type="button" class="cs-btn-secondary" id="cs-sec-test-key">
+                            <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
+                        </button>
+                        <span id="cs-sec-key-status" class="cs-sec-key-status"></span>
+                    </div>
+                    <span class="cs-hint"><?php echo wp_kses(
+                        __( 'Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Stored in wp_options.', 'cloudscale-devtools' ),
+                        [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
+                    ); ?></span>
                 </div>
             </div>
 
-        </div><!-- /grid -->
+            <div class="cs-sec-row" id="cs-row-gemini-key" style="display:none">
+                <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
+                <div class="cs-sec-control">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <input type="password" id="cs-sec-gemini-key" class="cs-text-input cs-sec-key-input"
+                               autocomplete="off" placeholder="AIza…">
+                        <button type="button" class="cs-btn-secondary" id="cs-sec-test-gemini-key">
+                            <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
+                        </button>
+                        <span id="cs-sec-gemini-key-status" class="cs-sec-key-status"></span>
+                    </div>
+                    <span class="cs-hint"><?php echo wp_kses(
+                        __( 'Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored in wp_options.', 'cloudscale-devtools' ),
+                        [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
+                    ); ?></span>
+                </div>
+            </div>
 
-        <div class="cs-home-actions">
-            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-primary">🔍 <?php esc_html_e( 'Run Security Scan', 'cloudscale-devtools' ); ?></a>
-            <a href="<?php echo esc_url( $login_url ); ?>" class="cs-btn-secondary">🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></a>
+            <div class="cs-sec-row">
+                <span class="cs-sec-label"><?php esc_html_e( 'Audit model:', 'cloudscale-devtools' ); ?></span>
+                <div class="cs-sec-control">
+                    <select id="cs-sec-model" class="cs-sec-select">
+                        <option value="_auto">&#x2728; Auto</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="cs-sec-row">
+                <span class="cs-sec-label"><?php esc_html_e( 'Deep dive model:', 'cloudscale-devtools' ); ?></span>
+                <div class="cs-sec-control">
+                    <select id="cs-sec-deep-model" class="cs-sec-select">
+                        <option value="_auto_deep">&#x2728; Auto</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="cs-sec-row cs-sec-row-prompt">
+                <span class="cs-sec-label"><?php esc_html_e( 'System prompt:', 'cloudscale-devtools' ); ?></span>
+                <div class="cs-sec-control">
+                    <textarea id="cs-sec-prompt" class="cs-sec-prompt-area" rows="10"></textarea>
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+                        <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-copy-prompt">&#x2398; <?php esc_html_e( 'Copy', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-reset-prompt"><?php esc_html_e( 'Reset to default', 'cloudscale-devtools' ); ?></button>
+                        <div style="flex:1"></div>
+                        <button type="button" class="cs-btn-primary" id="cs-sec-save">&#x1F4BE; <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
+                        <span class="cs-settings-saved" id="cs-sec-saved">&#x2713; <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <hr class="cs-sec-divider">
+
+        <!-- Scheduled scan -->
+        <div class="cs-sec-settings" style="margin-top:0;padding-top:0;">
+            <div class="cs-sec-row">
+                <span class="cs-sec-label"><?php esc_html_e( 'Scheduled Scan:', 'cloudscale-devtools' ); ?></span>
+                <div class="cs-sec-control">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="cs-sched-enabled" <?php checked( $sched_enabled ); ?>>
+                        <span><?php esc_html_e( 'Run automatically on a schedule', 'cloudscale-devtools' ); ?></span>
+                    </label>
+                    <?php if ( $next_run ) : ?>
+                    <span class="cs-hint"><?php printf( esc_html__( 'Next run: %s', 'cloudscale-devtools' ), esc_html( wp_date( 'D j M Y, g:ia', $next_run ) ) ); ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div id="cs-sched-options" <?php echo $sched_enabled ? 'style="display:flex;flex-direction:column;gap:16px;"' : 'style="display:none"'; ?>>
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'Frequency:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <select id="cs-sched-freq" class="cs-sec-select" style="width:auto;max-width:180px;">
+                            <option value="weekly"  <?php selected( $sched_freq, 'weekly' ); ?>><?php esc_html_e( 'Weekly', 'cloudscale-devtools' ); ?></option>
+                            <option value="monthly" <?php selected( $sched_freq, 'monthly' ); ?>><?php esc_html_e( 'Monthly', 'cloudscale-devtools' ); ?></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'Scan type:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <select id="cs-sched-type" class="cs-sec-select" style="width:auto;max-width:280px;">
+                            <option value="standard" <?php selected( $sched_type, 'standard' ); ?>><?php esc_html_e( 'AI Cyber Audit (fast)', 'cloudscale-devtools' ); ?></option>
+                            <option value="deep"     <?php selected( $sched_type, 'deep' ); ?>><?php esc_html_e( 'AI Deep Dive Cyber Audit (comprehensive)', 'cloudscale-devtools' ); ?></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'Notify via email:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input type="checkbox" id="cs-sched-email" <?php checked( $sched_email ); ?>>
+                            <span><?php printf( esc_html__( 'Send results to %s', 'cloudscale-devtools' ), '<strong>' . esc_html( get_option( 'admin_email' ) ) . '</strong>' ); ?></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'ntfy.sh topic:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <input type="text" id="cs-sched-ntfy-url" class="cs-text-input"
+                               placeholder="https://ntfy.sh/your-topic"
+                               value="<?php echo esc_attr( $sched_ntfy_url ); ?>"
+                               style="max-width:320px;">
+                        <span class="cs-hint"><?php echo wp_kses( __( 'Optional push notification via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a>.', 'cloudscale-devtools' ), [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></span>
+                    </div>
+                </div>
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'ntfy auth token:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <input type="password" id="cs-sched-ntfy-token" class="cs-text-input"
+                               autocomplete="off" placeholder="<?php echo $sched_ntfy_tok ? '&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;' : esc_attr__( 'Optional &#8212; for protected topics', 'cloudscale-devtools' ); ?>"
+                               style="max-width:320px;">
+                    </div>
+                </div>
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"></span>
+                    <div class="cs-sec-control">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <button type="button" class="cs-btn-primary" id="cs-sched-save">&#x1F4BE; <?php esc_html_e( 'Save Schedule', 'cloudscale-devtools' ); ?></button>
+                            <span class="cs-settings-saved" id="cs-sched-saved">&#x2713; <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div><!-- /AI settings -->
+
+        <!-- ── DB Prefix Rollback Banner ──────────────────────────────────── -->
+        <?php
+        if ( $rollback_info && ! empty( $rollback_info['old_prefix'] ) ) :
+            $age_h = round( ( time() - ( $rollback_info['time'] ?? 0 ) ) / 3600, 1 );
+        ?>
+        <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:12px 16px;margin:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:0;">
+                <span style="font-weight:700;color:#dc2626;font-size:13px;">&#x21A9; DB Prefix Rollback Available</span>
+                <span style="font-size:12px;color:#6b7280;margin-left:6px;"><?php echo esc_html( $age_h ); ?>h ago</span>
+                <div style="font-size:12px;color:#374151;margin-top:2px;">
+                    Tables were renamed from <code><?php echo esc_html( $rollback_info['old_prefix'] ); ?></code> &rarr; <code><?php echo esc_html( $rollback_info['new_prefix'] ); ?></code>
+                    (<?php echo count( $rollback_info['tables'] ?? [] ); ?> tables). Rollback restores all tables and wp-config.php.
+                </div>
+            </div>
+            <button type="button" id="csdt-prefix-rollback-persistent-btn" class="cs-btn-secondary cs-btn-sm" style="border-color:#ef4444;color:#dc2626;white-space:nowrap;">&#x21A9; Rollback Now</button>
+            <span id="csdt-prefix-rollback-persistent-msg" style="display:none;font-size:12px;"></span>
+        </div>
+        <script>
+        (function(){
+            var btn = document.getElementById('csdt-prefix-rollback-persistent-btn');
+            if (!btn) { return; }
+            btn.addEventListener('click', function () {
+                if (!confirm('Roll back all renamed tables and restore wp-config.php?')) { return; }
+                btn.disabled = true; btn.textContent = '⏳ Rolling back…';
+                var msg = document.getElementById('csdt-prefix-rollback-persistent-msg');
+                var fd = new FormData();
+                fd.append('action', 'csdt_db_prefix_rollback');
+                fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( 'csdt_devtools_security_nonce' ) ); ?>);
+                fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method:'POST', body:fd, credentials:'same-origin' })
+                    .then(function(r){ return r.json(); })
+                    .then(function(r){
+                        btn.disabled = false;
+                        if (msg) {
+                            msg.style.display = '';
+                            msg.style.color = r.success ? '#16a34a' : '#dc2626';
+                            msg.textContent = (r.data && r.data.message) || (r.success ? 'Rolled back.' : 'Failed.');
+                        }
+                        if (r.success) { btn.textContent = '✓ Done'; btn.disabled = true; btn.closest('div[style]').style.background='#f0fdf4'; }
+                        else { btn.textContent = '↩ Rollback Now'; }
+                    }).catch(function(){ btn.disabled=false; btn.textContent='↩ Rollback Now'; });
+            });
+        })();
+        </script>
+        <?php endif; ?>
+
+        <!-- ── Quick Fixes ─────────────────────────────────────────────────── -->
+        <div class="cs-section-header" style="background:linear-gradient(90deg,#78350f 0%,#b45309 100%);border-left:3px solid #fcd34d;margin-bottom:0;">
+            <span>&#x26A1; <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></span>
+            <span class="cs-header-hint"><?php esc_html_e( 'One-click hardening actions for common WordPress security settings', 'cloudscale-devtools' ); ?></span>
+            <?php self::render_explain_btn( 'quick-fixes', 'Quick Fixes', [
+                [ 'name' => 'How it works',       'rec' => 'Overview',    'html' => 'Each row shows a security hardening item and its current status (&#x2705; fixed / &#x26A0; needs attention). Click the action button to apply the fix in one click — no manual file editing or WP-CLI required. The panel refreshes automatically after each fix.' ],
+                [ 'name' => 'WP-Cron Health',     'rec' => 'Important',   'html' => 'Checks that WordPress scheduled cleanup events are scheduled and firing on time. If cron is disabled or events are overdue, click <strong>Reschedule &amp; Run Now</strong> to fix immediately.' ],
+                [ 'name' => 'Expired Transients', 'rec' => 'Maintenance', 'html' => 'Counts expired cache entries left in wp_options. WordPress auto-purges these daily via cron, but they can accumulate if cron has been unreliable. Click <strong>Delete Expired Transients</strong> to clear the backlog immediately.' ],
+                [ 'name' => 'DB Prefix',          'rec' => 'Critical',    'html' => 'Renames all <code>wp_</code> tables to a unique prefix and updates wp-config.php automatically. Always create a database backup before running this fix.' ],
+                [ 'name' => 'wp-config.php',      'rec' => 'Critical',    'html' => 'Sets <code>wp-config.php</code> permissions to <code>0400</code> (read-only). This prevents any PHP process — including a compromised plugin — from overwriting your database credentials or secret keys.' ],
+            ] ); ?>
+        </div>
+        <div id="cs-quick-fixes-panel" style="padding:12px 0 4px;">
+        <?php foreach ( self::get_quick_fixes() as $fix ) :
+            $is_fixed = (bool) $fix['fixed'];
+        ?>
+            <div class="cs-quick-fix-row" data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>" style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;margin-bottom:6px;background:<?php echo $is_fixed ? 'rgba(0,0,0,0.02)' : '#fff'; ?>;border-radius:6px;border:1px solid <?php echo $is_fixed ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.12)'; ?>;">
+                <div style="flex-shrink:0;font-size:16px;line-height:1.5;padding-top:1px;"><?php echo $is_fixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>'; ?></div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                        <div style="font-size:13px;font-weight:600;color:<?php echo $is_fixed ? '#6b7280' : '#1d2327'; ?>;"><?php echo esc_html( $fix['title'] ); ?></div>
+                        <?php if ( $is_fixed ) : ?>
+                        <span style="flex-shrink:0;font-size:12px;color:#16a34a;font-weight:600;white-space:nowrap;">Fixed &#x2713;</span>
+                        <?php endif; ?>
+                    </div>
+                    <div style="font-size:12px;color:#50575e;margin-top:2px;"><?php echo esc_html( $fix['detail'] ); ?></div>
+                    <?php if ( ! $is_fixed ) : ?>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                    <?php if ( ! empty( $fix['fix_modal'] ) ) : ?>
+                        <button type="button" class="cs-btn-primary cs-btn-sm"
+                                onclick="document.getElementById('<?php echo esc_attr( $fix['fix_modal'] ); ?>').style.display='flex';">
+                            <?php echo esc_html( $fix['fix_label'] ); ?>
+                        </button>
+                    <?php else : ?>
+                        <button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn"
+                                data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>">
+                            <?php echo esc_html( $fix['fix_label'] ); ?>
+                        </button>
+                        <?php if ( ! empty( $fix['dismiss_label'] ) && ! empty( $fix['dismiss_id'] ) ) : ?>
+                        <button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn"
+                                data-fix-id="<?php echo esc_attr( $fix['dismiss_id'] ); ?>"
+                                style="font-size:11px;">
+                            <?php echo esc_html( $fix['dismiss_label'] ); ?>
+                        </button>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
         </div>
 
         </div><!-- /cs-panel -->
@@ -12092,346 +12907,61 @@ class CloudScale_DevTools {
         <?php
     }
 
-    private static function render_security_panel(): void {
+    private static function render_quick_fix_modals(): void {
+        $sec_nonce = wp_json_encode( wp_create_nonce( 'csdt_devtools_security_nonce' ) );
+        $ajax_url  = wp_json_encode( admin_url( 'admin-ajax.php' ) );
         ?>
-        <div class="cs-panel" id="cs-panel-security">
-            <div class="cs-section-header cs-section-header-red">
-                <span>🛡️ <?php esc_html_e( 'AI Cyber Audit', 'cloudscale-devtools' ); ?></span>
-                <span class="cs-header-hint"><?php esc_html_e( 'Claude AI analyses your WordPress configuration and gives prioritised remediation advice', 'cloudscale-devtools' ); ?></span>
-                <?php self::render_explain_btn( 'cyber-audit', 'AI Cyber Audit', [
-                    [ 'name' => 'Quick Fixes',         'rec' => 'Critical',     'html' => 'Automated one-click remediations for common misconfigurations — moving <code>debug.log</code> outside the web root, disabling XML-RPC, hiding the WordPress version, and more. Each fix shows its current status so you can see what still needs attention at a glance.' ],
-                    [ 'name' => 'Standard Cyber Scan', 'rec' => 'Recommended',  'html' => 'A fast scan (a few seconds) that checks your WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php for common security misconfigurations. Results are sent to an AI model which prioritises findings and gives tailored remediation advice.' ],
-                    [ 'name' => 'Deep Dive Scan',      'rec' => 'Recommended',  'html' => 'A comprehensive scan that adds: static code analysis of plugin PHP files (looking for <code>eval</code>, shell functions, obfuscation, and suspicious patterns), external HTTP probes (open redirects, directory listing on <code>/wp-content/plugins/</code> and <code>/wp-content/themes/</code>, weak TLS protocols, CORS headers), DNS checks (SPF, DMARC, DKIM), PHP end-of-life status, and an AI-powered code triage step that classifies each static finding as confirmed, false positive, or needs-context.' ],
-                    [ 'name' => 'Code Triage',         'rec' => 'Info',         'html' => 'After a deep scan, the top 10 highest-risk static findings are sent to an AI model with ±10 lines of surrounding code. The model classifies each as <strong>Confirmed</strong> (genuine risk), <strong>False Positive</strong> (safe code), or <strong>Needs Context</strong> (depends on usage). Only confirmed findings are forwarded to the main audit AI, reducing noise.' ],
-                    [ 'name' => 'Scan History',        'rec' => 'Info',         'html' => 'The last 50 scan results are saved automatically. Click any entry in the history table to reload that report instantly — useful for comparing your security posture over time or reviewing a scan after making changes.' ],
-                    [ 'name' => 'Scheduled Scans',     'rec' => 'Optional',     'html' => 'Run a deep scan automatically on a daily or weekly schedule. Results are stored in scan history. Enable email alerts to receive the AI summary in your inbox whenever a scheduled scan completes.' ],
-                    [ 'name' => 'AI Providers',        'rec' => 'Info',         'html' => '<p>Two AI providers are supported. You supply your own API key — keys are stored only in your WordPress database (<code>wp_options</code>) and sent only to the provider\'s own API endpoint.</p><p><strong>Anthropic Claude</strong> — recommended for best results.<br>Get your key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a><br>Models: <code>claude-sonnet-4-6</code> (fast, cost-effective) · <code>claude-opus-4-7</code> (most capable)<br><a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener">View latest Claude models →</a></p><p><strong>Google Gemini</strong> — free tier available.<br>Get your key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a><br>Models: <code>gemini-2.0-flash</code> (fast, free tier) · <code>gemini-2.5-pro</code> (most capable)<br><a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener">View latest Gemini models →</a></p><p>Deep Dive scans run two AI calls — Code Triage pre-classification uses the faster model first to reduce cost before the main audit call.</p>' ],
-                ],
-                'The <strong>AI Cyber Audit</strong> uses frontier AI — Anthropic Claude or Google Gemini — to analyse your WordPress installation and produce a prioritised, scored security report in under 60 seconds. Think of it as a security consultant in your admin panel: it doesn\'t just list what\'s wrong, it tells you what to fix first and exactly how to fix it. A Standard scan takes seconds; a Deep Dive goes further with live HTTP probes, DNS checks, TLS quality analysis, and static code scanning of your plugins. You need an API key from one of the two providers — a free Gemini tier is available with no credit card required.' ); ?>
+        <!-- DB Prefix Migration Modal -->
+        <div id="csdt-db-prefix-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:8px;max-width:560px;width:92%;padding:24px 24px 20px;position:relative;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);">
+                <button id="csdt-dbp-close" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">&#x2715;</button>
+                <h3 style="margin:0 0 6px;font-size:16px;font-weight:700;">Fix Database Table Prefix</h3>
+                <p style="font-size:13px;color:#50575e;margin:0 0 18px;">Renames all <code style="background:#f0f0f1;padding:1px 5px;border-radius:3px;">wp_</code> tables to a unique prefix and updates <code style="background:#f0f0f1;padding:1px 5px;border-radius:3px;">wp-config.php</code> automatically.</p>
+                <!-- Step 1: Backup warning -->
+                <div id="csdt-dbp-step1">
+                    <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:14px 16px;margin-bottom:16px;">
+                        <p style="margin:0 0 6px;font-weight:600;font-size:13px;color:#92400e;">&#x26A0; Back up your database before continuing</p>
+                        <p style="margin:0 0 10px;font-size:13px;color:#78350f;">This operation renames tables directly in MySQL. If anything goes wrong mid-migration you will need a backup to recover.</p>
+                        <a href="https://andrewbaker.ninja/wordpress-plugin-help/backup-restore-help/" target="_blank" style="color:#b45309;font-weight:600;font-size:13px;text-decoration:underline;">&#x2192; CloudScale Backup &amp; Restore &#x2014; install &amp; create a backup first</a>
+                    </div>
+                    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#166534;">
+                        &#x21A9; <strong>Rollback is saved automatically</strong> &#x2014; after the rename a rollback snapshot is stored. You can undo from the <strong>Home tab</strong> at any time.
+                    </div>
+                    <label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;line-height:1.6;">
+                        <input type="checkbox" id="csdt-dbp-backup-ok" style="margin-top:3px;flex-shrink:0;">
+                        I have a recent database backup and understand this will rename my live database tables
+                    </label>
+                    <div style="margin-top:16px;">
+                        <button id="csdt-dbp-preflight-btn" class="cs-btn-primary" disabled style="opacity:.5;">Next: Pre-flight check &#x2192;</button>
+                    </div>
+                </div>
+                <!-- Step 2: Preflight results -->
+                <div id="csdt-dbp-step2" style="display:none;">
+                    <div id="csdt-dbp-preflight-out" style="background:#f6f7f7;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.6;margin-bottom:16px;"></div>
+                    <div style="display:flex;gap:8px;">
+                        <button id="csdt-dbp-back-btn" class="cs-btn-secondary">&#x2190; Back</button>
+                        <button id="csdt-dbp-migrate-btn" class="cs-btn-primary">&#x26A1; Rename Tables Now</button>
+                    </div>
+                </div>
+                <!-- Step 3: Result -->
+                <div id="csdt-dbp-step3" style="display:none;">
+                    <div id="csdt-dbp-result-out" style="font-size:13px;line-height:1.6;"></div>
+                </div>
             </div>
-            <div class="cs-panel-body">
+        </div>
 
-                <div class="cs-tab-intro">
-                    <p><?php echo wp_kses( __( '<strong>AI Cyber Audit</strong> connects to a frontier AI model — Anthropic Claude or Google Gemini — to analyse your WordPress installation and deliver a prioritised security report in under 60 seconds. It checks your core configuration, plugins, user accounts, file permissions, and key wp-config.php settings, then uses AI to score each finding as Critical / High / Medium / Low and give you specific steps to fix it. The <strong>Deep Dive</strong> extends this with live HTTP probes, DNS checks, TLS quality analysis, static PHP code scanning, and AI-powered triage of suspicious code patterns.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
-                    <p><?php echo wp_kses( __( 'To get started, select an AI provider below, paste in your API key, and click <strong>Run AI Cyber Audit</strong>. You can get a free Gemini key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a> with no credit card required.', 'cloudscale-devtools' ), [ 'strong' => [], 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></p>
-                </div>
-
-                <div class="cs-sec-settings">
-
-                    <div class="cs-sec-row">
-                        <span class="cs-sec-label"><?php esc_html_e( 'AI Provider:', 'cloudscale-devtools' ); ?></span>
-                        <div class="cs-sec-control">
-                            <select id="cs-sec-provider" class="cs-sec-select">
-                                <option value="anthropic"><?php esc_html_e( 'Anthropic Claude', 'cloudscale-devtools' ); ?></option>
-                                <option value="gemini"><?php esc_html_e( 'Google Gemini', 'cloudscale-devtools' ); ?></option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="cs-sec-row" id="cs-row-anthropic-key">
-                        <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
-                        <div class="cs-sec-control">
-                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                                <input type="password" id="cs-sec-api-key" class="cs-text-input cs-sec-key-input"
-                                       autocomplete="off" placeholder="sk-ant-api03-…">
-                                <button type="button" class="cs-btn-secondary" id="cs-sec-test-key">
-                                    <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
-                                </button>
-                                <span id="cs-sec-key-status" class="cs-sec-key-status"></span>
-                            </div>
-                            <span class="cs-hint"><?php echo wp_kses(
-                                __( 'Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Stored encrypted in wp_options.', 'cloudscale-devtools' ),
-                                [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
-                            ); ?></span>
-                        </div>
-                    </div>
-
-                    <div class="cs-sec-row" id="cs-row-gemini-key" style="display:none">
-                        <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
-                        <div class="cs-sec-control">
-                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                                <input type="password" id="cs-sec-gemini-key" class="cs-text-input cs-sec-key-input"
-                                       autocomplete="off" placeholder="AIza…">
-                                <button type="button" class="cs-btn-secondary" id="cs-sec-test-gemini-key">
-                                    <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
-                                </button>
-                                <span id="cs-sec-gemini-key-status" class="cs-sec-key-status"></span>
-                            </div>
-                            <span class="cs-hint"><?php echo wp_kses(
-                                __( 'Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored in wp_options.', 'cloudscale-devtools' ),
-                                [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
-                            ); ?></span>
-                        </div>
-                    </div>
-
-                    <div class="cs-sec-row">
-                        <span class="cs-sec-label"><?php esc_html_e( 'Audit model:', 'cloudscale-devtools' ); ?></span>
-                        <div class="cs-sec-control">
-                            <select id="cs-sec-model" class="cs-sec-select">
-                                <option value="_auto">✨ Auto</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="cs-sec-row">
-                        <span class="cs-sec-label"><?php esc_html_e( 'Deep dive model:', 'cloudscale-devtools' ); ?></span>
-                        <div class="cs-sec-control">
-                            <select id="cs-sec-deep-model" class="cs-sec-select">
-                                <option value="_auto_deep">✨ Auto</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="cs-sec-row cs-sec-row-prompt">
-                        <span class="cs-sec-label"><?php esc_html_e( 'System prompt:', 'cloudscale-devtools' ); ?></span>
-                        <div class="cs-sec-control">
-                            <textarea id="cs-sec-prompt" class="cs-sec-prompt-area" rows="10"></textarea>
-                            <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
-                                <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-copy-prompt">⎘ <?php esc_html_e( 'Copy', 'cloudscale-devtools' ); ?></button>
-                                <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-reset-prompt"><?php esc_html_e( 'Reset to default', 'cloudscale-devtools' ); ?></button>
-                                <div style="flex:1"></div>
-                                <button type="button" class="cs-btn-primary" id="cs-sec-save">💾 <?php esc_html_e( 'Save AI Settings', 'cloudscale-devtools' ); ?></button>
-                                <span class="cs-settings-saved" id="cs-sec-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <hr class="cs-sec-divider">
-
-                <!-- Scheduled scan settings -->
-                <?php
-                $sched_enabled  = get_option( 'csdt_scan_schedule_enabled', '0' ) === '1';
-                $sched_freq     = get_option( 'csdt_scan_schedule_freq',    'weekly' );
-                $sched_type     = get_option( 'csdt_scan_schedule_type',    'deep' );
-                $sched_email    = get_option( 'csdt_scan_schedule_email',   '1' ) === '1';
-                $sched_ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
-                $sched_ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
-                $next_run       = wp_next_scheduled( 'csdt_scheduled_scan' );
-                ?>
-                <div class="cs-sec-settings" style="margin-top:0;padding-top:0;">
-                    <div class="cs-sec-row">
-                        <span class="cs-sec-label"><?php esc_html_e( 'Scheduled Scan:', 'cloudscale-devtools' ); ?></span>
-                        <div class="cs-sec-control">
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" id="cs-sched-enabled" <?php checked( $sched_enabled ); ?>>
-                                <span><?php esc_html_e( 'Run automatically on a schedule', 'cloudscale-devtools' ); ?></span>
-                            </label>
-                            <?php if ( $next_run ) : ?>
-                            <span class="cs-hint"><?php printf( esc_html__( 'Next run: %s', 'cloudscale-devtools' ), esc_html( wp_date( 'D j M Y, g:ia', $next_run ) ) ); ?></span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div id="cs-sched-options" <?php echo $sched_enabled ? '' : 'style="display:none"'; ?>>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'Frequency:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <select id="cs-sched-freq" class="cs-sec-select" style="width:auto;">
-                                    <option value="weekly"  <?php selected( $sched_freq, 'weekly' ); ?>><?php esc_html_e( 'Weekly', 'cloudscale-devtools' ); ?></option>
-                                    <option value="monthly" <?php selected( $sched_freq, 'monthly' ); ?>><?php esc_html_e( 'Monthly', 'cloudscale-devtools' ); ?></option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'Scan type:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <select id="cs-sched-type" class="cs-sec-select" style="width:auto;">
-                                    <option value="standard" <?php selected( $sched_type, 'standard' ); ?>><?php esc_html_e( 'AI Cyber Audit (fast)', 'cloudscale-devtools' ); ?></option>
-                                    <option value="deep"     <?php selected( $sched_type, 'deep' ); ?>><?php esc_html_e( 'AI Deep Dive Cyber Audit (comprehensive)', 'cloudscale-devtools' ); ?></option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'Notify via email:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                    <input type="checkbox" id="cs-sched-email" <?php checked( $sched_email ); ?>>
-                                    <span><?php printf( esc_html__( 'Send results to %s', 'cloudscale-devtools' ), '<strong>' . esc_html( get_option( 'admin_email' ) ) . '</strong>' ); ?></span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'ntfy.sh topic:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <input type="text" id="cs-sched-ntfy-url" class="cs-text-input"
-                                       placeholder="https://ntfy.sh/your-topic"
-                                       value="<?php echo esc_attr( $sched_ntfy_url ); ?>"
-                                       style="max-width:320px;">
-                                <span class="cs-hint"><?php echo wp_kses( __( 'Optional push notification via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a>. Use a private topic or self-hosted server.', 'cloudscale-devtools' ), [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></span>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'ntfy auth token:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <input type="password" id="cs-sched-ntfy-token" class="cs-text-input"
-                                       autocomplete="off" placeholder="<?php echo $sched_ntfy_tok ? '••••••••' : esc_attr__( 'Optional — for protected topics', 'cloudscale-devtools' ); ?>"
-                                       style="max-width:320px;">
-                                <span class="cs-hint"><?php esc_html_e( 'Bearer token if your topic requires authentication.', 'cloudscale-devtools' ); ?></span>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"></span>
-                            <div class="cs-sec-control">
-                                <div style="display:flex;align-items:center;gap:8px;">
-                                    <button type="button" class="cs-btn-primary" id="cs-sched-save">💾 <?php esc_html_e( 'Save Schedule', 'cloudscale-devtools' ); ?></button>
-                                    <span class="cs-settings-saved" id="cs-sched-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="cs-sec-divider">
-
-                <?php
-                $rollback_info = get_option( 'csdt_db_prefix_rollback' );
-                if ( $rollback_info && ! empty( $rollback_info['old_prefix'] ) ) :
-                    $age_h = round( ( time() - ( $rollback_info['time'] ?? 0 ) ) / 3600, 1 );
-                ?>
-                <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                    <div style="flex:1;min-width:0;">
-                        <span style="font-weight:700;color:#dc2626;font-size:13px;">↩ DB Prefix Rollback Available</span>
-                        <span style="font-size:12px;color:#6b7280;margin-left:6px;"><?php echo esc_html( $age_h ); ?>h ago</span>
-                        <div style="font-size:12px;color:#374151;margin-top:2px;">
-                            Tables were renamed from <code><?php echo esc_html( $rollback_info['old_prefix'] ); ?></code> → <code><?php echo esc_html( $rollback_info['new_prefix'] ); ?></code>
-                            (<?php echo count( $rollback_info['tables'] ?? [] ); ?> tables). Rollback restores all tables and wp-config.php.
-                        </div>
-                    </div>
-                    <button type="button" id="csdt-prefix-rollback-persistent-btn" class="cs-btn-secondary cs-btn-sm" style="border-color:#ef4444;color:#dc2626;white-space:nowrap;">↩ Rollback Now</button>
-                    <span id="csdt-prefix-rollback-persistent-msg" style="display:none;font-size:12px;"></span>
-                </div>
-                <script>
-                (function(){
-                    var btn = document.getElementById('csdt-prefix-rollback-persistent-btn');
-                    if (!btn) { return; }
-                    btn.addEventListener('click', function () {
-                        if (!confirm('Roll back all renamed tables and restore wp-config.php?')) { return; }
-                        btn.disabled = true; btn.textContent = '⏳ Rolling back…';
-                        var msg = document.getElementById('csdt-prefix-rollback-persistent-msg');
-                        var fd = new FormData();
-                        fd.append('action', 'csdt_db_prefix_rollback');
-                        fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( 'csdt_devtools_security_nonce' ) ); ?>);
-                        fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method:'POST', body:fd, credentials:'same-origin' })
-                            .then(function(r){ return r.json(); })
-                            .then(function(r){
-                                btn.disabled = false;
-                                if (msg) {
-                                    msg.style.display = '';
-                                    msg.style.color = r.success ? '#16a34a' : '#dc2626';
-                                    msg.textContent = (r.data && r.data.message) || (r.success ? 'Rolled back.' : 'Failed.');
-                                }
-                                if (r.success) { btn.textContent = '✓ Done'; btn.disabled = true; btn.closest('div[style]').style.background='#f0fdf4'; }
-                                else { btn.textContent = '↩ Rollback Now'; }
-                            }).catch(function(){ btn.disabled=false; btn.textContent='↩ Rollback Now'; });
-                    });
-                })();
-                </script>
-                <?php endif; ?>
-
-                <!-- Quick Fixes -->
-                <div class="cs-section-header" style="background:linear-gradient(90deg,#78350f 0%,#b45309 100%);border-left:3px solid #fcd34d;margin-bottom:0;">
-                    <span>⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></span>
-                    <span class="cs-header-hint"><?php esc_html_e( 'One-click hardening actions for common WordPress security settings', 'cloudscale-devtools' ); ?></span>
-                    <?php self::render_explain_btn( 'quick-fixes', 'Quick Fixes', [
-                        [ 'name' => 'How it works',       'rec' => 'Overview',    'html' => 'Each row shows a security hardening item and its current status (✅ fixed / ❌ needs attention). Click the action button to apply the fix in one click — no manual file editing or WP-CLI required. The panel refreshes automatically after each fix.' ],
-                        [ 'name' => 'WP-Cron Health',     'rec' => 'Important',   'html' => 'Checks that WordPress scheduled cleanup events (expired transients, auto-drafts) are scheduled and firing on time. If cron is disabled or events are overdue, click <strong>Reschedule &amp; Run Now</strong> to fix immediately.' ],
-                        [ 'name' => 'Expired Transients', 'rec' => 'Maintenance', 'html' => 'Counts expired cache entries left in wp_options. WordPress auto-purges these daily via cron, but they can accumulate if cron has been unreliable. Click <strong>Delete Expired Transients</strong> to clear the backlog immediately.' ],
-                        [ 'name' => 'wp-config.php',      'rec' => 'Critical',    'html' => 'Sets <code>wp-config.php</code> permissions to <code>0400</code> (read-only). This prevents any PHP process — including a compromised plugin — from overwriting your database credentials or secret keys.' ],
-                    ] ); ?>
-                </div>
-                <div id="cs-quick-fixes-panel" style="padding:12px 0 4px;">
-                <?php foreach ( self::get_quick_fixes() as $fix ) :
-                    $is_fixed = (bool) $fix['fixed'];
-                ?>
-                    <div class="cs-quick-fix-row" data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>" style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;margin-bottom:6px;background:<?php echo $is_fixed ? 'rgba(0,0,0,0.02)' : '#fff'; ?>;border-radius:6px;border:1px solid <?php echo $is_fixed ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.12)'; ?>;">
-                        <div style="flex-shrink:0;font-size:16px;line-height:1.5;padding-top:1px;"><?php echo $is_fixed ? '<span style="color:#16a34a;">✓</span>' : '<span style="color:#d97706;">⚠</span>'; ?></div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                                <div style="font-size:13px;font-weight:600;color:<?php echo $is_fixed ? '#6b7280' : '#1d2327'; ?>;"><?php echo esc_html( $fix['title'] ); ?></div>
-                                <?php if ( $is_fixed ) : ?>
-                                <span style="flex-shrink:0;font-size:12px;color:#16a34a;font-weight:600;white-space:nowrap;">Fixed ✓</span>
-                                <?php endif; ?>
-                            </div>
-                            <div style="font-size:12px;color:#50575e;margin-top:2px;"><?php echo esc_html( $fix['detail'] ); ?></div>
-                            <?php if ( ! $is_fixed ) : ?>
-                            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-                            <?php if ( ! empty( $fix['fix_modal'] ) ) : ?>
-                                <button type="button" class="cs-btn-primary cs-btn-sm"
-                                        onclick="document.getElementById('<?php echo esc_attr( $fix['fix_modal'] ); ?>').style.display='flex';">
-                                    <?php echo esc_html( $fix['fix_label'] ); ?>
-                                </button>
-                            <?php else : ?>
-                                <button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn"
-                                        data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>">
-                                    <?php echo esc_html( $fix['fix_label'] ); ?>
-                                </button>
-                                <?php if ( ! empty( $fix['dismiss_label'] ) && ! empty( $fix['dismiss_id'] ) ) : ?>
-                                <button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn"
-                                        data-fix-id="<?php echo esc_attr( $fix['dismiss_id'] ); ?>"
-                                        style="font-size:11px;">
-                                    <?php echo esc_html( $fix['dismiss_label'] ); ?>
-                                </button>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-                </div>
-
-                <!-- DB Prefix Migration Modal -->
-                <div id="csdt-db-prefix-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
-                    <div style="background:#fff;border-radius:8px;max-width:560px;width:92%;padding:24px 24px 20px;position:relative;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);">
-                        <button id="csdt-dbp-close" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">✕</button>
-                        <h3 style="margin:0 0 6px;font-size:16px;font-weight:700;">Fix Database Table Prefix</h3>
-                        <p style="font-size:13px;color:#50575e;margin:0 0 18px;">Renames all <code style="background:#f0f0f1;padding:1px 5px;border-radius:3px;">wp_</code> tables to a unique prefix and updates <code style="background:#f0f0f1;padding:1px 5px;border-radius:3px;">wp-config.php</code> automatically.</p>
-
-                        <!-- Step 1: Backup warning -->
-                        <div id="csdt-dbp-step1">
-                            <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:14px 16px;margin-bottom:16px;">
-                                <p style="margin:0 0 6px;font-weight:600;font-size:13px;color:#92400e;">⚠ Back up your database before continuing</p>
-                                <p style="margin:0 0 10px;font-size:13px;color:#78350f;">This operation renames tables directly in MySQL. If anything goes wrong mid-migration you will need a backup to recover.</p>
-                                <a href="https://andrewbaker.ninja/wordpress-plugin-help/backup-restore-help/" target="_blank" style="color:#b45309;font-weight:600;font-size:13px;text-decoration:underline;">→ CloudScale Backup &amp; Restore — install &amp; create a backup first</a>
-                            </div>
-                            <label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;line-height:1.6;">
-                                <input type="checkbox" id="csdt-dbp-backup-ok" style="margin-top:3px;flex-shrink:0;">
-                                I have a recent database backup and understand this action cannot be automatically reversed
-                            </label>
-                            <div style="margin-top:16px;">
-                                <button id="csdt-dbp-preflight-btn" class="cs-btn-primary" disabled style="opacity:.5;">Next: Pre-flight check →</button>
-                            </div>
-                        </div>
-
-                        <!-- Step 2: Preflight results -->
-                        <div id="csdt-dbp-step2" style="display:none;">
-                            <div id="csdt-dbp-preflight-out" style="background:#f6f7f7;border-radius:6px;padding:14px 16px;font-size:13px;line-height:1.6;margin-bottom:16px;"></div>
-                            <div style="display:flex;gap:8px;">
-                                <button id="csdt-dbp-back-btn" class="cs-btn-secondary">← Back</button>
-                                <button id="csdt-dbp-migrate-btn" class="cs-btn-primary">⚡ Rename Tables Now</button>
-                            </div>
-                        </div>
-
-                        <!-- Step 3: Result -->
-                        <div id="csdt-dbp-step3" style="display:none;">
-                            <div id="csdt-dbp-result-out" style="font-size:13px;line-height:1.6;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- fail2ban config modal -->
-                <div id="csdt-fail2ban-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
-                    <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:600px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
-                        <button id="csdt-f2b-close" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">✕</button>
-                        <h3 style="margin:0 0 6px;font-size:16px;">SSH Brute-Force Protection — fail2ban</h3>
-                        <p style="margin:0 0 16px;font-size:13px;color:#50575e;">fail2ban monitors SSH login failures and automatically blocks offending IPs at the firewall level. Install it on your server, then use the config below.</p>
-                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">1. Install &amp; enable</p>
-                        <pre style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 16px;white-space:pre;">sudo apt install fail2ban -y
+        <!-- fail2ban config modal -->
+        <div id="csdt-fail2ban-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:600px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+                <button id="csdt-f2b-close" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">&#x2715;</button>
+                <h3 style="margin:0 0 6px;font-size:16px;">SSH Brute-Force Protection &#x2014; fail2ban</h3>
+                <p style="margin:0 0 16px;font-size:13px;color:#50575e;">fail2ban monitors SSH login failures and automatically blocks offending IPs at the firewall level. Install it on your server, then use the config below.</p>
+                <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">1. Install &amp; enable</p>
+                <pre style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 16px;white-space:pre;">sudo apt install fail2ban -y
 sudo systemctl enable fail2ban
 sudo systemctl start fail2ban</pre>
-                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">2. Create jail config — <code style="font-size:11px;">/etc/fail2ban/jail.local</code></p>
-                        <pre id="csdt-f2b-config" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 12px;white-space:pre;">[DEFAULT]
+                <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">2. Create jail config &#x2014; <code style="font-size:11px;">/etc/fail2ban/jail.local</code></p>
+                <pre id="csdt-f2b-config" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 12px;white-space:pre;">[DEFAULT]
 bantime  = 3600
 findtime = 600
 maxretry = 5
@@ -12443,50 +12973,56 @@ logpath  = %(sshd_log)s
 backend  = %(sshd_backend)s
 maxretry = 3
 bantime  = 86400</pre>
-                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                            <button id="csdt-f2b-copy" class="cs-btn-primary cs-btn-sm" onclick="
-                                navigator.clipboard.writeText(document.getElementById('csdt-f2b-config').textContent).then(function(){
-                                    var b=document.getElementById('csdt-f2b-copy');
-                                    b.textContent='Copied!';
-                                    setTimeout(function(){b.textContent='Copy Config';},2000);
-                                });
-                            ">Copy Config</button>
-                            <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';">Close</button>
-                        </div>
-                        <p style="margin:16px 0 0;font-size:12px;color:#64748b;">After saving <code>/etc/fail2ban/jail.local</code> run: <code>sudo systemctl restart fail2ban</code> — verify with: <code>sudo fail2ban-client status sshd</code></p>
-                    </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button id="csdt-f2b-copy" class="cs-btn-primary cs-btn-sm" onclick="
+                        navigator.clipboard.writeText(document.getElementById('csdt-f2b-config').textContent).then(function(){
+                            var b=document.getElementById('csdt-f2b-copy');
+                            b.textContent='Copied!';
+                            setTimeout(function(){b.textContent='Copy Config';},2000);
+                        });
+                    ">Copy Config</button>
+                    <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-modal').style.display='none';">Close</button>
                 </div>
+                <p style="margin:16px 0 0;font-size:12px;color:#64748b;">After saving <code>/etc/fail2ban/jail.local</code> run: <code>sudo systemctl restart fail2ban</code> &#x2014; verify with: <code>sudo fail2ban-client status sshd</code></p>
+            </div>
+        </div>
 
-                <!-- fail2ban Docker detection modal -->
-                <div id="csdt-fail2ban-docker-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
-                    <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:620px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
-                        <button onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">✕</button>
-                        <h3 style="margin:0 0 6px;font-size:16px;">Enable fail2ban Detection</h3>
-                        <p style="margin:0 0 16px;font-size:13px;color:#50575e;">WordPress is running inside a Docker container that cannot see host services. To prove whether fail2ban is installed and running, expose its log file into the container — a read-only mount, one line in your docker-compose.yml.</p>
+        <!-- fail2ban Docker detection modal -->
+        <div id="csdt-fail2ban-docker-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:620px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+                <button onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#50575e;line-height:1;" title="Close">&#x2715;</button>
+                <h3 style="margin:0 0 6px;font-size:16px;">Enable fail2ban Detection</h3>
+                <p style="margin:0 0 16px;font-size:13px;color:#50575e;">WordPress is running inside a Docker container that cannot see host services. To prove whether fail2ban is installed and running, expose its log file into the container &#x2014; a read-only mount, one line in your docker-compose.yml.</p>
+                <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 1 &#x2014; Add this to your docker-compose.yml (under WordPress <code>volumes:</code>)</p>
+                <pre id="csdt-f2b-docker-vol" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro</pre>
+                <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
+                    navigator.clipboard.writeText('      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy line';},2000); }.bind(this));
+                ">Copy line</button>
+                <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 2 &#x2014; Restart the WordPress container</p>
+                <pre id="csdt-f2b-docker-restart" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">docker compose up -d wordpress</pre>
+                <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
+                    navigator.clipboard.writeText('docker compose up -d wordpress').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy command';},2000); }.bind(this));
+                ">Copy command</button>
+                <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 3 &#x2014; Refresh this page</p>
+                <p style="margin:0 0 16px;font-size:13px;color:#50575e;">The plugin will now read <code>/var/log/fail2ban.log</code> directly and report whether fail2ban is installed and running.</p>
+                <div style="background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#713f12;">
+                    <strong>fail2ban not installed?</strong> Click Close and use the "Copy fail2ban config" button to install it on your host first.
+                </div>
+                <div style="display:flex;justify-content:flex-end;">
+                    <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';">Close</button>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
 
-                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 1 — Add this to your docker-compose.yml (under WordPress <code>volumes:</code>)</p>
-                        <pre id="csdt-f2b-docker-vol" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro</pre>
-                        <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
-                            navigator.clipboard.writeText('      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy line';},2000); }.bind(this));
-                        ">Copy line</button>
+        private static function render_security_panel(): void {
+        ?>
+        <div class="cs-panel" id="cs-panel-security">
+            <div class="cs-panel-body">
 
-                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 2 — Restart the WordPress container</p>
-                        <pre id="csdt-f2b-docker-restart" style="background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0 0 8px;white-space:pre;">docker compose up -d wordpress</pre>
-                        <button class="cs-btn-secondary cs-btn-sm" style="margin-bottom:16px;" onclick="
-                            navigator.clipboard.writeText('docker compose up -d wordpress').then(function(){ this.textContent='Copied!'; var b=this; setTimeout(function(){b.textContent='Copy command';},2000); }.bind(this));
-                        ">Copy command</button>
-
-                        <p style="margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Step 3 — Refresh this page</p>
-                        <p style="margin:0 0 16px;font-size:13px;color:#50575e;">The plugin will now read <code>/var/log/fail2ban.log</code> directly and report whether fail2ban is installed and running.</p>
-
-                        <div style="background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#713f12;">
-                            <strong>fail2ban not installed?</strong> Click Close and use the "Copy fail2ban config" button to install it on your host first.
-                        </div>
-
-                        <div style="display:flex;justify-content:flex-end;">
-                            <button class="cs-btn-secondary cs-btn-sm" onclick="document.getElementById('csdt-fail2ban-docker-modal').style.display='none';">Close</button>
-                        </div>
-                    </div>
+                <div class="cs-tab-intro">
+                    <p><?php echo wp_kses( __( 'The <strong>AI Cyber Audit</strong> uses frontier AI &#8212; Anthropic Claude or Google Gemini &#8212; to analyse your WordPress installation and produce a prioritised, scored security report in under 60 seconds. Think of it as a security consultant in your admin panel: it doesn&#8217;t just list what&#8217;s wrong, it tells you what to fix first and exactly how to fix it. A Standard scan takes seconds; a Deep Dive goes further with live HTTP probes, DNS checks, TLS quality analysis, and static code scanning of your plugins. You need an API key from one of the two providers &#8212; a free Gemini tier is available with no credit card required. Configure your provider and key on the <a href="' . esc_url( admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=home' ) ) . '">Home tab</a>, then use the <strong>Quick Fixes</strong> below to resolve common misconfigurations before running a scan.', 'cloudscale-devtools' ), [ 'strong' => [], 'a' => [ 'href' => [] ] ] ); ?></p>
                 </div>
 
                 <!-- ── Threat Monitor ──────────────────────────── -->
@@ -12585,7 +13121,7 @@ bantime  = 86400</pre>
                         </div>
 
                         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                            <button type="button" class="cs-btn-primary" id="csdt-tm-save">💾 <?php esc_html_e( 'Save Threat Monitor Settings', 'cloudscale-devtools' ); ?></button>
+                            <button type="button" class="cs-btn-primary" id="csdt-tm-save">💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
                             <span class="cs-settings-saved" id="csdt-tm-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                             <?php if ( $tm_baseline ) : ?>
                             <button type="button" class="cs-btn-secondary" id="csdt-tm-reset" style="font-size:12px;margin-left:auto;">↺ <?php esc_html_e( 'Reset File Baseline', 'cloudscale-devtools' ); ?></button>
@@ -13247,7 +13783,7 @@ bantime  = 86400</pre>
         // Flush object cache — stale Redis/Memcached entries keyed to old prefix cause 404s
         wp_cache_flush();
 
-        // Store rollback info so the user can undo within 24 hours
+        // Store rollback info so the user can undo at any time
         update_option( 'csdt_db_prefix_rollback', [
             'old_prefix'   => $current_prefix,
             'new_prefix'   => $new_prefix,
@@ -14007,136 +14543,6 @@ bantime  = 86400</pre>
         }
     }
 
-    // ── Background execution helper ──────────────────────────────────
-
-    private static function send_json_and_continue( array $data ): void {
-        if ( function_exists( 'set_time_limit' ) ) {
-            set_time_limit( 0 );
-        }
-        // Discard any output buffers so headers can be sent cleanly
-        while ( ob_get_level() ) {
-            ob_end_clean();
-        }
-        header( 'Content-Type: application/json; charset=utf-8' );
-        header( 'Connection: close' );
-        $body = wp_json_encode( [ 'success' => true, 'data' => $data ] );
-        header( 'Content-Length: ' . strlen( $body ) );
-        echo $body;
-        flush();
-        // On PHP-FPM: close the HTTP connection but keep the process running
-        if ( function_exists( 'fastcgi_finish_request' ) ) {
-            fastcgi_finish_request();
-        }
-    }
-
-    // ── Parallel AI calls via curl_multi ─────────────────────────────
-
-    private static function build_ai_curl_handle( string $provider, string $system, string $user_message, string $model, int $max_tokens ): \CurlHandle {
-        if ( $provider === 'gemini' ) {
-            $key = get_option( 'csdt_devtools_gemini_key', '' );
-            if ( ! $key ) { throw new \RuntimeException( 'No Gemini API key configured.' ); }
-            if ( $model === '_auto' || $model === '_auto_deep' ) { $model = 'gemini-2.0-flash'; }
-            $url     = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $key );
-            $body    = wp_json_encode( [
-                'systemInstruction' => [ 'parts' => [ [ 'text' => $system ] ] ],
-                'contents'          => [ [ 'role' => 'user', 'parts' => [ [ 'text' => $user_message ] ] ] ],
-                'generationConfig'  => [ 'maxOutputTokens' => $max_tokens ],
-            ] );
-            $headers = [ 'Content-Type: application/json' ];
-        } else {
-            $key = get_option( 'csdt_devtools_anthropic_key', '' );
-            if ( ! $key ) { throw new \RuntimeException( 'No Anthropic API key configured.' ); }
-            if ( $model === '_auto' )      { $model = 'claude-sonnet-4-6'; }
-            if ( $model === '_auto_deep' ) { $model = 'claude-opus-4-7'; }
-            $url     = 'https://api.anthropic.com/v1/messages';
-            $body    = wp_json_encode( [
-                'model'      => $model,
-                'max_tokens' => $max_tokens,
-                'system'     => $system,
-                'messages'   => [ [ 'role' => 'user', 'content' => $user_message ] ],
-            ] );
-            $headers = [
-                'x-api-key: ' . $key,
-                'anthropic-version: 2023-06-01',
-                'content-type: application/json',
-            ];
-        }
-        $ch = curl_init();
-        curl_setopt_array( $ch, [
-            CURLOPT_URL            => $url,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $body,
-            CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 180,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ] );
-        return $ch;
-    }
-
-    private static function parse_ai_curl_text( string $provider, string $body ): string {
-        $data = json_decode( $body, true );
-        if ( ! $data ) { throw new \RuntimeException( 'Empty or invalid API response.' ); }
-        if ( $provider === 'gemini' ) {
-            if ( isset( $data['error'] ) ) { throw new \RuntimeException( $data['error']['message'] ?? 'Gemini API error.' ); }
-            return trim( $data['candidates'][0]['content']['parts'][0]['text'] ?? '' );
-        }
-        if ( isset( $data['error'] ) ) { throw new \RuntimeException( $data['error']['message'] ?? 'Anthropic API error.' ); }
-        return trim( $data['content'][0]['text'] ?? '' );
-    }
-
-    private static function dispatch_parallel_ai_calls( array $calls ): array {
-        $provider = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
-        $mh       = curl_multi_init();
-        $handles  = [];
-        foreach ( $calls as $i => $call ) {
-            $ch          = self::build_ai_curl_handle( $provider, $call['system'], $call['user'], $call['model'], $call['max_tokens'] );
-            $handles[$i] = $ch;
-            curl_multi_add_handle( $mh, $ch );
-        }
-        $running = null;
-        do {
-            curl_multi_exec( $mh, $running );
-            if ( $running ) { curl_multi_select( $mh, 1.0 ); }
-        } while ( $running > 0 );
-
-        $texts = [];
-        foreach ( $handles as $i => $ch ) {
-            $texts[$i] = self::parse_ai_curl_text( $provider, (string) curl_multi_getcontent( $ch ) );
-            curl_multi_remove_handle( $mh, $ch );
-            curl_close( $ch );
-        }
-        curl_multi_close( $mh );
-        return $texts;
-    }
-
-    private static function parse_ai_json( string $text ): array {
-        $text   = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
-        $text   = preg_replace( '/\s*```$/', '', $text );
-        $report = json_decode( $text, true );
-        if ( ! $report || ! isset( $report['score'] ) ) {
-            throw new \RuntimeException( 'AI returned unexpected format.' );
-        }
-        return $report;
-    }
-
-    private static function merge_reports( array $a, array $b ): array {
-        $score = (int) round( $a['score'] * 0.45 + $b['score'] * 0.55 );
-        $label = $score >= 90 ? 'Excellent' : ( $score >= 75 ? 'Good' : ( $score >= 55 ? 'Fair' : ( $score >= 35 ? 'Poor' : 'Critical' ) ) );
-        $sum_a = rtrim( $a['summary'] ?? '', '. ' );
-        $sum_b = ltrim( $b['summary'] ?? '' );
-        return [
-            'score'       => $score,
-            'score_label' => $label,
-            'summary'     => $sum_a . '. ' . $sum_b,
-            'critical'    => array_merge( $a['critical'] ?? [], $b['critical'] ?? [] ),
-            'high'        => array_merge( $a['high']     ?? [], $b['high']     ?? [] ),
-            'medium'      => array_merge( $a['medium']   ?? [], $b['medium']   ?? [] ),
-            'low'         => array_merge( $a['low']      ?? [], $b['low']      ?? [] ),
-            'good'        => array_merge( $a['good']     ?? [], $b['good']     ?? [] ),
-        ];
-    }
-
     private static function default_internal_scan_prompt(): string {
         return <<<'PROMPT'
 You are a WordPress security expert. Analyse the provided internal WordPress configuration data only.
@@ -14354,7 +14760,7 @@ PROMPT;
             $system   = 'You are a WordPress plugin update risk assessor. Given a plugin name, version numbers, and changelog, classify the update as exactly one of: "patch" (security fix or bug fix — apply immediately), "minor" (new features, low breaking risk), or "breaking" (major version, deprecated APIs, DB migrations, or significant structural changes — review before applying). Respond with ONLY valid JSON, no other text: {"risk":"patch","reason":"One sentence."}';
             $user_msg = "Plugin: {$plugin_name}\nCurrent version: {$current_version}\nNew version: {$new_version}\n\nChangelog:\n{$changelog}";
             try {
-                $raw  = self::dispatch_ai_call( $system, $user_msg, '_auto', 150 );
+                $raw  = CSDT_AI_Dispatcher::call( $system, $user_msg, '_auto', 150 );
                 $raw  = preg_replace( '/^```(?:json)?\s*/i', '', trim( $raw ) );
                 $raw  = preg_replace( '/\s*```$/', '', $raw );
                 $data = json_decode( $raw, true );
@@ -14638,7 +15044,7 @@ PROMPT;
         $system   = 'You are a WordPress debugging expert. The user provides an error message, log excerpt, or problem description. Identify the root cause and give specific actionable steps to fix it. Be direct and practical. Structure your response with exactly three sections: **Root Cause** (1-2 sentences), **Why It Happens** (2-3 sentences explaining the underlying mechanism), **How to Fix It** (numbered steps). Use backtick formatting for file paths, function names, and code snippets. Do not pad with generic advice.';
         $user_msg = "Site context: {$site_ctx}\n\nError / Problem:\n{$input}";
 
-        $result = self::dispatch_ai_call( $system, $user_msg, '_auto', 1024 );
+        $result = CSDT_AI_Dispatcher::call( $system, $user_msg, '_auto', 1024 );
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( [ 'message' => $result->get_error_message() ] );
@@ -14665,7 +15071,7 @@ PROMPT;
             $user_msg = "Audit this WordPress site and return findings as a JSON array:\n\n" . wp_json_encode( $data, JSON_PRETTY_PRINT );
 
             try {
-                $raw      = self::dispatch_ai_call( $system, $user_msg, '_auto', 2048 );
+                $raw      = CSDT_AI_Dispatcher::call( $system, $user_msg, '_auto', 2048 );
                 // Strip markdown code fences if present
                 $raw      = preg_replace( '/^```(?:json)?\s*/i', '', trim( $raw ) );
                 $raw      = preg_replace( '/\s*```$/', '', $raw );
@@ -14879,7 +15285,7 @@ PROMPT;
         // ── Login & brute-force settings ──
         $bf_enabled       = get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1';
         $bf_attempts      = (int) get_option( 'csdt_devtools_brute_force_attempts', '5' );
-        $bf_lockout       = (int) get_option( 'csdt_devtools_brute_force_lockout', '5' );
+        $bf_lockout       = (int) get_option( 'csdt_devtools_brute_force_lockout', '10' );
         $login_hide_on    = get_option( 'csdt_devtools_login_hide_enabled', '0' ) === '1';
         $twofa_admins     = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1';
         $twofa_method     = get_option( 'csdt_devtools_2fa_method', '' );
@@ -14893,6 +15299,13 @@ PROMPT;
                 $passkeys_count += count( $pks );
             }
         }
+
+        // ── Active BF attack detection (today's count from bf_log) ──
+        $bf_log_raw       = get_option( 'csdt_devtools_bf_log', [] );
+        $today_start      = mktime( 0, 0, 0 );
+        $bf_today_count   = is_array( $bf_log_raw )
+            ? count( array_filter( $bf_log_raw, fn( $e ) => isset( $e[0] ) && $e[0] >= $today_start ) )
+            : 0;
 
         // ── SSH monitor ──
         $ssh_monitor_on        = get_option( 'csdt_ssh_monitor_enabled', '1' ) === '1';
@@ -14994,6 +15407,7 @@ PROMPT;
             'bf_enabled'          => $bf_enabled,
             'bf_attempts'         => $bf_attempts,
             'bf_lockout_mins'     => $bf_lockout,
+            'bf_today_count'      => $bf_today_count,
             'login_hide_on'       => $login_hide_on,
             'twofa_admins'        => $twofa_admins,
             'twofa_method'        => $twofa_method,
@@ -15405,6 +15819,39 @@ PROMPT;
             ];
         }
 
+        // ── Username enumeration protection ──
+        if ( get_option( 'csdt_devtools_enum_protect', '1' ) === '1' ) {
+            $findings[] = [
+                'category' => 'Security',
+                'severity' => 'info',
+                'title'    => 'Username enumeration protection active',
+                'detail'   => 'Login errors are genericised to "Invalid username or password." — attackers cannot distinguish a missing username from a wrong password, preventing account enumeration.',
+                'fix'      => 'No action needed.',
+                'affected' => 'Login page',
+            ];
+        } else {
+            $findings[] = [
+                'category' => 'Security',
+                'severity' => 'warning',
+                'title'    => 'Username enumeration protection is disabled',
+                'detail'   => 'WordPress reveals whether a username exists ("The username X is not registered on this site.") — attackers can automate this to enumerate all valid usernames in minutes.',
+                'fix'      => 'Enable "Prevent account enumeration" in Security → Brute-Force Settings.',
+                'affected' => 'Login page',
+            ];
+        }
+
+        // ── Active brute-force attack detected today ──
+        if ( ! empty( $d['bf_today_count'] ) && $d['bf_today_count'] >= 30 ) {
+            $findings[] = [
+                'category' => 'Security',
+                'severity' => 'critical',
+                'title'    => "Active brute-force attack in progress — {$d['bf_today_count']} failed login attempts today",
+                'detail'   => "More than 30 failed WordPress login attempts have been recorded today. This indicates an automated credential-stuffing or brute-force campaign is actively targeting this site. Distributed attacks use rotating IPs to evade per-IP blocks.",
+                'fix'      => 'Enable 2FA immediately for all administrator accounts — it makes credential guessing irrelevant even if an attacker has your password. Consider adding a Web Application Firewall (WAF) such as Cloudflare to block attacking IPs at the edge.',
+                'affected' => "{$d['bf_today_count']} attempts today",
+            ];
+        }
+
         // ── Login brute-force protection ──
         if ( ! empty( $d['bf_enabled'] ) ) {
             $short_lockout = $d['bf_lockout_mins'] < 15;
@@ -15537,67 +15984,6 @@ PROMPT;
         return $findings;
     }
 
-    // ── AI dispatcher — Anthropic or Gemini ──────────────────────────
-
-    private static function dispatch_ai_call( string $system, string $user_message, string $model, int $max_tokens ): string {
-        $provider = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
-
-        if ( $provider === 'gemini' ) {
-            $key = get_option( 'csdt_devtools_gemini_key', '' );
-            if ( ! $key ) { throw new \RuntimeException( 'No Gemini API key configured.' ); }
-            if ( $model === '_auto' || $model === '_auto_deep' ) { $model = 'gemini-2.0-flash'; }
-
-            $url  = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $key );
-            $resp = wp_remote_post( $url, [
-                'timeout' => 180,
-                'headers' => [ 'Content-Type' => 'application/json' ],
-                'body'    => wp_json_encode( [
-                    'systemInstruction' => [ 'parts' => [ [ 'text' => $system ] ] ],
-                    'contents'          => [ [ 'role' => 'user', 'parts' => [ [ 'text' => $user_message ] ] ] ],
-                    'generationConfig'  => [ 'maxOutputTokens' => $max_tokens ],
-                ] ),
-            ] );
-            if ( is_wp_error( $resp ) ) { throw new \RuntimeException( $resp->get_error_message() ); }
-            $code = wp_remote_retrieve_response_code( $resp );
-            $body = json_decode( wp_remote_retrieve_body( $resp ), true );
-            if ( $code !== 200 ) {
-                $err = $body['error']['message'] ?? "HTTP {$code}";
-                throw new \RuntimeException( $err );
-            }
-            return trim( $body['candidates'][0]['content']['parts'][0]['text'] ?? '' );
-
-        } else {
-            $key = get_option( 'csdt_devtools_anthropic_key', '' );
-            if ( ! $key ) { throw new \RuntimeException( 'No Anthropic API key configured.' ); }
-            if ( $model === '_auto' )      { $model = 'claude-sonnet-4-6'; }
-            if ( $model === '_auto_deep' ) { $model = 'claude-opus-4-7'; }
-
-            $resp = wp_remote_post( 'https://api.anthropic.com/v1/messages', [
-                'timeout' => 180,
-                'headers' => [
-                    'x-api-key'         => $key,
-                    'anthropic-version' => '2023-06-01',
-                    'content-type'      => 'application/json',
-                ],
-                'body' => wp_json_encode( [
-                    'model'      => $model,
-                    'max_tokens' => $max_tokens,
-                    'system'     => $system,
-                    'messages'   => [ [ 'role' => 'user', 'content' => $user_message ] ],
-                ] ),
-            ] );
-            if ( is_wp_error( $resp ) ) { throw new \RuntimeException( $resp->get_error_message() ); }
-            $code = wp_remote_retrieve_response_code( $resp );
-            $raw  = wp_remote_retrieve_body( $resp );
-            $api  = json_decode( $raw, true );
-            if ( $code !== 200 ) {
-                $err = $api['error']['message'] ?? "HTTP {$code}";
-                throw new \RuntimeException( $err );
-            }
-            return trim( $api['content'][0]['text'] ?? '' );
-        }
-    }
-
     public static function ajax_vuln_scan(): void {
         check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
@@ -15631,7 +16017,7 @@ PROMPT;
         set_transient( 'csdt_vuln_scan_status', [ 'status' => 'running', 'started_at' => time() ], 600 );
 
         // Send response immediately, then run scan after connection closes
-        self::send_json_and_continue( [ 'queued' => true ] );
+        CSDT_AI_Dispatcher::send_and_continue( [ 'queued' => true ] );
         self::cron_vuln_scan();
         exit;
     }
@@ -15650,7 +16036,7 @@ PROMPT;
             $user_message  = 'WordPress site security data (JSON):' . "\n\n" . wp_json_encode( self::gather_security_data(), JSON_PRETTY_PRINT );
 
             error_log( '[CSDT-SCAN] cron running, model=' . $model );
-            $text = self::dispatch_ai_call( $system_prompt, $user_message, $model, 4096 );
+            $text = CSDT_AI_Dispatcher::call( $system_prompt, $user_message, $model, 4096 );
         } catch ( \Throwable $e ) {
             set_transient( 'csdt_vuln_scan_status', [ 'status' => 'error', 'message' => $e->getMessage() ], 300 );
             return;
@@ -16140,14 +16526,23 @@ PROMPT;
         $ext['csp_duplicate_count']       = 0;
         if ( ! is_wp_error( $headers_r ) ) {
             $h = wp_remote_retrieve_headers( $headers_r );
+            // Build raw multi-value map to reliably detect duplicate headers.
+            $raw_multi_ext = [];
+            foreach ( $h->getAll() as $raw_line ) {
+                if ( strpos( $raw_line, ':' ) !== false ) {
+                    [ $rk, $rv ] = explode( ':', $raw_line, 2 );
+                    $raw_multi_ext[ strtolower( trim( $rk ) ) ][] = trim( $rv );
+                }
+            }
             foreach ( [ 'x-frame-options', 'x-content-type-options', 'strict-transport-security',
                         'content-security-policy', 'referrer-policy', 'permissions-policy',
                         'access-control-allow-origin', 'x-powered-by', 'server' ] as $hname ) {
-                $val = $h[ $hname ] ?? null;
-                if ( 'content-security-policy' === $hname && is_array( $val ) ) {
-                    $ext['csp_duplicate_count'] = count( $val );
+                $all_vals = $raw_multi_ext[ $hname ] ?? null;
+                if ( 'content-security-policy' === $hname && ! empty( $all_vals ) ) {
+                    $ext['csp_duplicate_count'] = count( $all_vals );
                 }
-                $ext['security_headers_external'][ $hname ] = is_array( $val ) ? implode( ', ', $val ) : $val;
+                $val = $h[ $hname ] ?? null;
+                $ext['security_headers_external'][ $hname ] = is_array( $val ) ? implode( ' | ', $val ) : $val;
             }
         }
 
@@ -16406,7 +16801,7 @@ PROMPT;
         $triage_model = $provider === 'gemini' ? 'gemini-2.0-flash' : 'claude-haiku-4-5-20251001';
 
         try {
-            $raw = self::dispatch_ai_call( $system, $user, $triage_model, 2048 );
+            $raw = CSDT_AI_Dispatcher::call( $system, $user, $triage_model, 2048 );
         } catch ( \Throwable $e ) {
             return [ 'skipped' => true, 'reason' => 'api_error', 'error' => $e->getMessage(), 'results' => [] ];
         }
@@ -16998,7 +17393,7 @@ PROMPT;
         set_transient( 'csdt_deep_scan_status', [ 'status' => 'running', 'started_at' => time() ], 900 );
 
         // Send response immediately, then run scan after connection closes
-        self::send_json_and_continue( [ 'queued' => true ] );
+        CSDT_AI_Dispatcher::send_and_continue( [ 'queued' => true ] );
         self::cron_deep_scan();
         exit;
     }
@@ -17032,16 +17427,16 @@ PROMPT;
 
             if ( function_exists( 'curl_multi_init' ) ) {
                 error_log( '[CSDT-DEEP] firing two parallel AI calls, model=' . $model );
-                $texts    = self::dispatch_parallel_ai_calls( [
+                $texts    = CSDT_AI_Dispatcher::call_parallel( [
                     [ 'system' => self::default_internal_scan_prompt(), 'user' => $msg_internal, 'model' => $model, 'max_tokens' => 4096 ],
                     [ 'system' => self::default_external_scan_prompt(), 'user' => $msg_external, 'model' => $model, 'max_tokens' => 4096 ],
                 ] );
-                $report = self::merge_reports( self::parse_ai_json( $texts[0] ), self::parse_ai_json( $texts[1] ) );
+                $report = CSDT_AI_Dispatcher::merge_reports( CSDT_AI_Dispatcher::parse_json_report( $texts[0] ), CSDT_AI_Dispatcher::parse_json_report( $texts[1] ) );
             } else {
                 // Fallback: single sequential call
                 error_log( '[CSDT-DEEP] curl_multi unavailable, falling back to sequential, model=' . $model );
-                $text   = self::dispatch_ai_call( self::default_deep_scan_prompt(), 'WordPress site full security data (JSON):' . "\n\n" . wp_json_encode( [ 'internal' => $base_data, 'external_checks' => $external, 'plugin_code_scan' => $code_scan, 'code_triage' => $code_triage ], JSON_PRETTY_PRINT ), $model, 8192 );
-                $report = self::parse_ai_json( $text );
+                $text   = CSDT_AI_Dispatcher::call( self::default_deep_scan_prompt(), 'WordPress site full security data (JSON):' . "\n\n" . wp_json_encode( [ 'internal' => $base_data, 'external_checks' => $external, 'plugin_code_scan' => $code_scan, 'code_triage' => $code_triage ], JSON_PRETTY_PRINT ), $model, 8192 );
+                $report = CSDT_AI_Dispatcher::parse_json_report( $text );
             }
 
         } catch ( \Throwable $e ) {
@@ -17484,12 +17879,36 @@ PROMPT;
         }
         update_option( 'csdt_threat_alerted_admins', $alerted, false );
 
-        $site      = get_bloginfo( 'name' ) ?: home_url();
+        // Detect creation method
+        if ( defined( 'WP_CLI' ) && WP_CLI ) {
+            $method = 'WP-CLI / SSH';
+        } elseif ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+            $method = 'REST API';
+        } elseif ( ! empty( $_SERVER['REQUEST_URI'] ) && strpos( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ), '/wp-admin/' ) !== false ) {
+            $method = 'Admin UI';
+        } else {
+            $method = 'Programmatic';
+        }
+
+        // Detect test/automation accounts
+        $test_patterns = [ 'playwright', 'helpdocs', 'test_', 'e2e_', 'cypress', 'selenium' ];
+        $is_test       = false;
+        foreach ( $test_patterns as $p ) {
+            if ( stripos( $user->user_login, $p ) !== false || stripos( $user->user_email, $p ) !== false ) {
+                $is_test = true;
+                break;
+            }
+        }
+        $test_flag = $is_test ? ' [TEST]' : '';
+
+        $site      = wp_specialchars_decode( get_bloginfo( 'name' ) ?: home_url(), ENT_QUOTES );
         $admin_url = admin_url( 'users.php' );
-        $subject   = sprintf( '[%s] 🚨 New administrator created: %s', $site, $user->user_login );
+        $subject   = sprintf( '[%s] 🚨 New admin: %s — via %s%s', $site, $user->user_login, $method, $test_flag );
         $body      = sprintf(
-            "A new administrator account was created on %s.\n\nUsername: %s\nEmail: %s\nRegistered: %s\n\nIf you did not create this account, revoke it immediately.\n\nManage users: %s",
-            home_url(), $user->user_login, $user->user_email, $user->user_registered, $admin_url
+            "A new administrator account was created on %s.\n\nUsername: %s\nEmail: %s\nCreated via: %s\nRegistered: %s\n\n%sIf you did not create this account, revoke it immediately.\n\nManage users: %s",
+            home_url(), $user->user_login, $user->user_email, $method, $user->user_registered,
+            $is_test ? "This appears to be a TEST/automation account.\n\n" : '',
+            $admin_url
         );
         self::send_threat_alert( $subject, $body, 'urgent', 'rotating_light,bust_in_silhouette', $admin_url );
         update_option( 'csdt_threat_last_admin_alert', [ 'ts' => time(), 'login' => $user->user_login, 'email' => $user->user_email ], false );
@@ -17551,6 +17970,79 @@ PROMPT;
     }
 
     // ── SSH Brute-Force Monitor ───────────────────────────────────────────────
+
+    public static function ajax_bf_self_test(): void {
+        check_ajax_referer( self::LOGIN_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $max_attempts = max( 1, (int) get_option( 'csdt_devtools_brute_force_attempts', '5' ) );
+        $lockout_mins = max( 1, (int) get_option( 'csdt_devtools_brute_force_lockout', '10' ) );
+        $lockout_secs = $lockout_mins * MINUTE_IN_SECONDS;
+        $bf_enabled   = get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1';
+
+        if ( ! $bf_enabled ) {
+            wp_send_json_error( 'Brute-force protection is disabled — enable it first.' );
+        }
+
+        // Use a synthetic username — no real user created.
+        $test_user = 'csdt_bf_selftest_' . time();
+        $slug      = md5( strtolower( $test_user ) );
+        $count_key = 'csdt_devtools_bf_count_' . $slug;
+        $lock_key  = 'csdt_devtools_bf_lock_' . $slug;
+
+        // Simulate max_attempts consecutive failed logins (mirrors perf_track_failed_login logic).
+        for ( $i = 1; $i <= $max_attempts; $i++ ) {
+            $attempts = (int) get_transient( $count_key ) + 1;
+            if ( $attempts >= $max_attempts ) {
+                set_transient( $lock_key, time() + $lockout_secs, $lockout_secs );
+                delete_transient( $count_key );
+            } else {
+                set_transient( $count_key, $attempts, $lockout_secs * 2 );
+            }
+        }
+
+        $locked_until = (int) get_transient( $lock_key );
+        $is_locked    = $locked_until > time();
+
+        // Send a clearly-labelled test notification if ntfy is configured.
+        $ntfy_url     = get_option( 'csdt_scan_schedule_ntfy_url', '' );
+        $notif_sent   = false;
+        if ( $is_locked && $ntfy_url ) {
+            $site    = wp_specialchars_decode( get_bloginfo( 'name' ) ?: home_url(), ENT_QUOTES );
+            $subject = sprintf( '[%s] ✅ BF Protection TEST passed — lockout works', $site );
+            $body    = sprintf(
+                "Self-test result: PASS\n\nBrute-force lockout fired correctly after %d failed attempts.\nTest account: %s\nLockout duration: %d minutes\n\nThis is a self-test message — no action needed.",
+                $max_attempts, $test_user, $lockout_mins
+            );
+            self::send_threat_alert( $subject, $body, 'default', 'white_check_mark,lock', admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=login' ) );
+            $notif_sent = true;
+        }
+
+        // Clean up all test transients.
+        delete_transient( $count_key );
+        delete_transient( $lock_key );
+        delete_transient( 'csdt_devtools_bf_notif_' . $slug );
+
+        wp_send_json_success( [
+            'passed'        => $is_locked,
+            'attempts'      => $max_attempts,
+            'lockout_mins'  => $lockout_mins,
+            'notif_sent'    => $notif_sent,
+            'ntfy_url'      => ! empty( $ntfy_url ),
+            'clear_cmd'     => "wp transient delete csdt_devtools_bf_lock_\$(php -r \"echo md5(strtolower('USERNAME'));\") --path=/var/www/html",
+        ] );
+    }
+
+    public static function ajax_ssh_log_clear(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        delete_option( 'csdt_ssh_monitor_alert_log' );
+        wp_send_json_success();
+    }
 
     public static function ajax_ssh_monitor_save(): void {
         check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
@@ -17630,6 +18122,24 @@ PROMPT;
 
         $count = count( $failures );
 
+        // Extract targeted usernames from failure lines
+        $user_counts = [];
+        foreach ( $failures as $line ) {
+            $username = '';
+            if ( preg_match( '/Failed password for (?:invalid user )?(\S+)\s+from/i', $line, $um ) ) {
+                $username = $um[1];
+            } elseif ( preg_match( '/Invalid user (\S+)\s+from/i', $line, $um ) ) {
+                $username = $um[1];
+            } elseif ( preg_match( '/Connection closed by invalid user (\S+)\s/i', $line, $um ) ) {
+                $username = $um[1];
+            } elseif ( preg_match( '/\buser=(\S+)/', $line, $um ) ) {
+                $username = $um[1];
+            }
+            if ( $username && $username !== 'for' && $username !== 'by' ) {
+                $user_counts[ $username ] = ( $user_counts[ $username ] ?? 0 ) + 1;
+            }
+        }
+
         // Store recent failure data for the Quick Fixes panel display
         update_option( 'csdt_ssh_monitor_last_check', [
             'ts'    => $now,
@@ -17647,6 +18157,15 @@ PROMPT;
             return;
         }
         update_option( 'csdt_ssh_monitor_last_alert', $now, false );
+
+        // Append to alert log (keep last 50 events)
+        arsort( $user_counts );
+        $alert_log   = get_option( 'csdt_ssh_monitor_alert_log', [] );
+        $alert_log[] = [ 'ts' => $now, 'count' => $count, 'users' => $user_counts ];
+        if ( count( $alert_log ) > 50 ) {
+            $alert_log = array_slice( $alert_log, -50 );
+        }
+        update_option( 'csdt_ssh_monitor_alert_log', $alert_log, false );
 
         // Build alert message
         $site      = get_bloginfo( 'name' ) ?: home_url();

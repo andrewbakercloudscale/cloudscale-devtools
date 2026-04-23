@@ -28,6 +28,7 @@
 .cs-tab-heading{font-size:2em;font-weight:800;color:#0f172a;padding:0 0 16px;border-bottom:3px solid #0e6b8f;margin:0 0 8px;}
 .cs-tab-intro{color:#475569;font-size:1.05em;margin:10px 0 32px;}
 .cs-panel-section{margin:36px 0 0;}
+.cs-panel-intro{font-size:1.05em;color:#475569;line-height:1.7;margin:0 0 16px;}
 .cs-panel-heading{font-size:1.45em!important;font-weight:700!important;color:#1e293b!important;margin:0 0 16px!important;padding:0 0 10px!important;border-bottom:2px solid #e2e8f0!important;border-left:none!important;border-top:none!important;border-right:none!important;display:flex!important;align-items:center!important;gap:10px!important;background:transparent!important;}
 .cs-panel-heading::before{content:""!important;display:inline-block!important;width:4px!important;height:1.2em!important;background:#0e6b8f!important;border-radius:2px!important;flex-shrink:0!important;}
 .cs-screenshot{margin:20px 0 24px;}
@@ -46,7 +47,7 @@
 <a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-cyber-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
 <h1 style="margin-bottom:0;">CloudScale Cyber and Devtools</h1>
 </div>
-<img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/CloudScaleCyberDevtools.jpeg" alt="" style="flex-shrink:0;width:96px;height:96px;border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.4);object-fit:cover;">
+<img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/CloudScaleCyberDevtools-3.jpeg" alt="" style="flex-shrink:0;width:96px;height:96px;border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.4);object-fit:cover;">
 </div>
 <p>Free WordPress security plugin with AI cyber audit using Claude &amp; Gemini, two-factor authentication, passkeys, login URL protection, one-click hardening, server logs, and code blocks.</p>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">⬇ Download Latest Version (.zip)</a><a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/cloudscale-cyber-devtools" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a></div>
@@ -414,7 +415,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="hide-login">Hide Login URL</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-hide-login.jpg" alt="WordPress Hide Login URL settings panel — move wp-login.php to a secret URL to block automated bot attacks" loading="lazy" /></figure>
+<p class="cs-panel-intro">Moves your WordPress login page from the default <code>/wp-login.php</code> to a secret URL you choose. Bots and automated attack scripts probe the default path thousands of times a day — if they can't find the login form, they can't attack it.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-hide-login-3.jpg" alt="WordPress Hide Login URL settings panel — move wp-login.php to a secret URL to block automated bot attacks" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔐 Stop Bots Before They Even See Your Login Page</h2>
@@ -435,7 +436,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="2fa">Two-Factor Auth</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-2fa.jpg" alt="WordPress two-factor authentication settings with email OTP, TOTP authenticator app, and passkeys" loading="lazy" /></figure>
+<p class="cs-panel-intro">Adds a second authentication step after the password so a stolen or leaked password alone is never enough to break in. Supports email OTP, authenticator apps (TOTP), and passkeys — all three methods included free.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-2fa-3.jpg" alt="WordPress two-factor authentication settings with email OTP, TOTP authenticator app, and passkeys" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fdf4ff;border-left:4px solid #9333ea;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔑 A Stolen Password Should Never Be Enough to Break In</h2>
@@ -456,7 +457,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="passkeys">Passkeys (WebAuthn)</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-passkeys.jpg" alt="WordPress passkeys WebAuthn registration supporting Face ID, Touch ID and hardware security key login" loading="lazy" /></figure>
+<p class="cs-panel-intro">Replace passwords entirely with biometric login: Face ID, Touch ID, Windows Hello, or a hardware security key. Passkeys are cryptographically bound to your exact domain — unlike TOTP codes, they cannot be phished by a fake login page.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-passkeys-3.jpg" alt="WordPress passkeys WebAuthn registration supporting Face ID, Touch ID and hardware security key login" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fff7ed;border-left:4px solid #ea580c;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🪪 The Most Secure WordPress Login Method Available. And It's Free.</h2>
@@ -477,7 +478,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="security">AI Cyber Audit</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-security.jpg" alt="WordPress AI security audit showing a perfect score with Claude 4 and Gemini 2.5 Pro on a free security plugin" loading="lazy" /></figure>
+<p class="cs-panel-intro">Uses frontier AI — Anthropic Claude or Google Gemini — to analyse your entire WordPress installation and return a prioritised, scored security report in under 60 seconds. Unlike signature-based scanners, the AI reasons from first principles: it reads your actual configuration and code, identifies risk combinations no database can match, and gives you specific fix steps for your exact setup.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-security-3.jpg" alt="WordPress AI security audit showing a perfect score with Claude 4 and Gemini 2.5 Pro on a free security plugin" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fff5f5;border-left:4px solid #c0392b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🛡️ A Security Consultant in Your WordPress Dashboard, for Free</h2>
@@ -564,7 +565,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="site-audit">AI Site Auditor</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-site-audit-scaled.jpg" alt="WordPress AI site auditor scanning SEO, content, performance, and database health with prioritised findings" loading="lazy" /></figure>
+<p class="cs-panel-intro">One button scans all your published content and database, then returns a prioritised list of SEO gaps, thin content, missing images, database bloat, and security misconfigurations — each with a specific fix instruction. No external crawlers, no data sent to third parties, no Screaming Frog licence required.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-site-audit-3-scaled.jpg" alt="WordPress AI site auditor scanning SEO, content, performance, and database health with prioritised findings" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-left:4px solid #10b981;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔍 Your Entire Site Audited in Under 60 Seconds</h2>
@@ -605,7 +606,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="code-block">Code Block</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-code-block.jpg" alt="WordPress syntax-highlighted code block settings with 190 languages, 14 themes, no CDN, completely free" loading="lazy" /></figure>
+<p class="cs-panel-intro">Syntax-highlighted code blocks powered by highlight.js, running entirely on your own server with zero CDN calls. Supports 190+ languages and 14 professional colour themes — completely free, with no impact on your Core Web Vitals score.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-code-block-3.jpg" alt="WordPress syntax-highlighted code block settings with 190 languages, 14 themes, no CDN, completely free" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">💻 Beautiful Code Blocks Without Paying $50/Year or Slowing Your Site Down</h2>
@@ -622,7 +623,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="migrator">Code Block Migrator</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-migrator.jpg" alt="WordPress code block migrator for batch converting from Enlighter, SyntaxHighlighter, and other plugins" loading="lazy" /></figure>
+<p class="cs-panel-intro">Converts all posts using legacy code block formats — WordPress core blocks, SyntaxHighlighter, Enlighter shortcodes — to CloudScale blocks in a single batch operation. Scan → preview the diff per post → migrate everything in one click, with no manual post editing.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-migrator-3.jpg" alt="WordPress code block migrator for batch converting from Enlighter, SyntaxHighlighter, and other plugins" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#fefce8;border-left:4px solid #ca8a04;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔄 Switch Plugins Without Touching 100 Posts by Hand</h2>
@@ -648,7 +649,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="sql-tool">SQL Query Tool</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-sql-tool.jpg" alt="WordPress read-only SQL query tool for safe database inspection inside wp-admin without phpMyAdmin" loading="lazy" /></figure>
+<p class="cs-panel-intro">A read-only SQL query interface inside wp-admin — inspect tables, check row counts, trace slow queries, and find database bloat without phpMyAdmin, SSH access, or exposing your database port. Architecturally impossible to delete or modify data.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-sql-tool-3.jpg" alt="WordPress read-only SQL query tool for safe database inspection inside wp-admin without phpMyAdmin" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f8fafc;border-left:4px solid #64748b;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🗄️ Query Your Live Database Safely, Without phpMyAdmin or SSH</h2>
@@ -669,7 +670,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="server-logs">Server Logs</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-server-logs.jpg" alt="WordPress server log viewer for PHP error logs, debug logs, and web server logs without SSH access" loading="lazy" /></figure>
+<p class="cs-panel-intro">Browse your PHP error log, WordPress debug log, and web server logs directly in the dashboard — with live search, severity filtering, and auto-refresh tail mode. No SSH, no cPanel, no asking your hosting provider to email you a file.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-server-logs-3.jpg" alt="WordPress server log viewer for PHP error logs, debug logs, and web server logs without SSH access" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0fdf4;border-left:4px solid #15803d;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">📋 Read Your Server Logs Without Leaving WordPress</h2>
@@ -693,7 +694,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="optimizer">Plugin Optimizer</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-optimizer-scaled.jpg" alt="WordPress plugin stack scanner showing which plugins CloudScale replaces with AI debugging assistant" loading="lazy" /></figure>
+<p class="cs-panel-intro">Two tools in one tab: a plugin stack scanner that maps your installed plugins against everything CloudScale already replaces (so you know exactly which ones to remove), and an AI debugging assistant that diagnoses PHP errors, stack traces, and WordPress warnings instantly with step-by-step fix instructions.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-optimizer-3-scaled.jpg" alt="WordPress plugin stack scanner showing which plugins CloudScale replaces with AI debugging assistant" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:linear-gradient(135deg,#f0f4ff,#f5f3ff);border-left:4px solid #6366f1;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔧 Reduce Your Plugin Stack. Fix Errors Faster.</h2>
@@ -728,7 +729,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="cs-monitor">CS Monitor</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-cs-monitor.jpg" alt="CS Monitor floating performance panel showing DB queries, hooks, HTTP calls, and PHP errors on every WordPress page" loading="lazy" /></figure>
+<p class="cs-panel-intro">A floating DevTools-style performance panel that appears on every WordPress admin screen and frontend page for logged-in administrators. Surfaces database queries, HTTP calls, hook timings, PHP errors, assets, and template resolution in one overlay — without switching tools or tailing log files.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-cs-monitor-3.jpg" alt="CS Monitor floating performance panel showing DB queries, hooks, HTTP calls, and PHP errors on every WordPress page" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:linear-gradient(135deg,#f0f4ff,#fdf4ff);border-left:4px solid #6366f1;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">⚡ A DevTools-Style Performance Panel, Built Into Every WordPress Page</h2>
@@ -763,7 +764,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="fpm-monitor">FPM Monitor</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-fpm-monitor-scaled.jpg" alt="PHP-FPM saturation monitor showing live worker counts and memory usage with auto-restart and ntfy alerts" loading="lazy" /></figure>
+<p class="cs-panel-intro">PHP-FPM (FastCGI Process Manager) is the process pool that serves every WordPress page request. When all workers are occupied — during a traffic spike, a slow database query, or a runaway loop — new requests queue and the site freezes. The FPM Monitor shows live worker counts and memory usage, and alerts you the moment saturation builds — running as a host-level script outside PHP so it fires even when every PHP worker is consumed.</p><figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-fpm-monitor-3-scaled.jpg" alt="PHP-FPM saturation monitor showing live worker counts and memory usage with auto-restart and ntfy alerts" loading="lazy" /></figure>
 <div class="cs-panel-body">
 <div style="background:linear-gradient(135deg,#0f172a,#1e293b);border-left:4px solid #60a5fa;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
 <h2 style="margin:0 0 8px;font-size:1.25em;color:#e2e8f0;background:transparent!important;padding:0!important;border:none!important;">🖥️ Know When Your PHP Workers Are Exhausted — Before Your Site Goes Down</h2>

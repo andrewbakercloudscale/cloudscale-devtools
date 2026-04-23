@@ -53,6 +53,7 @@
             bf_enabled:       document.getElementById( 'cs-bf-enabled' )?.checked ? '1' : '0',
             bf_attempts:      document.getElementById( 'cs-bf-attempts' )?.value || '5',
             bf_lockout:       document.getElementById( 'cs-bf-lockout' )?.value || '5',
+            bf_enum_protect:  document.getElementById( 'cs-bf-enum-protect' )?.checked ? '1' : '0',
         };
     }
 
@@ -404,7 +405,7 @@
         return Math.floor( secs / 86400 ) + 'd ago';
     }
 
-    function renderBfChart( log, now ) {
+    function renderBfChart( log, now, isAttack ) {
         if ( ! bfChart ) return;
         const DAY = 86400;
         const days = [];
@@ -416,6 +417,7 @@
             days.push( {
                 label: d.toLocaleDateString( 'en', { month: 'short', day: 'numeric' } ),
                 count,
+                isToday: i === 0,
             } );
         }
         const max = Math.max( 1, ...days.map( d => d.count ) );
@@ -427,17 +429,19 @@
         </div>`;
         const bars = days.map( d => {
             const pct = Math.round( ( d.count / max ) * 100 );
-            const cls = d.count === 0 ? '' : d.count >= max * 0.75 ? ' cs-bf-bar-high' : d.count >= max * 0.4 ? ' cs-bf-bar-mid' : '';
+            let cls = d.count === 0 ? '' : d.count >= max * 0.75 ? ' cs-bf-bar-high' : d.count >= max * 0.4 ? ' cs-bf-bar-mid' : '';
+            // In attack mode: force all bars red; today's bar gets extra emphasis
+            const extraStyle = isAttack && d.count > 0
+                ? `background:#dc2626!important;${ d.isToday ? 'box-shadow:0 0 8px rgba(220,38,38,.6);' : 'opacity:.7;' }`
+                : '';
             return `<div class="cs-bf-day">
                 <div class="cs-bf-bar-track">
-                    <div class="cs-bf-bar${cls}" style="height:${pct}%" title="${d.count} failed attempt${d.count !== 1 ? 's' : ''}"></div>
+                    <div class="cs-bf-bar${cls}" style="height:${pct}%;${extraStyle}" title="${d.count} failed attempt${d.count !== 1 ? 's' : ''}"></div>
                 </div>
-                <div class="cs-bf-day-label">${d.label}</div>
+                <div class="cs-bf-day-label" style="${isAttack && d.isToday ? 'color:#dc2626;font-weight:700;' : ''}">${d.label}</div>
             </div>`;
         } ).join( '' );
         bfChart.innerHTML = yAxis + bars;
-        // y-axis uses align-self:flex-start to pin to top of bar-track (70px)
-        // while day divs (90px) remain bottom-aligned via parent align-items:flex-end
     }
 
     function renderBfTable( log, now ) {
@@ -469,12 +473,74 @@
     if ( bfLogWrap ) {
         post( 'csdt_devtools_bf_log_fetch', {} ).then( res => {
             if ( ! res.success ) return;
-            const { log, now } = res.data;
+            const { log, now, today_count } = res.data;
+            const isAttack = today_count >= 30;
             if ( bfLogTotal ) bfLogTotal.textContent = log.length + ' event' + ( log.length !== 1 ? 's' : '' );
-            renderBfChart( log, now );
+            renderBfChart( log, now, isAttack );
             renderBfTable( log, now );
+
+            // Active attack banner
+            const header = bfLogWrap.querySelector( '.cs-bf-log-header' );
+            if ( today_count >= 30 && header ) {
+                // Replace the title with a screaming red alert
+                header.style.cssText = 'background:#dc2626;border-radius:8px 8px 0 0;padding:12px 16px;margin:0 0 16px 0;';
+                header.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <span style="font-size:1.35em;font-weight:900;color:#fff;letter-spacing:.5px;text-transform:uppercase;">
+                            ⚠ BRUTE FORCE ATTACK DETECTED
+                        </span>
+                        <span style="background:#fff;color:#dc2626;font-size:.85em;font-weight:800;padding:2px 10px;border-radius:12px;">
+                            ${today_count} attempts today
+                        </span>
+                    </div>
+                    <div style="font-size:.82em;color:#fecaca;margin-top:4px;">
+                        Automated credential-stuffing is actively targeting this site. Enable 2FA now if not already active.
+                    </div>`;
+                bfLogWrap.style.border = '2px solid #dc2626';
+                bfLogWrap.style.borderRadius = '10px';
+                bfLogWrap.style.boxShadow = '0 0 0 4px rgba(220,38,38,.15)';
+            }
         } ).catch( () => {
             if ( bfTableWrap ) bfTableWrap.innerHTML = '<div class="cs-bf-empty">Could not load log.</div>';
+        } );
+    }
+
+    // ── BF Self-Test ──────────────────────────────────────────────────────
+    const bfTestBtn    = document.getElementById( 'cs-bf-test-btn' );
+    const bfTestResult = document.getElementById( 'cs-bf-test-result' );
+
+    if ( bfTestBtn ) {
+        bfTestBtn.addEventListener( 'click', () => {
+            bfTestBtn.disabled = true;
+            bfTestBtn.textContent = '⏳ Testing…';
+            if ( bfTestResult ) { bfTestResult.style.display = 'none'; bfTestResult.textContent = ''; }
+
+            post( 'csdt_bf_self_test', {} ).then( res => {
+                bfTestBtn.disabled = false;
+                bfTestBtn.textContent = '🧪 Test BF Protection';
+                if ( ! bfTestResult ) return;
+                bfTestResult.style.display = 'inline-block';
+                if ( res.success && res.data.passed ) {
+                    bfTestResult.style.cssText = 'display:inline-block;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:6px;padding:5px 12px;font-size:13px;font-weight:600;';
+                    const notif = res.data.ntfy_url
+                        ? ( res.data.notif_sent ? ' ntfy sent.' : ' (no ntfy configured)' )
+                        : ' (no ntfy configured)';
+                    bfTestResult.textContent = `✅ PASS — lockout fired after ${res.data.attempts} attempts (${res.data.lockout_mins} min).${notif}`;
+                } else if ( res.success && ! res.data.passed ) {
+                    bfTestResult.style.cssText = 'display:inline-block;background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:13px;font-weight:600;';
+                    bfTestResult.textContent = '❌ FAIL — lockout did not trigger. Check BF protection is saved correctly.';
+                } else {
+                    bfTestResult.style.cssText = 'display:inline-block;background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:13px;font-weight:600;';
+                    bfTestResult.textContent = '❌ ' + ( res.data || 'Test failed.' );
+                }
+            } ).catch( () => {
+                bfTestBtn.disabled = false;
+                bfTestBtn.textContent = '🧪 Test BF Protection';
+                if ( bfTestResult ) {
+                    bfTestResult.style.cssText = 'display:inline-block;background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:13px;font-weight:600;';
+                    bfTestResult.textContent = '❌ Request failed. Check your connection.';
+                }
+            } );
         } );
     }
 
@@ -499,6 +565,19 @@
             } ).catch( () => {
                 sshMonSaveBtn.disabled = false;
                 alert( 'Save failed. Check your connection.' );
+            } );
+        } );
+    }
+
+    const sshLogClearBtn = document.getElementById( 'cs-ssh-log-clear' );
+    if ( sshLogClearBtn ) {
+        sshLogClearBtn.addEventListener( 'click', () => {
+            if ( ! confirm( 'Clear SSH alert history?' ) ) return;
+            post( 'csdt_ssh_log_clear', {} ).then( res => {
+                if ( res.success ) {
+                    const tbl = sshLogClearBtn.closest( 'div[style]' );
+                    if ( tbl ) tbl.remove();
+                }
             } );
         } );
     }

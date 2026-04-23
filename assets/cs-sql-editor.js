@@ -126,4 +126,50 @@
             run();
         } );
     } );
+
+    // ── HTTP → HTTPS fix buttons ───────────────────────────────────────────
+    function runHttpFix( dryRun ) {
+        var dryBtn    = document.getElementById( 'cs-http-fix-dry' );
+        var fixBtn    = document.getElementById( 'cs-http-fix-run' );
+        var statusEl  = document.getElementById( 'cs-http-fix-status' );
+        var outputEl  = document.getElementById( 'cs-http-fix-output' );
+        if ( ! dryBtn || ! fixBtn ) { return; }
+
+        dryBtn.disabled = fixBtn.disabled = true;
+        statusEl.textContent = dryRun ? 'Running dry run…' : 'Running fix…';
+        outputEl.style.display = 'none';
+
+        var fd = new FormData();
+        fd.append( 'action',   'csdt_sql_http_fix' );
+        fd.append( 'nonce',    csdtDevtoolsSqlEditor.nonce );
+        fd.append( 'dry_run',  dryRun ? '1' : '0' );
+
+        fetch( ajaxurl, { method: 'POST', body: fd } )
+            .then( function( r ) { return r.json(); } )
+            .then( function( resp ) {
+                dryBtn.disabled = fixBtn.disabled = false;
+                if ( resp.success ) {
+                    statusEl.textContent = dryRun ? '✓ Dry run complete' : '✓ Fix complete';
+                    outputEl.textContent = resp.data.output || '(no output)';
+                    outputEl.style.display = '';
+                } else {
+                    statusEl.textContent = '✗ ' + ( resp.data || 'Error' );
+                }
+            } )
+            .catch( function() {
+                dryBtn.disabled = fixBtn.disabled = false;
+                statusEl.textContent = 'Request failed.';
+            } );
+    }
+
+    var dryBtn = document.getElementById( 'cs-http-fix-dry' );
+    var fixBtn = document.getElementById( 'cs-http-fix-run' );
+    if ( dryBtn ) { dryBtn.addEventListener( 'click', function() { runHttpFix( true ); } ); }
+    if ( fixBtn ) {
+        fixBtn.addEventListener( 'click', function() {
+            if ( confirm( 'This will replace ALL http:// references with https:// in the database. Are you sure?' ) ) {
+                runHttpFix( false );
+            }
+        } );
+    }
 } )();

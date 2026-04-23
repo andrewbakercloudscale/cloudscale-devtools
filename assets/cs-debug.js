@@ -623,4 +623,38 @@
         } );
     }
 
+    // ── CS Monitor toggle save ─────────────────────────────────────────────
+    ( function () {
+        var chk     = document.getElementById( 'cs-perf-monitor-toggle' );
+        var saveBtn = document.getElementById( 'cs-perf-monitor-save' );
+        var savedEl = document.getElementById( 'cs-perf-monitor-saved' );
+        if ( ! chk || ! saveBtn ) { return; }
+
+        saveBtn.addEventListener( 'click', function () {
+            saveBtn.disabled = true;
+            var fd = new FormData();
+            fd.append( 'action',  'csdt_devtools_save_perf_monitor' );
+            fd.append( 'nonce',   csdtDebug.perfNonce );
+            fd.append( 'enabled', chk.checked ? '1' : '0' );
+            fetch( csdtDebug.ajaxUrl, { method: 'POST', body: fd } )
+                .then( function ( r ) { return r.json(); } )
+                .then( function ( resp ) {
+                    saveBtn.disabled = false;
+                    if ( resp.success ) {
+                        if ( savedEl ) {
+                            savedEl.classList.add( 'visible' );
+                            setTimeout( function () { savedEl.classList.remove( 'visible' ); }, 2000 );
+                        }
+                        var perfPanel = document.getElementById( 'cs-perf' );
+                        if ( resp.data.perf_enabled === '1' && ! perfPanel ) {
+                            window.location.reload();
+                        } else if ( perfPanel ) {
+                            perfPanel.style.display = resp.data.perf_enabled === '1' ? '' : 'none';
+                        }
+                    }
+                } )
+                .catch( function () { saveBtn.disabled = false; } );
+        } );
+    } )();
+
 }() );

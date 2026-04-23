@@ -577,7 +577,13 @@
 
         if (schedEnabled && schedOptions) {
             schedEnabled.addEventListener('change', function () {
-                schedOptions.style.display = schedEnabled.checked ? '' : 'none';
+                if (schedEnabled.checked) {
+                    schedOptions.style.display = 'flex';
+                    schedOptions.style.flexDirection = 'column';
+                    schedOptions.style.gap = '16px';
+                } else {
+                    schedOptions.style.display = 'none';
+                }
             });
         }
 
@@ -954,6 +960,7 @@
                         html += '<details style="margin-top:8px;"><summary style="cursor:pointer;color:#1e6fd9;font-size:12px;">View ' + d.tables.length + ' tables</summary>';
                         html += '<div style="margin-top:6px;font-size:11px;color:#50575e;max-height:120px;overflow-y:auto;">' + d.tables.map(function(t){ return escHtml(t); }).join('<br>') + '</div></details>';
                     }
+                    html += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:4px;padding:8px 10px;margin-top:10px;font-size:12px;color:#166534;">↩ <strong>Rollback saved automatically</strong> — after the rename you can undo from the <strong>Home tab</strong> at any time.</div>';
                     preflightOut.innerHTML = html;
                     step1.style.display = 'none';
                     step2.style.display = '';
@@ -978,7 +985,7 @@
         });
 
         migrateBtn.addEventListener('click', function () {
-            if (!confirm('This will rename all wp_ tables to a new prefix. This cannot be automatically reversed. Proceed?')) {
+            if (!confirm('This will rename all wp_ tables to a new prefix. A rollback snapshot will be saved — undo from the Home tab at any time. Proceed?')) {
                 return;
             }
             migrateBtn.disabled = true;

@@ -381,6 +381,7 @@ helpLib.run({
 
     sections: [
         { id: 'hide-login', label: 'Hide Login URL',        file: 'panel-hide-login.png',  tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-hide-login',
+          intro: 'Moves your WordPress login page from the default <code>/wp-login.php</code> to a secret URL you choose. Bots and automated attack scripts probe the default path thousands of times a day — if they can\'t find the login form, they can\'t attack it.',
           altText: 'WordPress Hide Login URL settings panel — move wp-login.php to a secret URL to block automated bot attacks',
           jsBeforeShot: () => {
             var s = document.getElementById('cs-login-slug');
@@ -389,10 +390,13 @@ helpLib.run({
             if (u) u.textContent = window.location.origin + '/your-secret-slug/';
           } },
         { id: '2fa',        label: 'Two-Factor Auth',       file: 'panel-2fa.png',         tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-2fa',
+          intro: 'Adds a second authentication step after the password so a stolen or leaked password alone is never enough to break in. Supports email OTP, authenticator apps (TOTP), and passkeys — all three methods included free.',
           altText: 'WordPress two-factor authentication settings with email OTP, TOTP authenticator app, and passkeys' },
         { id: 'passkeys',   label: 'Passkeys (WebAuthn)',   file: 'panel-passkeys.png',    tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-passkeys',
+          intro: 'Replace passwords entirely with biometric login: Face ID, Touch ID, Windows Hello, or a hardware security key. Passkeys are cryptographically bound to your exact domain — unlike TOTP codes, they cannot be phished by a fake login page.',
           altText: 'WordPress passkeys WebAuthn registration supporting Face ID, Touch ID and hardware security key login' },
         { id: 'security',   label: 'AI Cyber Audit',        file: 'panel-security.png',    tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-vuln-results',
+          intro: 'Uses frontier AI — Anthropic Claude or Google Gemini — to analyse your entire WordPress installation and return a prioritised, scored security report in under 60 seconds. Unlike signature-based scanners, the AI reasons from first principles: it reads your actual configuration and code, identifies risk combinations no database can match, and gives you specific fix steps for your exact setup.',
           altText: 'WordPress AI security audit showing a perfect score with Claude 4 and Gemini 2.5 Pro on a free security plugin',
           jsBeforeShot: () => {
             // Inject demo data: score 100, no real findings
@@ -441,21 +445,31 @@ helpLib.run({
           }
         },
         { id: 'site-audit', label: 'AI Site Auditor',        file: 'panel-site-audit.png',  tabSelector: 'a[href*="tab=site-audit"]', elementSelector: '#cs-panel-site-audit',
+          intro: 'One button scans all your published content and database, then returns a prioritised list of SEO gaps, thin content, missing images, database bloat, and security misconfigurations — each with a specific fix instruction. No external crawlers, no data sent to third parties, no Screaming Frog licence required.',
           altText: 'WordPress AI site auditor scanning SEO, content, performance, and database health with prioritised findings' },
         { id: 'code-block', label: 'Code Block',             file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings',
+          intro: 'Syntax-highlighted code blocks powered by highlight.js, running entirely on your own server with zero CDN calls. Supports 190+ languages and 14 professional colour themes — completely free, with no impact on your Core Web Vitals score.',
           altText: 'WordPress syntax-highlighted code block settings with 190 languages, 14 themes, no CDN, completely free' },
         { id: 'migrator',   label: 'Code Block Migrator',   file: 'panel-migrator.png',    tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-migrator',
+          intro: 'Converts all posts using legacy code block formats — WordPress core blocks, SyntaxHighlighter, Enlighter shortcodes — to CloudScale blocks in a single batch operation. Scan → preview the diff per post → migrate everything in one click, with no manual post editing.',
           altText: 'WordPress code block migrator for batch converting from Enlighter, SyntaxHighlighter, and other plugins' },
         { id: 'sql-tool',   label: 'SQL Query Tool',        file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=sql"]',     elementSelector: '#cs-panel-sql',
+          intro: 'A read-only SQL query interface inside wp-admin — inspect tables, check row counts, trace slow queries, and find database bloat without phpMyAdmin, SSH access, or exposing your database port. Architecturally impossible to delete or modify data.',
           altText: 'WordPress read-only SQL query tool for safe database inspection inside wp-admin without phpMyAdmin' },
         { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=logs"]',    elementSelector: '#cs-panel-logs',
+          intro: 'Browse your PHP error log, WordPress debug log, and web server logs directly in the dashboard — with live search, severity filtering, and auto-refresh tail mode. No SSH, no cPanel, no asking your hosting provider to email you a file.',
           altText: 'WordPress server log viewer for PHP error logs, debug logs, and web server logs without SSH access' },
-        { id: 'optimizer',  label: 'Plugin Optimizer',      file: 'panel-optimizer.png',   tabSelector: 'a[href*="tab=optimizer"]',
+        { id: 'optimizer',  label: 'Plugin Optimizer',      file: 'panel-optimizer.png',   tabSelector: 'a[href*="tab=optimizer"]',  elementSelector: '#cs-panel-optimizer',
+          intro: 'Two tools in one tab: a plugin stack scanner that maps your installed plugins against everything CloudScale already replaces (so you know exactly which ones to remove), and an AI debugging assistant that diagnoses PHP errors, stack traces, and WordPress warnings instantly with step-by-step fix instructions.',
           altText: 'WordPress plugin stack scanner showing which plugins CloudScale replaces with AI debugging assistant' },
         { id: 'cs-monitor', label: 'CS Monitor',             file: 'panel-cs-monitor.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings',
+          intro: 'A floating DevTools-style performance panel that appears on every WordPress admin screen and frontend page for logged-in administrators. Surfaces database queries, HTTP calls, hook timings, PHP errors, assets, and template resolution in one overlay — without switching tools or tailing log files.',
           altText: 'CS Monitor floating performance panel showing DB queries, hooks, HTTP calls, and PHP errors on every WordPress page' },
         { id: 'fpm-monitor',label: 'FPM Monitor',            file: 'panel-fpm-monitor.png', tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-debug',
-          altText: 'PHP-FPM saturation monitor showing live worker counts and memory usage with auto-restart and ntfy alerts' },
+          intro: 'PHP-FPM (FastCGI Process Manager) is the process pool that serves every WordPress page request. When all workers are occupied — during a traffic spike, a slow database query, or a runaway loop — new requests queue and the site freezes. The FPM Monitor shows live worker counts and memory usage, and alerts you the moment saturation builds — running as a host-level script outside PHP so it fires even when every PHP worker is consumed.',
+          altText: 'PHP-FPM saturation monitor showing live worker counts and memory usage with auto-restart and ntfy alerts',
+          jsBeforeShot: () => { const el = document.getElementById('cs-perf'); if (el) el.style.display = 'none'; },
+          jsAfterShot:  () => { const el = document.getElementById('cs-perf'); if (el) el.style.display = ''; } },
     ],
 
     docs: {

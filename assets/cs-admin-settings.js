@@ -11,7 +11,6 @@
     var selPair   = document.getElementById( 'cs-settings-pair' );
     var selTheme  = document.getElementById( 'cs-settings-theme' );
     var savedMsg  = document.getElementById( 'cs-settings-saved' );
-    var chkPerf   = document.getElementById( 'cs-settings-perf-enabled' );
 
     if ( ! saveBtn ) {
         return;
@@ -26,7 +25,6 @@
         fd.append( 'nonce',      csdtDevtoolsAdminSettings.nonce );
         fd.append( 'theme',      selTheme.value );
         fd.append( 'theme_pair', selPair.value );
-        fd.append( 'csdt_devtools_perf_monitor_enabled', chkPerf && chkPerf.checked ? '1' : '0' );
 
         fetch( ajaxurl, { method: 'POST', body: fd } )
             .then( function( r ) { return r.json(); } )
@@ -35,16 +33,7 @@
                 saveBtn.textContent = '💾 Save Settings';
                 if ( resp.success ) {
                     savedMsg.classList.add( 'visible' );
-                    setTimeout( function() {
-                        savedMsg.classList.remove( 'visible' );
-                    }, 2000 );
-                    var perfPanel = document.getElementById( 'cs-perf' );
-                    if ( resp.data.perf_enabled === '1' && ! perfPanel ) {
-                        // Panel wasn't rendered (was disabled) — reload to inject it
-                        window.location.reload();
-                    } else if ( perfPanel ) {
-                        perfPanel.style.display = resp.data.perf_enabled === '1' ? '' : 'none';
-                    }
+                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); }, 2000 );
                 }
             } )
             .catch( function( e ) {
