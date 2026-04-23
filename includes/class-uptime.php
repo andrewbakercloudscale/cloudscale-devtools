@@ -355,6 +355,14 @@ class CSDT_Uptime {
             return;
         }
 
+        // Resolve worker URL if not stored — look it up via CF API
+        if ( $worker_url === '' ) {
+            $worker_url = self::resolve_worker_url();
+            if ( $worker_url !== '' ) {
+                update_option( 'csdt_uptime_worker_url', $worker_url, false );
+            }
+        }
+
         // If we have the worker URL, trigger CF Worker (full E2E: CF → readiness → ping back)
         if ( $worker_url !== '' ) {
             $start = microtime( true );
@@ -615,6 +623,24 @@ class CSDT_Uptime {
                 'timeout' => 10,
             ] );
         }
+    }
+
+    private static function resolve_worker_url(): string {
+        $zone_id  = (string) get_option( 'csdt_devtools_cf_zone_id', '' );
+        $cf_token = (string) get_option( 'csdt_devtools_cf_api_token', '' );
+        if ( $zone_id === '' || $cf_token === '' ) { return ''; }
+
+        $zone_resp  = wp_remote_get( 'https://api.cloudflare.com/client/v4/zones/' . rawurlencode( $zone_id ),
+            [ 'headers' => [ 'Authorization' => 'Bearer ' . $cf_token ], 'timeout' => 10 ] );
+        if ( is_wp_error( $zone_resp ) ) { return ''; }
+        $account_id = json_decode( wp_remote_retrieve_body( $zone_resp ), true )['result']['account']['id'] ?? '';
+        if ( ! $account_id ) { return ''; }
+
+        $sub_resp = wp_remote_get( "https://api.cloudflare.com/client/v4/accounts/{$account_id}/workers/subdomain",
+            [ 'headers' => [ 'Authorization' => 'Bearer ' . $cf_token ], 'timeout' => 10 ] );
+        if ( is_wp_error( $sub_resp ) ) { return ''; }
+        $subdomain = json_decode( wp_remote_retrieve_body( $sub_resp ), true )['result']['subdomain'] ?? '';
+        return $subdomain ? "https://cloudscale-uptime.{$subdomain}.workers.dev" : '';
     }
 
     private static function uptime_worker_js(): string {
