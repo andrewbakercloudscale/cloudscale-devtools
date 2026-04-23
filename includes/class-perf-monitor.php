@@ -164,16 +164,16 @@ class CSDT_Perf_Monitor {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
-        $base = plugin_dir_path( __FILE__ ) . 'assets/';
+        $root_url = plugin_dir_url( __DIR__ );
         wp_enqueue_style(
             'csdt-perf-monitor',
-            plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
+            $root_url . 'assets/cs-perf-monitor.css',
             [],
             CloudScale_DevTools::VERSION
         );
         wp_enqueue_script(
             'csdt-perf-monitor',
-            plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
+            $root_url . 'assets/cs-perf-monitor.js',
             [],
             CloudScale_DevTools::VERSION,
             true
@@ -444,16 +444,16 @@ class CSDT_Perf_Monitor {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
-        $base = plugin_dir_path( __FILE__ ) . 'assets/';
+        $root_url = plugin_dir_url( __DIR__ );
         wp_enqueue_style(
             'csdt-perf-monitor',
-            plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
+            $root_url . 'assets/cs-perf-monitor.css',
             [],
             CloudScale_DevTools::VERSION
         );
         wp_enqueue_script(
             'csdt-perf-monitor',
-            plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
+            $root_url . 'assets/cs-perf-monitor.js',
             [],
             CloudScale_DevTools::VERSION,
             true

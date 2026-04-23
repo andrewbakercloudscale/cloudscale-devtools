@@ -223,7 +223,7 @@
         if (!uptimeManualWrap) return;
         uptimeManualWrap.innerHTML =
             '<p style="font-size:.85em;color:#374151;margin:0 0 10px;">1. Go to <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create" target="_blank" rel="noopener" style="color:#6366f1;">dash.cloudflare.com → Workers → Create</a>. Choose "Hello World" then replace the entire script with the code below.</p>' +
-            '<p style="font-size:.85em;color:#374151;margin:0 0 6px;">2. Click <strong>Deploy</strong>, then go to <strong>Settings → Variables</strong> and add: <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">SITE_URL</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">PING_URL</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">PING_TOKEN</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">NTFY_URL</code> from the wrangler.toml below.</p>' +
+            '<p style="font-size:.85em;color:#374151;margin:0 0 6px;">2. Click <strong>Deploy</strong>, then go to <strong>Settings → Variables</strong> and add: <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">SITE_URL</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">PING_URL</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">READY_URL</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">PING_TOKEN</code>, <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">NTFY_URL</code> from the wrangler.toml below.</p>' +
             '<p style="font-size:.85em;color:#374151;margin:0 0 6px;">3. Go to <strong>Triggers → Cron Triggers → Add Cron</strong> and enter <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">* * * * *</code> (every minute).</p>' +
             '<p style="font-size:.85em;font-weight:700;color:#374151;margin:8px 0 4px;">worker.js</p>' +
             '<textarea readonly style="width:100%;height:160px;font-family:monospace;font-size:.78em;border:1px solid #e5e7eb;border-radius:6px;padding:10px;resize:vertical;background:#f8fafc;">' + escHtml(workerJs) + '</textarea>' +
@@ -288,6 +288,15 @@
         }).catch(function () {});
     }
 
+    function fmtAgo(ts) {
+        if (!ts) return null;
+        var secs = Math.floor(Date.now() / 1000) - ts;
+        if (secs < 5)   return 'just now';
+        if (secs < 60)  return secs + 's ago';
+        if (secs < 3600) return Math.round(secs / 60) + 'm ago';
+        return Math.round(secs / 3600) + 'h ago';
+    }
+
     function renderUptimeStatus(d) {
         if (!uptimeStatusInner) return;
         var lp     = d.last_ping;
@@ -311,6 +320,43 @@
         if (lp) {
             html += '<p style="font-size:.82em;color:#6b7280;margin:0 0 14px;">Last ping: ' + escHtml(ageStr) + '</p>';
         }
+
+        // Readiness probe status
+        html += '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:18px;">';
+        html += '<p style="font-size:.82em;font-weight:700;color:#374151;margin:0 0 10px;">Readiness Probe</p>';
+
+        var checks = d.readiness_checks;
+        if (checks) {
+            html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">';
+            ['db','fpm','wp'].forEach(function(key) {
+                var c    = checks[key] || {};
+                var ok   = c.ok !== false;
+                var col  = ok ? '#16a34a' : '#dc2626';
+                var icon = ok ? '✅' : '❌';
+                var sub  = key === 'fpm' && c.saturation_pct != null
+                    ? c.active + '/' + c.total + ' workers (' + c.saturation_pct + '%)'
+                    : key === 'db' ? (c.message || '') : key === 'wp' && c.version ? 'WP ' + c.version : '';
+                html += '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;text-align:center;">';
+                html += '<div style="font-size:1em;font-weight:700;color:' + col + ';">' + icon + ' ' + key.toUpperCase() + '</div>';
+                if (sub) html += '<div style="font-size:.72em;color:#6b7280;margin-top:2px;">' + escHtml(sub) + '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        } else {
+            html += '<p style="font-size:.82em;color:#9ca3af;margin:0 0 8px;">Not yet probed — deploy the Worker to begin.</p>';
+        }
+
+        var lastProbed = fmtAgo(d.readiness_last);
+        var lastBad    = fmtAgo(d.readiness_bad);
+        html += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        html += '<p style="font-size:.78em;color:#6b7280;margin:0;">Last queried: <strong style="color:#374151;">' + escHtml(lastProbed || 'Never') + '</strong></p>';
+        if (lastBad) {
+            html += '<p style="font-size:.78em;color:#dc2626;margin:0;">Last failed query (bad token): <strong>' + escHtml(lastBad) + '</strong></p>';
+        }
+        if (d.ready_url) {
+            html += '<p style="font-size:.75em;color:#9ca3af;margin:4px 0 0;word-break:break-all;">Endpoint: ' + escHtml(d.ready_url) + '</p>';
+        }
+        html += '</div></div>';
 
         // Response-time chart (raw — last 60 pings)
         var raw = d.raw || [];

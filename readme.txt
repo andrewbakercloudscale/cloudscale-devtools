@@ -4,11 +4,11 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.379
+Stable tag: 1.9.392
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI-powered WordPress security audit, one-click hardening fixes, server log viewer, syntax-highlighted code blocks, SQL tool, and login security.
+Free AI penetration testing, brute-force protection, 2FA, passkeys, site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and uptime monitoring. No subscription.
 
 == Description ==
 

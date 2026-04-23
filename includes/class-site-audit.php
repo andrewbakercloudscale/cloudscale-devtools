@@ -753,6 +753,17 @@ bantime  = 86400</pre>
             return;
         }
 
+        if ( $action === 'dismiss' ) {
+            $allowed_acks = [ 'cron_disabled_ack' ];
+            if ( ! in_array( $fix_id, $allowed_acks, true ) ) {
+                wp_send_json_error( 'Invalid dismiss id' );
+                return;
+            }
+            update_option( 'csdt_' . $fix_id, '1' );
+            wp_send_json_success( [ 'message' => 'Acknowledged' ] );
+            return;
+        }
+
         if ( $action !== 'apply' ) {
             wp_send_json_error( 'Invalid action' );
             return;
@@ -797,11 +808,15 @@ bantime  = 86400</pre>
                 if ( ! wp_next_scheduled( 'delete_expired_transients' ) ) {
                     wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'delete_expired_transients' );
                 }
-                // Run them immediately if not disabled.
-                if ( ! ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) ) {
-                    do_action( 'delete_expired_transients' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
-                    do_action( 'wp_scheduled_delete' );       // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+                if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+                    // Can't run events — WP-Cron is disabled. Acknowledge the finding so it
+                    // stops reappearing: the admin has confirmed a system cron handles this.
+                    update_option( 'csdt_cron_disabled_ack', '1', false );
+                    wp_send_json_success( [ 'message' => 'Acknowledged — ensure your system cron calls wp-cli cron event run --due-now at least every 15 minutes.' ] );
+                    return;
                 }
+                do_action( 'delete_expired_transients' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+                do_action( 'wp_scheduled_delete' );       // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
                 break;
             case 'expired_transients':
                 global $wpdb;
@@ -1647,6 +1662,9 @@ PROMPT;
         $bf_today_count   = is_array( $bf_log_raw )
             ? count( array_filter( $bf_log_raw, fn( $e ) => isset( $e[0] ) && $e[0] >= $today_start ) )
             : 0;
+        $bf_last_attempt  = is_array( $bf_log_raw ) && ! empty( $bf_log_raw )
+            ? max( array_column( $bf_log_raw, 0 ) )
+            : 0;
 
         // ── SSH monitor ──
         $ssh_monitor_on        = get_option( 'csdt_ssh_monitor_enabled', '1' ) === '1';
@@ -1749,6 +1767,7 @@ PROMPT;
             'bf_attempts'         => $bf_attempts,
             'bf_lockout_mins'     => $bf_lockout,
             'bf_today_count'      => $bf_today_count,
+            'bf_last_attempt'     => $bf_last_attempt,
             'login_hide_on'       => $login_hide_on,
             'twofa_admins'        => $twofa_admins,
             'twofa_method'        => $twofa_method,
@@ -1960,14 +1979,15 @@ PROMPT;
             ];
         }
 
-        if ( ! empty( $d['cron_disabled'] ) || ! empty( $d['cron_missing'] ) || ! empty( $d['cron_overdue'] ) ) {
+        $cron_disabled_acked = get_option( 'csdt_cron_disabled_ack', '0' ) === '1';
+        if ( ( ! empty( $d['cron_disabled'] ) && ! $cron_disabled_acked ) || ! empty( $d['cron_missing'] ) || ! empty( $d['cron_overdue'] ) ) {
             $sev    = ! empty( $d['cron_disabled'] ) ? 'high' : 'medium';
             $detail = ! empty( $d['cron_disabled'] )
                 ? 'DISABLE_WP_CRON is defined in wp-config.php. WordPress will never automatically run scheduled cleanup — expired transients, auto-drafts, and trashed posts will accumulate indefinitely unless a system cron calls wp-cron.php.'
                 : ( ! empty( $d['cron_missing'] )
                     ? 'Core cleanup cron events (wp_scheduled_delete, delete_expired_transients) are missing from the schedule. These events handle expired transients, auto-drafts, and trashed content — their absence means database bloat will grow unchecked.'
                     : 'Core cleanup cron events are overdue by more than 6 hours, suggesting WP-Cron is not firing reliably. Expired transients and auto-drafts may be accumulating.' );
-            $findings[] = [
+            $finding = [
                 'category'   => 'Database',
                 'severity'   => $sev,
                 'title'      => ! empty( $d['cron_disabled'] )
@@ -1978,6 +1998,11 @@ PROMPT;
                 'fix_action' => 'cron_health',
                 'affected'   => 'wp_options, wp_posts tables',
             ];
+            if ( ! empty( $d['cron_disabled'] ) ) {
+                $finding['dismiss_id']    = 'cron_disabled_ack';
+                $finding['dismiss_label'] = 'System Cron Configured';
+            }
+            $findings[] = $finding;
         }
 
         if ( $d['expired_transients'] > 50 ) {
@@ -2184,12 +2209,13 @@ PROMPT;
         // ── Active brute-force attack detected today ──
         if ( ! empty( $d['bf_today_count'] ) && $d['bf_today_count'] >= 30 ) {
             $findings[] = [
-                'category' => 'Security',
-                'severity' => 'critical',
-                'title'    => "Active brute-force attack in progress — {$d['bf_today_count']} failed login attempts today",
-                'detail'   => "More than 30 failed WordPress login attempts have been recorded today. This indicates an automated credential-stuffing or brute-force campaign is actively targeting this site. Distributed attacks use rotating IPs to evade per-IP blocks.",
-                'fix'      => 'Enable 2FA immediately for all administrator accounts — it makes credential guessing irrelevant even if an attacker has your password. Consider adding a Web Application Firewall (WAF) such as Cloudflare to block attacking IPs at the edge.',
-                'affected' => "{$d['bf_today_count']} attempts today",
+                'category'        => 'Security',
+                'severity'        => 'critical',
+                'title'           => "Active brute-force attack in progress — {$d['bf_today_count']} failed login attempts today",
+                'detail'          => "More than 30 failed WordPress login attempts have been recorded today. This indicates an automated credential-stuffing or brute-force campaign is actively targeting this site. Distributed attacks use rotating IPs to evade per-IP blocks.",
+                'fix'             => 'Enable 2FA immediately for all administrator accounts — it makes credential guessing irrelevant even if an attacker has your password. Consider adding a Web Application Firewall (WAF) such as Cloudflare to block attacking IPs at the edge.',
+                'affected'        => "{$d['bf_today_count']} attempts today",
+                'bf_last_attempt' => $d['bf_last_attempt'] ?? 0,
             ];
         }
 

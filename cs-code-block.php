@@ -2,8 +2,8 @@
 /**
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
- * Description: AI security scanner and developer toolkit. Replaces your security scanner, 2FA plugin, SMTP mailer, SQL tool, and log viewer — one free plugin, no cloud dependency.
- * Version: 1.9.379
+ * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
+ * Version: 1.9.392
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,21 +54,21 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.379';
+    const VERSION      = '1.9.392';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
 
     // Nonce action strings — single source of truth used across all extracted classes.
     const MIGRATE_NONCE      = 'csdt_devtools_code_migrate_action';
-    const SECURITY_NONCE     = CloudScale_DevTools::SECURITY_NONCE;
-    const OPTIMIZER_NONCE    = CloudScale_DevTools::OPTIMIZER_NONCE;
-    const LOGS_NONCE         = CloudScale_DevTools::LOGS_NONCE;
-    const SQL_NONCE          = CloudScale_DevTools::SQL_NONCE;
-    const DEBUG_NONCE        = CloudScale_DevTools::DEBUG_NONCE;
-    const FPM_NONCE          = CloudScale_DevTools::FPM_NONCE;
-    const SITE_AUDIT_NONCE   = CloudScale_DevTools::SITE_AUDIT_NONCE;
-    const PERF_NONCE         = CloudScale_DevTools::PERF_NONCE;
+    const SECURITY_NONCE     = 'csdt_devtools_security_nonce';
+    const OPTIMIZER_NONCE    = 'csdt_optimizer_nonce';
+    const LOGS_NONCE         = 'csdt_devtools_server_logs';
+    const SQL_NONCE          = 'csdt_devtools_sql_nonce';
+    const DEBUG_NONCE        = 'csdt_debug_nonce';
+    const FPM_NONCE          = 'csdt_fpm_nonce';
+    const SITE_AUDIT_NONCE   = 'csdt_site_audit_nonce';
+    const PERF_NONCE         = 'csdt_devtools_perf_monitor_nonce';
     const LOGIN_NONCE        = 'csdt_devtools_login_nonce';
     const SMTP_NONCE         = 'csdt_devtools_smtp_nonce';
 
@@ -510,6 +510,7 @@ class CloudScale_DevTools {
         add_action( 'rest_api_init',                            [ 'CSDT_Custom_404', 'register_hiscore_routes' ] );
         add_action( 'rest_api_init',                            [ 'CSDT_CSP', 'register_csp_report_route' ] );
         add_action( 'rest_api_init',                            [ 'CSDT_Monitor', 'register_fpm_report_route' ] );
+        add_action( 'rest_api_init',                            [ 'CSDT_Uptime', 'register_rest_routes' ] );
         add_action( 'wp_ajax_csdt_devtools_save_404_settings',    [ 'CSDT_Custom_404', 'ajax_save_404_settings' ] );
 
         // Performance monitor — EXPLAIN endpoint.
@@ -3690,9 +3691,15 @@ class CloudScale_DevTools {
             $score_cls = $s >= 75 ? '#16a34a' : ( $s >= 55 ? '#d97706' : '#dc2626' );
         }
 
+        $audit_cache       = get_option( 'csdt_site_audit_cache', null );
+        $audit_counts      = $audit_cache['data']['counts'] ?? null;
+        $audit_run_at      = $audit_cache['run_at'] ?? 0;
+        $audit_critical    = isset( $audit_counts ) ? (int) ( $audit_counts['critical'] ?? 0 ) : null;
+        $audit_high        = isset( $audit_counts ) ? (int) ( $audit_counts['high'] ?? 0 ) : null;
+
         $bf_on      = get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1';
         $login_slug = get_option( 'csdt_devtools_login_slug', '' );
-        $force_2fa  = get_option( 'csdt_devtools_force_2fa', '0' ) === '1';
+        $force_2fa  = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1';
         $email_2fa  = get_option( 'csdt_devtools_2fa_method', 'off' ) === 'email';
         $admins     = get_users( [ 'role' => 'administrator' ] );
         $adm_tot    = count( $admins );
@@ -3716,27 +3723,45 @@ class CloudScale_DevTools {
             </span>
         </div>
 
+        <?php
+        $combined_critical = (int) ( $last_scan['critical_count'] ?? 0 ) + ( $audit_critical ?? 0 );
+        $combined_high     = (int) ( $last_scan['high_count'] ?? 0 ) + ( $audit_high ?? 0 );
+        $either_run        = $last_scan || null !== $audit_critical;
+        ?>
         <div class="cs-dw-section" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
-            <span>🛡️ <?php esc_html_e( 'Last Security Scan', 'cloudscale-devtools' ); ?></span>
-            <?php if ( $last_scan ) : ?><a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" style="font-size:11px;font-weight:600;color:#0e6b8f;text-decoration:none;"><?php esc_html_e( 'View Report →', 'cloudscale-devtools' ); ?></a><?php endif; ?>
+            <span>🛡️ <?php esc_html_e( 'AI Scans', 'cloudscale-devtools' ); ?></span>
+            <span style="display:flex;gap:10px;">
+                <?php if ( $last_scan ) : ?><a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>" style="font-size:11px;font-weight:600;color:#0e6b8f;text-decoration:none;"><?php esc_html_e( 'Security →', 'cloudscale-devtools' ); ?></a><?php endif; ?>
+                <?php if ( null !== $audit_critical ) : ?><a href="<?php echo esc_url( $base_url . '&tab=site-audit' ); ?>" style="font-size:11px;font-weight:600;color:#0e6b8f;text-decoration:none;"><?php esc_html_e( 'Audit →', 'cloudscale-devtools' ); ?></a><?php endif; ?>
+            </span>
         </div>
+        <?php if ( $either_run ) : ?>
         <?php if ( $last_scan ) : ?>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( 'SCORE', 'cloudscale-devtools' ); ?></span>
             <span style="color:<?php echo esc_attr( $score_cls ); ?>;font-weight:600;"><?php echo esc_html( ( $last_scan['score_label'] ?? '' ) . ' · ' . ( $last_scan['score'] ?? '' ) ); ?></span>
         </div>
+        <?php endif; ?>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( 'CRITICAL', 'cloudscale-devtools' ); ?></span>
-            <span style="color:<?php echo (int) ( $last_scan['critical_count'] ?? 0 ) > 0 ? '#dc2626' : '#16a34a'; ?>;font-weight:600;"><?php echo (int) ( $last_scan['critical_count'] ?? 0 ); ?></span>
+            <span style="color:<?php echo $combined_critical > 0 ? '#dc2626' : '#16a34a'; ?>;font-weight:600;"><?php echo esc_html( $combined_critical ); ?></span>
         </div>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( 'HIGH', 'cloudscale-devtools' ); ?></span>
-            <span style="color:<?php echo (int) ( $last_scan['high_count'] ?? 0 ) > 0 ? '#d97706' : '#16a34a'; ?>;font-weight:600;"><?php echo (int) ( $last_scan['high_count'] ?? 0 ); ?></span>
+            <span style="color:<?php echo $combined_high > 0 ? '#d97706' : '#16a34a'; ?>;font-weight:600;"><?php echo esc_html( $combined_high ); ?></span>
         </div>
+        <?php if ( $last_scan ) : ?>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( 'SCANNED', 'cloudscale-devtools' ); ?></span>
             <span style="color:#888;"><?php echo esc_html( human_time_diff( (int) ( $last_scan['scanned_at'] ?? 0 ) ) . ' ' . __( 'ago', 'cloudscale-devtools' ) ); ?></span>
         </div>
+        <?php endif; ?>
+        <?php if ( null !== $audit_critical ) : ?>
+        <div class="cs-dw-row">
+            <span class="cs-dw-lbl"><?php esc_html_e( 'AUDITED', 'cloudscale-devtools' ); ?></span>
+            <span style="color:#888;"><?php echo esc_html( human_time_diff( $audit_run_at ) . ' ' . __( 'ago', 'cloudscale-devtools' ) ); ?></span>
+        </div>
+        <?php endif; ?>
         <?php else : ?>
         <div class="cs-dw-row"><span style="color:#94a3b8;"><?php esc_html_e( 'No scans run yet', 'cloudscale-devtools' ); ?></span></div>
         <?php endif; ?>
@@ -3748,7 +3773,7 @@ class CloudScale_DevTools {
         </div>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( '2FA ADMINS', 'cloudscale-devtools' ); ?></span>
-            <span style="color:<?php echo $adm_2fa === $adm_tot ? '#16a34a' : ( $adm_2fa > 0 ? '#d97706' : '#dc2626' ); ?>;font-weight:600;"><?php echo esc_html( $adm_2fa . ' / ' . $adm_tot ); ?></span>
+            <span style="color:<?php echo ( $adm_tot > 0 && $adm_2fa === $adm_tot ) ? '#16a34a' : ( $adm_2fa > 0 ? '#d97706' : '#dc2626' ); ?>;font-weight:600;"><?php echo esc_html( $adm_2fa . ' / ' . $adm_tot ); ?></span>
         </div>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( 'HIDE LOGIN', 'cloudscale-devtools' ); ?></span>
@@ -3756,7 +3781,7 @@ class CloudScale_DevTools {
         </div>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( 'FORCE 2FA', 'cloudscale-devtools' ); ?></span>
-            <span style="color:<?php echo $force_2fa ? '#16a34a' : '#94a3b8'; ?>;font-weight:600;"><?php echo $force_2fa ? esc_html__( 'On', 'cloudscale-devtools' ) : esc_html__( 'Off', 'cloudscale-devtools' ); ?></span>
+            <span style="color:<?php echo $force_2fa ? '#16a34a' : '#dc2626'; ?>;font-weight:600;"><?php echo $force_2fa ? esc_html__( 'On', 'cloudscale-devtools' ) : esc_html__( 'Off', 'cloudscale-devtools' ); ?></span>
         </div>
 
         <div class="cs-dw-actions">
@@ -4139,10 +4164,17 @@ class CloudScale_DevTools {
                 <div style="border-top:1px solid #e5e7eb;padding-top:28px;padding-bottom:28px;">
                     <h2 class="cs-panel-heading">⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></h2>
                     <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
-                        <?php esc_html_e( 'Deploys a Cloudflare Worker that pings your site every 60 seconds from the edge — independent of your server. If the site goes down, the Worker sends an ntfy.sh alert immediately, even if your server is completely offline.', 'cloudscale-devtools' ); ?>
+                        <?php esc_html_e( 'Deploys a Cloudflare Worker that probes your site every 60 seconds from the edge — independent of your server. Each probe calls the built-in readiness endpoint, which checks PHP-FPM saturation, database connectivity, and WordPress boot. If any check fails, the Worker alerts you immediately via ntfy.sh, even if your server is completely offline.', 'cloudscale-devtools' ); ?>
+                    </p>
+                    <p style="color:#9ca3af;margin:0 0 6px;font-size:.88em;">
+                        <?php esc_html_e( 'Requires Cloudflare Zone ID and API Token (saved in Thumbnails tab). The API token needs Workers:Edit permission.', 'cloudscale-devtools' ); ?>
                     </p>
                     <p style="color:#9ca3af;margin:0 0 16px;font-size:.88em;">
-                        <?php esc_html_e( 'Requires Cloudflare Zone ID and API Token (saved in Thumbnails tab). The API token needs Workers:Edit permission.', 'cloudscale-devtools' ); ?>
+                        <?php echo wp_kses( sprintf(
+                            /* translators: %s: readiness endpoint URL */
+                            __( 'Readiness endpoint: <code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;">%s</code>', 'cloudscale-devtools' ),
+                            esc_html( rest_url( 'csdt/v1/ready' ) )
+                        ), [ 'code' => [ 'style' => [] ] ] ); ?>
                     </p>
                     <div id="csdt-uptime-setup-wrap">
                         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">

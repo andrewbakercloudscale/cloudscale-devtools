@@ -8,10 +8,10 @@ helpLib.run({
     restPass:   process.env.WP_REST_PASS,
     docsDir:    process.env.WP_DOCS_DIR,
 
-    pluginName: 'CloudScale Cyber and Devtools',
-    pluginDesc: 'Free WordPress security plugin with AI cyber audit using Claude &amp; Gemini, two-factor authentication, passkeys, login URL protection, one-click hardening, server logs, and code blocks.',
-    seoTitle:  'CloudScale Cyber & Devtools | Free WordPress Security Plugin',
-    seoDesc:   'Free WordPress security plugin with AI cyber audit (Claude & Gemini), 2FA, passkeys, one-click hardening, server logs, and code blocks. No subscription.',
+    pluginName: 'CloudScale Cyber and Devtools — Free WordPress Security, AI Penetration Testing &amp; Developer Toolkit',
+    pluginDesc: 'The only free WordPress plugin that runs a full AI penetration test of your site using Anthropic Claude 4 or Google Gemini 2.5 Pro — the same AI models security consultants charge thousands to access. Combines brute-force login protection, two-factor authentication (TOTP, email &amp; passkeys/WebAuthn), hidden login URL, AI site content audit, AI debugging assistant, live PHP-FPM performance monitor, SMTP mailer, read-only SQL query tool, server log viewer, plugin CVE vulnerability scanner, Cloudflare uptime monitor with deep readiness probe (DB + FPM + WP health), and syntax-highlighted code blocks. Replaces 8+ paid plugins. No subscription, no SaaS, no data leaving your server.',
+    seoTitle:  'CloudScale Cyber & Devtools | Free WordPress AI Security Scanner, 2FA & Developer Toolkit',
+    seoDesc:   'Free WordPress security plugin: AI penetration testing with Claude 4 & Gemini, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, PHP-FPM monitor, SMTP, SQL tool, server logs, CVE scanner, Cloudflare uptime. No subscription.',
 
     schema: {
         '@context': 'https://schema.org',
@@ -20,7 +20,7 @@ helpLib.run({
         'applicationCategory': 'SecurityApplication',
         'operatingSystem': 'WordPress',
         'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
-        'description': 'Free WordPress security plugin powered by Anthropic Claude and Google Gemini AI. Features: AI cyber audit, two-factor authentication, passkeys (WebAuthn), hide login URL, brute-force protection, CSP builder, server logs, SQL tool, and syntax-highlighted code blocks.',
+        'description': 'Free WordPress security plugin powered by Anthropic Claude and Google Gemini AI. Features: AI-powered penetration testing, brute-force protection, two-factor authentication, passkeys (WebAuthn), hide login URL, AI site audit, AI debugging assistant, PHP-FPM monitoring, performance panel, SMTP mailer, SQL tool, server logs, plugin vulnerability scanner, Cloudflare uptime monitor with readiness probe, and syntax-highlighted code blocks.',
         'url': 'https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-cyber-devtools-help/',
         'downloadUrl': 'https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
         'softwareVersion': '1.9.121',
@@ -28,7 +28,7 @@ helpLib.run({
         'isAccessibleForFree': true,
         'license': 'https://www.gnu.org/licenses/gpl-2.0.html',
     },
-    pageTitle:  'CloudScale Cyber and Devtools',
+    pageTitle:  'CloudScale Cyber & Devtools — Free AI Penetration Testing & WordPress Security Plugin',
     pageSlug:   'cloudscale-cyber-devtools-help',
     downloadUrl: 'https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
     repoUrl:     'https://github.com/andrewbakercloudscale/cloudscale-cyber-devtools',
@@ -453,10 +453,10 @@ helpLib.run({
         { id: 'migrator',   label: 'Code Block Migrator',   file: 'panel-migrator.png',    tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-migrator',
           intro: 'Converts all posts using legacy code block formats — WordPress core blocks, SyntaxHighlighter, Enlighter shortcodes — to CloudScale blocks in a single batch operation. Scan → preview the diff per post → migrate everything in one click, with no manual post editing.',
           altText: 'WordPress code block migrator for batch converting from Enlighter, SyntaxHighlighter, and other plugins' },
-        { id: 'sql-tool',   label: 'SQL Query Tool',        file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=sql"]',     elementSelector: '#cs-panel-sql',
+        { id: 'sql-tool',   label: 'SQL Query Tool',        file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-sql',
           intro: 'A read-only SQL query interface inside wp-admin — inspect tables, check row counts, trace slow queries, and find database bloat without phpMyAdmin, SSH access, or exposing your database port. Architecturally impossible to delete or modify data.',
           altText: 'WordPress read-only SQL query tool for safe database inspection inside wp-admin without phpMyAdmin' },
-        { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=logs"]',    elementSelector: '#cs-panel-logs',
+        { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-logs',
           intro: 'Browse your PHP error log, WordPress debug log, and web server logs directly in the dashboard — with live search, severity filtering, and auto-refresh tail mode. No SSH, no cPanel, no asking your hosting provider to email you a file.',
           altText: 'WordPress server log viewer for PHP error logs, debug logs, and web server logs without SSH access' },
         { id: 'optimizer',  label: 'Plugin Optimizer',      file: 'panel-optimizer.png',   tabSelector: 'a[href*="tab=optimizer"]',  elementSelector: '#cs-panel-optimizer',
@@ -799,5 +799,100 @@ helpLib.run({
 <h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">Setup</h3>
 <p>Configure the settings in the panel, then copy the <strong>crontab line</strong> and <strong>config.env snippet</strong> from the Host Cron Setup section. The config includes the callback URL and a secret token that authenticates events back to this panel. Add the crontab line to your host's crontab with <code>crontab -e</code>, and source the config.env from your cron script. The monitor starts detecting saturation immediately.</p>
 <p><strong>Auto-restart:</strong> when enabled, the script issues <code>docker restart {container}</code> after declaring saturation. Use with care on production — a restart drops all in-flight requests. The restart cooldown (default: 20 minutes) prevents the script from restarting more than once per incident.</p>`,
+
+        'uptime-monitor': `
+<div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-left:4px solid #16a34a;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">⏱ Deep Uptime Monitoring — From the Cloudflare Edge</h2>
+<p style="margin:0 0 10px;color:#374151;">Traditional uptime monitors check whether your site returns a 200 status code. That tells you nothing about whether WordPress is actually healthy — your site can return 200 while the database is failing, PHP-FPM workers are exhausted, or the application is silently broken.</p>
+<p style="margin:0;color:#374151;">The CloudScale Uptime Monitor probes a built-in <strong>readiness endpoint</strong> every 60 seconds from the Cloudflare edge. Each probe checks: database connectivity, PHP-FPM saturation, and WordPress boot. If any check fails, you get an alert immediately — even if your server is completely offline.</p>
+</div>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">How It Works</h3>
+<ol>
+<li>A <strong>Cloudflare Worker</strong> runs on a 60-second cron from the Cloudflare edge — completely independent of your server, your hosting provider, and WP-Cron.</li>
+<li>Every minute, the Worker sends a <code>GET</code> request to your site's <strong>readiness endpoint</strong> (<code>/wp-json/csdt/v1/ready</code>) with a secret Bearer token in the Authorization header.</li>
+<li>The readiness endpoint runs three checks internally and returns <code>HTTP 200</code> if all pass or <code>HTTP 503</code> if any fail.</li>
+<li>The Worker posts the result back to your WordPress site, recording it in the uptime history and triggering alerts if the site is down.</li>
+<li>The uptime panel shows <strong>Last Queried</strong> (last time Cloudflare successfully called your endpoint) and <strong>Last Failed Query</strong> (last time someone called with an invalid token) so you can see at a glance that the Worker is running and no unauthorised probing is happening.</li>
+</ol>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">The Readiness Endpoint</h3>
+<p>The readiness endpoint is a public REST API route at <code>/wp-json/csdt/v1/ready</code>. It requires a Bearer token — requests without a valid token return <code>401 Unauthorized</code> and the timestamp is logged as "Last Failed Query".</p>
+<p><strong>Checks performed on each probe:</strong></p>
+<ul>
+<li><strong>Database</strong> — executes <code>SELECT 1</code> against your WordPress database. Fails if the DB is unreachable or returning errors.</li>
+<li><strong>PHP-FPM saturation</strong> — reads the <code>/fpm-status</code> page (if configured) and fails if active workers exceed 90% of total pool size. This catches the scenario where your site is technically reachable but is about to freeze under load.</li>
+<li><strong>WordPress boot</strong> — implicit: if the endpoint responds at all, WordPress initialised successfully.</li>
+</ul>
+<p><strong>Response format (200 — healthy):</strong></p>
+<pre style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:12px;font-size:.82em;overflow-x:auto;">{
+  "ok": true,
+  "checks": {
+    "db":  { "ok": true, "message": "Connected" },
+    "fpm": { "ok": true, "active": 2, "total": 10, "saturation_pct": 20 },
+    "wp":  { "ok": true, "version": "6.8" }
+  },
+  "site": "https://yoursite.com",
+  "checked_at": 1745000000
+}</pre>
+<p><strong>Response format (503 — degraded):</strong></p>
+<pre style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:12px;font-size:.82em;overflow-x:auto;">{
+  "ok": false,
+  "checks": {
+    "db":  { "ok": false, "message": "Query failed" },
+    "fpm": { "ok": false, "active": 10, "total": 10, "saturation_pct": 100 },
+    "wp":  { "ok": true, "version": "6.8" }
+  },
+  "site": "https://yoursite.com",
+  "checked_at": 1745000000
+}</pre>
+<p>You can call this endpoint manually at any time (with the token) to check your site's health.</p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">One-Click Setup</h3>
+<p><strong>Prerequisites:</strong> a Cloudflare account with your site's domain proxied through Cloudflare. Enter your Cloudflare Zone ID and API Token in the <strong>Thumbnails tab</strong> — the token needs <strong>Workers:Edit</strong> permission.</p>
+<ol>
+<li>Go to <strong>Tools → Cyber and Devtools → Optimizer tab</strong>.</li>
+<li>Scroll to the <strong>Uptime Monitor</strong> section.</li>
+<li>Optionally enter an <strong>ntfy.sh alert URL</strong> (e.g. <code>https://ntfy.sh/your-topic</code>) to receive push notifications on your phone when the site goes down. This is the same ntfy URL used by the scheduled security scan.</li>
+<li>Click <strong>Deploy Worker to Cloudflare</strong>. The plugin will:
+  <ul>
+  <li>Generate a secure random token (or reuse an existing one)</li>
+  <li>Resolve your Cloudflare account ID from your Zone ID</li>
+  <li>Upload the Worker script with all environment variables pre-configured (SITE_URL, PING_URL, READY_URL, PING_TOKEN, NTFY_URL)</li>
+  <li>Set the cron trigger to run every minute</li>
+  </ul>
+</li>
+<li>Within 60 seconds, the <strong>Last Queried</strong> timestamp in the status panel will update, confirming the Worker is running and probing your endpoint.</li>
+</ol>
+<p>That's it. No command line required.</p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">Manual Setup (CLI)</h3>
+<p>If you prefer Wrangler, click <strong>Generate Token</strong> first, then expand <strong>Manual deploy</strong>. You'll get a <code>worker.js</code> file and a pre-filled <code>wrangler.toml</code> with all variables set. Run:</p>
+<pre style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:12px;font-size:.82em;">npm install -g wrangler
+wrangler login
+wrangler deploy</pre>
+<p>Then set the cron trigger in the Cloudflare dashboard: <strong>Workers → cloudscale-uptime → Triggers → Cron Triggers → Add Cron → <code>* * * * *</code></strong></p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">Alerts and Notifications</h3>
+<ul>
+<li><strong>ntfy.sh push</strong> — sent directly from the Cloudflare Worker when the readiness probe fails. This fires even if your server is completely offline, because the Worker runs on Cloudflare's infrastructure independently.</li>
+<li><strong>Email alert</strong> — sent from WordPress when the ping callback receives a down status. Falls back to the WordPress admin email if no specific alert email is configured.</li>
+<li><strong>Recovery alert</strong> — sent when the site comes back up after a confirmed outage, including how long the site was down.</li>
+<li><strong>5-minute alert cooldown</strong> — prevents notification spam during extended outages.</li>
+</ul>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">Security</h3>
+<p>The readiness endpoint is public (accessible without a WordPress login) but protected by a Bearer token. All token comparisons use <code>hash_equals()</code> to prevent timing attacks. Requests with a missing or incorrect token return <code>401</code> and log the time of the attempt as <strong>Last Failed Query</strong> — visible in the uptime panel. If you see unexpected failed queries, regenerate your token using the <strong>Generate Token</strong> button and re-deploy the Worker.</p>
+<p>The endpoint does not expose sensitive data — it only returns health check pass/fail status and version numbers.</p>`,
     },
 }).catch(err => { console.error('ERROR:', err.message); process.exit(1); });

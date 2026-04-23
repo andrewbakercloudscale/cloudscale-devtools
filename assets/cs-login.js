@@ -480,25 +480,31 @@
             renderBfTable( log, now );
 
             // Active attack banner
-            const header = bfLogWrap.querySelector( '.cs-bf-log-header' );
-            if ( today_count >= 30 && header ) {
-                // Replace the title with a screaming red alert
-                header.style.cssText = 'background:#dc2626;border-radius:8px 8px 0 0;padding:12px 16px;margin:0 0 16px 0;';
-                header.innerHTML = `
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                        <span style="font-size:1.35em;font-weight:900;color:#fff;letter-spacing:.5px;text-transform:uppercase;">
-                            ⚠ BRUTE FORCE ATTACK DETECTED
-                        </span>
-                        <span style="background:#fff;color:#dc2626;font-size:.85em;font-weight:800;padding:2px 10px;border-radius:12px;">
-                            ${today_count} attempts today
-                        </span>
-                    </div>
-                    <div style="font-size:.82em;color:#fecaca;margin-top:4px;">
-                        Automated credential-stuffing is actively targeting this site. Enable 2FA now if not already active.
-                    </div>`;
-                bfLogWrap.style.border = '2px solid #dc2626';
-                bfLogWrap.style.borderRadius = '10px';
-                bfLogWrap.style.boxShadow = '0 0 0 4px rgba(220,38,38,.15)';
+            if ( today_count >= 30 ) {
+                const banner = document.createElement( 'div' );
+                banner.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:12px;';
+
+                const icon = document.createElement( 'span' );
+                icon.textContent = '⚠';
+                icon.style.cssText = 'font-size:1.1em;color:#dc2626;flex-shrink:0;';
+
+                const label = document.createElement( 'span' );
+                label.textContent = 'Brute force attack detected';
+                label.style.cssText = 'font-weight:700;color:#991b1b;font-size:.9em;';
+
+                const badge = document.createElement( 'span' );
+                badge.textContent = today_count + ' attempts today';
+                badge.style.cssText = 'background:#dc2626;color:#fff;font-size:.78em;font-weight:700;padding:2px 9px;border-radius:10px;white-space:nowrap;';
+
+                const msg = document.createElement( 'span' );
+                msg.textContent = 'Credential-stuffing is actively targeting this site. Ensure 2FA is enabled.';
+                msg.style.cssText = 'font-size:.82em;color:#7f1d1d;flex-basis:100%;margin-top:2px;';
+
+                banner.appendChild( icon );
+                banner.appendChild( label );
+                banner.appendChild( badge );
+                banner.appendChild( msg );
+                bfLogWrap.insertBefore( banner, bfLogWrap.firstChild );
             }
         } ).catch( () => {
             if ( bfTableWrap ) bfTableWrap.innerHTML = '<div class="cs-bf-empty">Could not load log.</div>';

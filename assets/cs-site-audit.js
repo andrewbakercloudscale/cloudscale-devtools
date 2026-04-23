@@ -104,10 +104,17 @@
                 fixActionHtml = '<div style="margin-top:8px;"><a href="' + escHtml(csdtSiteAudit.seoAiUrl || '') +
                     '" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;">⚡ Fix It — Open SEO AI</a></div>';
             } else if (quickFixActions[effectiveFixAction]) {
+                var dismissBtn = '';
+                if (f.dismiss_id) {
+                    dismissBtn = ' <button class="csdt-dismiss-btn" data-dismiss-id="' + escHtml(f.dismiss_id) +
+                        '" style="background:none;color:#6b7280;border:1px solid #d1d5db;font-size:.8em;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;margin-left:6px;">' +
+                        escHtml(f.dismiss_label || 'Acknowledge') + '</button>';
+                }
                 fixActionHtml = '<div style="margin-top:8px;">' +
                     '<button class="csdt-fix-it-btn" data-fix-id="' + escHtml(quickFixActions[effectiveFixAction]) +
                     '" style="background:#10b981;color:#fff;border:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;cursor:pointer;">⚡ Fix It</button>' +
-                    '<span class="csdt-fix-it-status" style="display:none;margin-left:8px;font-size:.82em;"></span></div>';
+                    dismissBtn +
+                    '<span class="csdt-fix-it-status" style="display:none;margin-left:8px;font-size:.82em;color:#374151;"></span></div>';
             } else if (modalFixActions[effectiveFixAction]) {
                 fixActionHtml = '<div style="margin-top:8px;">' +
                     '<button class="csdt-modal-fix-btn" data-modal="' + escHtml(modalFixActions[effectiveFixAction]) +
@@ -135,7 +142,9 @@
             '<span style="background:#e2e8f0;color:#475569;font-size:.7em;font-weight:600;padding:2px 8px;border-radius:20px;">' + escHtml(f.category || '') + '</span>' +
             ( f.affected ? '<span style="color:#94a3b8;font-size:.78em;">→ ' + escHtml(f.affected) + '</span>' : '' ) +
             '</div>' +
-            '<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:.95em;line-height:1.4;">' + escHtml(f.title || '') + '</p>' +
+            '<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:.95em;line-height:1.4;">' + escHtml(f.title || '') +
+            ( f.bf_last_attempt ? ' <span style="font-size:.75em;font-weight:400;color:#6b7280;margin-left:6px;">Last attempt: ' + escHtml(new Date(f.bf_last_attempt * 1000).toLocaleString()) + '</span>' : '' ) +
+            '</p>' +
             '<p style="margin:0 0 8px;color:#4b5563;font-size:.87em;line-height:1.6;">' + linkifyDetail(f.detail || '') + '</p>' +
             linksHtml +
             '<div style="background:rgba(255,255,255,.7);border-left:2px solid ' + col.badge + ';padding:8px 12px;border-radius:0 4px 4px 0;font-size:.85em;color:#374151;line-height:1.5;">' +
@@ -247,9 +256,10 @@
             secPost('csdt_devtools_quick_fix', { fix_action: 'apply', fix_id: fixId })
                 .then(function (res) {
                     if (res && res.success) {
-                        btn.textContent = '✅ Fixed';
-                        btn.style.background = '#6b7280';
-                        if (status) { status.style.display = 'inline'; status.style.color = '#16a34a'; status.textContent = res.data && res.data.message ? res.data.message : 'Done'; }
+                        btn.textContent = '✓ Fixed';
+                        btn.style.cssText = 'background:#16a34a;color:#fff;border:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;cursor:default;';
+                        btn.disabled = true;
+                        if (status) { status.style.display = 'inline'; status.style.color = '#374151'; status.style.fontWeight = 'normal'; status.textContent = res.data && res.data.message ? res.data.message : ''; }
                     } else {
                         btn.disabled = false;
                         btn.textContent = '⚡ Fix It';
@@ -261,6 +271,28 @@
                     btn.textContent = '⚡ Fix It';
                     if (status) { status.style.display = 'inline'; status.style.color = '#dc2626'; status.textContent = 'Request failed'; }
                 });
+        });
+
+        // Wire Dismiss/Acknowledge buttons
+        resultsDiv.addEventListener('click', function (e) {
+            var btn = e.target.closest('.csdt-dismiss-btn');
+            if (!btn) return;
+            var dismissId = btn.getAttribute('data-dismiss-id');
+            var card = btn.closest('[style]');
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            secPost('csdt_devtools_quick_fix', { fix_action: 'dismiss', fix_id: dismissId })
+                .then(function (res) {
+                    if (res && res.success) {
+                        btn.textContent = '✓ Acknowledged';
+                        btn.style.cssText = 'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;font-size:.8em;font-weight:600;padding:5px 12px;border-radius:6px;cursor:default;margin-left:6px;';
+                        if (card) { card.style.opacity = '0.5'; }
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = btn.getAttribute('data-original-label') || 'Acknowledge';
+                    }
+                })
+                .catch(function () { btn.disabled = false; });
         });
 
         // Wire PDF button

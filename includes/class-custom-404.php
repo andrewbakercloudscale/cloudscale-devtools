@@ -86,10 +86,12 @@ class CSDT_Custom_404 {
             $logo_html = '<img src="' . esc_url( $icon_url ) . '" alt="" width="48" height="48">';
         }
 
-        $css_path = plugin_dir_path( __FILE__ ) . 'assets/cs-custom-404.css';
-        $js_path  = plugin_dir_path( __FILE__ ) . 'assets/cs-custom-404.js';
-        $css_url  = plugins_url( 'assets/cs-custom-404.css', __FILE__ ) . '?ver=' . CloudScale_DevTools::VERSION . '.' . filemtime( $css_path );
-        $js_url   = plugins_url( 'assets/cs-custom-404.js',  __FILE__ ) . '?ver=' . CloudScale_DevTools::VERSION . '.' . filemtime( $js_path );
+        $root_path = plugin_dir_path( __DIR__ );
+        $root_url  = plugin_dir_url( __DIR__ );
+        $css_path  = $root_path . 'assets/cs-custom-404.css';
+        $js_path   = $root_path . 'assets/cs-custom-404.js';
+        $css_url   = $root_url . 'assets/cs-custom-404.css?ver=' . CloudScale_DevTools::VERSION . '.' . filemtime( $css_path );
+        $js_url    = $root_url . 'assets/cs-custom-404.js?ver=' . CloudScale_DevTools::VERSION . '.' . filemtime( $js_path );
 
         $preview_key   = isset( $_GET['csdt_devtools_preview_scheme'] ) ? sanitize_key( wp_unslash( $_GET['csdt_devtools_preview_scheme'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only palette preview
         $all_schemes   = self::get_404_schemes();
