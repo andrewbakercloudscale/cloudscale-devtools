@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.379] - 2026-04-23
+
+### Changed
+- All inline `<script>` blocks extracted to enqueued JS files (`cs-csp.js`, `cs-optimizer-panel.js`, `cs-prefix-rollback.js`) — eliminates PCP `NonEnqueuedScript` violations
+- All inline `<style>` blocks extracted to `wp_add_inline_style()` calls — eliminates PCP `NonEnqueuedStylesheet` violations
+- All `onclick=` inline event handlers replaced with `data-cs-modal-open/close/backdrop` and `data-cs-copy-from` data attributes; event delegation added to `cs-admin-settings.js`
+- `uninstall.php` updated to delete all current `csdt_devtools_*` options on plugin removal
+- `build.sh` now excludes dev-only files from distribution zip
+
+### Fixed
+- Removed 5 `error_log()` debug statements left in cron scan handlers
+- Removed stale `wp_ajax_nopriv_csdt_fpm_report` AJAX hook pointing to non-existent method
+- Added `phpcs:ignore` annotations to all intentional `curl_multi`, `set_time_limit`, and `file_put_contents`/`file_get_contents` calls
+
+## [1.9.376] - 2026-04-22
+
+### Fixed
+- Fatal error: `CSDT_SMTP::maybe_migrate_prefix()` and related migration methods changed from `private static` to `public static` — they are called cross-class from `CloudScale_DevTools::init()`
+- All `private static` methods called cross-class in 9 include files promoted to `public static`
+- Added missing `CloudScale_DevTools::get_client_ip()` referenced by `class-login.php`
+
 ## [1.8.120] - 2026-04-11
 
 ### Fixed

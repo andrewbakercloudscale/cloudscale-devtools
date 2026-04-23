@@ -11,13 +11,12 @@ class CSDT_Uptime {
 
     public static function admin_bar_badge_styles(): void {
         if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) ) return;
-        echo '<style>
-#wp-admin-bar-csdt-health > .ab-item { font-weight:700 !important; }
-#wp-admin-bar-csdt-health.csdt-bar-critical > .ab-item { color:#fca5a5 !important; }
-#wp-admin-bar-csdt-health.csdt-bar-high > .ab-item { color:#fdba74 !important; }
-#wp-admin-bar-csdt-health.csdt-bar-medium > .ab-item { color:#fde68a !important; }
-#wp-admin-bar-csdt-health.csdt-bar-ok > .ab-item { color:#86efac !important; }
-</style>' . "\n";
+        $css = '#wp-admin-bar-csdt-health>.ab-item{font-weight:700!important}'
+             . '#wp-admin-bar-csdt-health.csdt-bar-critical>.ab-item{color:#fca5a5!important}'
+             . '#wp-admin-bar-csdt-health.csdt-bar-high>.ab-item{color:#fdba74!important}'
+             . '#wp-admin-bar-csdt-health.csdt-bar-medium>.ab-item{color:#fde68a!important}'
+             . '#wp-admin-bar-csdt-health.csdt-bar-ok>.ab-item{color:#86efac!important}';
+        wp_add_inline_style( 'admin-bar', $css );
     }
 
     public static function render_admin_bar_badge( \WP_Admin_Bar $bar ): void {

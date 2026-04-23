@@ -232,25 +232,10 @@ class CSDT_Login {
     }
 
     public static function login_error_styles(): void {
-        echo '<style>
-#login_error,
-div.error {
-    background: #0f172a !important;
-    border-left: 4px solid #ef4444 !important;
-    border-radius: 6px !important;
-    color: #f1f5f9 !important;
-    padding: 12px 16px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35) !important;
-}
-#login_error a,
-div.error a {
-    color: #93c5fd !important;
-}
-#login_error strong,
-div.error strong {
-    color: #fca5a5 !important;
-}
-</style>';
+        $css = '#login_error,div.error{background:#0f172a!important;border-left:4px solid #ef4444!important;border-radius:6px!important;color:#f1f5f9!important;padding:12px 16px!important;box-shadow:0 2px 8px rgba(0,0,0,.35)!important}'
+             . '#login_error a,div.error a{color:#93c5fd!important}'
+             . '#login_error strong,div.error strong{color:#fca5a5!important}';
+        wp_add_inline_style( 'login', $css );
     }
 
     public static function login_block_direct_access(): void {
@@ -342,7 +327,7 @@ div.error strong {
         update_option( 'csdt_devtools_admin_probe_log', $log, false );
         status_header( 403 );
         header( 'Content-Type: text/html; charset=utf-8' );
-        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
+        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- custom 403 HTML page output after status_header(403); wp_head() has not fired so wp_enqueue_style() is unavailable.
         echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -657,7 +642,7 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
                 // frame instead of the main tab, painting the dashboard inside the sheet.
                 // window.top.location.href escapes any sub-frame and lands the user correctly.
                 echo '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>';
-                echo '<script>window.top.location.href=' . wp_json_encode( $redirect ) . ';</script>';
+                echo '<script>window.top.location.href=' . wp_json_encode( $redirect ) . ';</script>'; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- minimal inline redirect in a raw HTML exit page; wp_enqueue_script not available after output has started.
                 echo '</body></html>';
                 exit;
             }

@@ -146,7 +146,6 @@ class CSDT_Vuln_Scan {
             $system_prompt = get_option( 'csdt_devtools_security_prompt', '' ) ?: CSDT_Site_Audit::default_security_prompt();
             $user_message  = 'WordPress site security data (JSON):' . "\n\n" . wp_json_encode( CSDT_Site_Audit::gather_security_data(), JSON_PRETTY_PRINT );
 
-            error_log( '[CSDT-SCAN] cron running, model=' . $model );
             $text = CSDT_AI_Dispatcher::call( $system_prompt, $user_message, $model, 4096 );
         } catch ( \Throwable $e ) {
             set_transient( 'csdt_vuln_scan_status', [ 'status' => 'error', 'message' => $e->getMessage() ], 300 );
@@ -172,7 +171,6 @@ class CSDT_Vuln_Scan {
         update_option( 'csdt_security_scan_v2', $output, false );
         set_transient( 'csdt_vuln_scan_status', [ 'status' => 'complete', 'completed_at' => time() ], 600 );
         CSDT_Site_Audit::append_scan_history( 'standard', $report, $output['model_used'], $output['scanned_at'] );
-        error_log( '[CSDT-SCAN] cron complete, score=' . $report['score'] );
     }
 
 }

@@ -1097,7 +1097,7 @@ class CSDT_Perf_Monitor {
         $cpu_count = 1;
         if ( is_readable( '/proc/cpuinfo' ) ) {
             // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-            $cpuinfo = file_get_contents( '/proc/cpuinfo' );
+            $cpuinfo = file_get_contents( '/proc/cpuinfo' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
             if ( false !== $cpuinfo ) {
                 preg_match_all( '/^processor\s*:/m', $cpuinfo, $cpu_matches );
                 $cpu_count = max( 1, count( $cpu_matches[0] ) );

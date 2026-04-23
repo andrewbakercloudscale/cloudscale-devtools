@@ -131,6 +131,7 @@ class CSDT_AI_Dispatcher {
      */
     public static function call_parallel( array $calls ): array {
         $provider = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_multi_init -- wp_remote_* has no parallel multi-handle equivalent; curl_multi is required for concurrent AI calls.
         $mh       = curl_multi_init();
         $handles  = [];
 
@@ -208,7 +209,7 @@ class CSDT_AI_Dispatcher {
      * the PHP process alive for background work (PHP-FPM / fastcgi).
      */
     public static function send_and_continue( array $data ): void {
-        if ( function_exists( 'set_time_limit' ) ) { set_time_limit( 0 ); }
+        if ( function_exists( 'set_time_limit' ) ) { set_time_limit( 0 ); } // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- required for background AI calls that must not time out.
         while ( ob_get_level() ) { ob_end_clean(); }
         header( 'Content-Type: application/json; charset=utf-8' );
         header( 'Connection: close' );
