@@ -42,7 +42,7 @@ async function watchdog(env, ctx) {
     ctx.waitUntil(Promise.all([
       notify(env, true, downSecs),
       env.STATE.delete('ds'),
-      env.STATE.put('la', '0'),
+      env.STATE.put('la', String(now)),
     ]));
   }
 
@@ -61,7 +61,7 @@ async function notify(env, recovered, downSecs) {
     },
     body: recovered
       ? 'Back online' + (dur ? ' — was down ' + dur : '')
-      : 'No heartbeat received for ' + (dur || '2m+'),
+      : 'No heartbeat received for ' + (dur || '3m+'),
   }).catch(() => {});
 }
 

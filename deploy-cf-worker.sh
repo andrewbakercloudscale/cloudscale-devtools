@@ -214,7 +214,7 @@ echo "--- Installing host cron for WP-Cron heartbeat via localhost (every minute
 WP_HOST="${SITE_URL#https://}"
 WP_HOST="${WP_HOST#http://}"
 CRON_LINE="* * * * * curl -sf -m 10 -H 'Host: ${WP_HOST}' 'http://127.0.0.1:${NGINX_PORT}/wp-cron.php?doing_wp_cron' -o /dev/null 2>/dev/null"
-pi_ssh "( crontab -l 2>/dev/null | grep -v 'wp-cron.php'; echo '${CRON_LINE}' ) | crontab -"
+{ pi_ssh "crontab -l 2>/dev/null | grep -v 'wp-cron.php'"; echo "$CRON_LINE"; } | pi_ssh "crontab -"
 echo "  Cron installed: ${CRON_LINE}"
 
 echo ""
