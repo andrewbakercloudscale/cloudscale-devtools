@@ -555,16 +555,23 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
             return $user;
         }
 
+        // Build the list of methods this user actually has available.
+        $available = self::login_2fa_available_methods( $user );
+
+        // If multiple methods are registered, show a picker rather than auto-routing.
+        $initial_method = count( $available ) === 1 ? $available[0] : 'picker';
+
         // Generate a short-lived pending token.
         $token = wp_generate_password( 32, false, false );
         $data  = [
-            'user_id'  => $user->ID,
-            'method'   => $method,
-            'created'  => time(),
-            'remember' => ! empty( $_POST['rememberme'] ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
+            'user_id'   => $user->ID,
+            'method'    => $initial_method,
+            'available' => $available,
+            'created'   => time(),
+            'remember'  => ! empty( $_POST['rememberme'] ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
         ];
 
-        if ( $method === 'email' ) {
+        if ( $initial_method === 'email' ) {
             // Generate + store OTP.
             $otp = str_pad( (string) wp_rand( 0, 999999 ), 6, '0', STR_PAD_LEFT );
             set_transient( CloudScale_DevTools::LOGIN_OTP_TRANSIENT . $user->ID, wp_hash( $otp ), 600 );
@@ -611,9 +618,48 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
             exit;
         }
 
-        $user_id = (int) $pending['user_id'];
-        $method  = $pending['method'];
-        $error   = '';
+        $user_id   = (int) $pending['user_id'];
+        $method    = $pending['method'];
+        $available = isset( $pending['available'] ) && is_array( $pending['available'] ) ? $pending['available'] : [ $method ];
+        $error     = '';
+
+        // ── Method picker ────────────────────────────────────────────────────
+        // When multiple methods are registered, show a selection screen before
+        // the challenge so the user can choose how they want to authenticate.
+        if ( $method === 'picker' ) {
+            if ( isset( $_POST['csdt_devtools_method_choice'] ) ) {
+                $choice = sanitize_key( wp_unslash( $_POST['csdt_devtools_method_choice'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+                if ( in_array( $choice, $available, true ) ) {
+                    $pending['method'] = $choice;
+                    // Send email OTP now that the user chose email.
+                    if ( $choice === 'email' ) {
+                        $rate_key    = 'csdt_devtools_pk_fb_' . $user_id;
+                        $already_sent = get_transient( $rate_key );
+                        if ( ! $already_sent ) {
+                            $u = get_user_by( 'id', $user_id );
+                            if ( $u instanceof \WP_User ) {
+                                $otp = str_pad( (string) wp_rand( 0, 999999 ), 6, '0', STR_PAD_LEFT );
+                                set_transient( CloudScale_DevTools::LOGIN_OTP_TRANSIENT . $user_id, wp_hash( $otp ), 600 );
+                                set_transient( $rate_key, 1, 30 );
+                                $site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+                                add_filter( 'wp_mail_content_type', [ __CLASS__, 'email_content_type_html' ] );
+                                wp_mail( $u->user_email, sprintf( '[%s] Your login code', $site ), self::email_html_otp( $u->display_name, $site, $otp ) );
+                                remove_filter( 'wp_mail_content_type', [ __CLASS__, 'email_content_type_html' ] );
+                            }
+                        }
+                    }
+                    set_transient( CloudScale_DevTools::LOGIN_2FA_TRANSIENT . $token, $pending, 600 );
+                    $url = add_query_arg( [
+                        'action'              => 'csdt_devtools_2fa',
+                        'csdt_devtools_token' => rawurlencode( $token ),
+                    ], wp_login_url() );
+                    wp_safe_redirect( $url );
+                    exit;
+                }
+            }
+            self::login_2fa_render_picker( $token, $available );
+            exit;
+        }
 
         // ── Passkey → email fallback ─────────────────────────────────────────
         if ( $method === 'passkey' && ! empty( $_POST['csdt_devtools_pk_fallback'] ) ) {
@@ -820,6 +866,76 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
         }
 
         return 'off';
+    }
+
+    /**
+     * Returns every 2FA method that is actually available for the given user.
+     * Used to decide whether to show a method picker (multiple) or go straight
+     * to the challenge (single).
+     *
+     * @param  \WP_User $user
+     * @return string[]  Non-empty array from: 'passkey', 'totp', 'email'
+     */
+    private static function login_2fa_available_methods( \WP_User $user ): array {
+        $methods = [];
+        if ( ! empty( CSDT_DevTools_Passkey::get_passkeys( $user->ID ) ) ) {
+            $methods[] = 'passkey';
+        }
+        if ( get_user_meta( $user->ID, 'csdt_devtools_totp_enabled', true ) === '1' ) {
+            $methods[] = 'totp';
+        }
+        // Email is always a valid fallback when 2FA is required for this user.
+        $methods[] = 'email';
+        return $methods;
+    }
+
+    /**
+     * Renders the method-selection screen when a user has multiple 2FA options.
+     *
+     * @param  string   $token     2FA transient token.
+     * @param  string[] $available Methods available for this user.
+     * @return void
+     */
+    private static function login_2fa_render_picker( string $token, array $available ): void {
+        login_header( __( 'Two-Factor Authentication', 'cloudscale-devtools' ), '', null );
+        $labels = [
+            'passkey' => [ 'icon' => '🔑', 'label' => __( 'Use a Passkey',             'cloudscale-devtools' ), 'hint' => __( 'Biometric or device PIN',        'cloudscale-devtools' ) ],
+            'totp'    => [ 'icon' => '📱', 'label' => __( 'Use Google Authenticator',   'cloudscale-devtools' ), 'hint' => __( 'Code from your authenticator app', 'cloudscale-devtools' ) ],
+            'email'   => [ 'icon' => '📧', 'label' => __( 'Send me an email code',      'cloudscale-devtools' ), 'hint' => __( 'One-time code sent to your email', 'cloudscale-devtools' ) ],
+        ];
+        ?>
+        <p style="text-align:center;font-size:48px;margin:0 0 8px">🔐</p>
+        <p style="text-align:center;margin:0 0 24px;color:#555;font-size:13px;line-height:1.5">
+            <?php esc_html_e( 'Choose how you want to verify your identity.', 'cloudscale-devtools' ); ?>
+        </p>
+        <?php foreach ( $available as $m ) :
+            if ( ! isset( $labels[ $m ] ) ) continue;
+            $l = $labels[ $m ];
+        ?>
+        <form method="post" action="" style="margin-bottom:10px">
+            <input type="hidden" name="action"                       value="csdt_devtools_2fa">
+            <input type="hidden" name="csdt_devtools_token"          value="<?php echo esc_attr( $token ); ?>">
+            <input type="hidden" name="csdt_devtools_method_choice"  value="<?php echo esc_attr( $m ); ?>">
+            <button type="submit" style="
+                width:100%;padding:12px 16px;border:1px solid #d1d5db;border-radius:6px;
+                background:#fff;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;
+                font-size:13px;color:#1a2332;transition:background .15s;
+            " onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='#fff'">
+                <span style="font-size:22px;line-height:1"><?php echo $l['icon']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — emoji literal ?></span>
+                <span>
+                    <strong style="display:block"><?php echo esc_html( $l['label'] ); ?></strong>
+                    <span style="color:#6b7280;font-size:11px"><?php echo esc_html( $l['hint'] ); ?></span>
+                </span>
+            </button>
+        </form>
+        <?php endforeach; ?>
+        <p style="text-align:center;margin-top:16px">
+            <a href="<?php echo esc_url( wp_login_url() ); ?>" style="font-size:12px;color:#888">
+                &larr; <?php esc_html_e( 'Back to login', 'cloudscale-devtools' ); ?>
+            </a>
+        </p>
+        <?php
+        login_footer();
     }
 
     // ── C. TOTP (RFC 6238) — pure PHP, no Composer dependency ────────────
