@@ -284,7 +284,7 @@ class CSDT_DevTools_Passkey {
      * @param int    $user_id User to authenticate.
      * @return void  Always exits.
      */
-    public static function render_login_challenge( string $token, int $user_id, string $error = '' ): void {
+    public static function render_login_challenge( string $token, int $user_id, string $error = '', bool $has_picker = false ): void {
         $credentials = self::get_passkeys( $user_id );
         if ( empty( $credentials ) ) {
             wp_safe_redirect( wp_login_url() );
@@ -306,6 +306,9 @@ class CSDT_DevTools_Passkey {
         $nonce = wp_create_nonce( 'csdt_devtools_pk_login_' . $token );
 
         $fallback_url = add_query_arg( [ 'action' => 'csdt_devtools_2fa', 'csdt_devtools_token' => rawurlencode( $token ) ], wp_login_url() );
+        $picker_url   = $has_picker
+            ? add_query_arg( [ 'action' => 'csdt_devtools_2fa', 'csdt_devtools_token' => rawurlencode( $token ), 'csdt_devtools_back_to_picker' => '1' ], wp_login_url() )
+            : '';
 
         login_header( __( 'Passkey Authentication', 'cloudscale-devtools' ), '', null );
         ?>
@@ -339,6 +342,14 @@ class CSDT_DevTools_Passkey {
                   📧 <?php esc_html_e( 'Send me an email code instead', 'cloudscale-devtools' ); ?>
                 </button>
               </p>
+              <?php if ( $picker_url ) : ?>
+              <p id="cs-pk-picker-wrap" style="<?php echo $error ? '' : 'display:none;'; ?>margin:10px 0 0;">
+                <a href="<?php echo esc_url( $picker_url ); ?>"
+                   style="font-size:12px;color:#6b7280;text-decoration:none;">
+                  &larr; <?php esc_html_e( 'Other verification options', 'cloudscale-devtools' ); ?>
+                </a>
+              </p>
+              <?php endif; ?>
             </div>
           </form>
 
@@ -381,10 +392,18 @@ class CSDT_DevTools_Passkey {
                     if ( icon ) icon.textContent = '✅';
                     document.getElementById('cs-pk-login-form').submit();
                 } catch ( e ) {
-                    if ( msg ) { msg.textContent = e.message || '<?php esc_html_e( 'Passkey authentication failed.', 'cloudscale-devtools' ); ?>'; msg.style.color = '#d63638'; }
-                    if ( icon ) icon.textContent = '❌';
+                    const cancelled = e.name === 'NotAllowedError';
+                    if ( msg ) {
+                        msg.textContent = cancelled
+                            ? '<?php esc_html_e( 'Passkey cancelled — choose another way to sign in.', 'cloudscale-devtools' ); ?>'
+                            : ( e.message || '<?php esc_html_e( 'Passkey authentication failed.', 'cloudscale-devtools' ); ?>' );
+                        msg.style.color = cancelled ? '#6b7280' : '#d63638';
+                    }
+                    if ( icon ) icon.textContent = cancelled ? '🔑' : '❌';
                     if ( wrap )     wrap.style.display = '';
                     if ( fallback ) fallback.style.display = '';
+                    const pickerWrap = document.getElementById('cs-pk-picker-wrap');
+                    if ( pickerWrap ) pickerWrap.style.display = '';
                 }
             }
 
