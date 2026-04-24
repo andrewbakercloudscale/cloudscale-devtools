@@ -4085,21 +4085,6 @@ class CloudScale_DevTools {
         $has_key = CSDT_AI_Dispatcher::has_key();
         $security_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         ?>
-        <div class="cs-panel" id="cs-panel-optimizer">
-            <div class="cs-section-header" style="background:linear-gradient(90deg,#1e1b4b 0%,#4338ca 100%);border-left:3px solid #818cf8;">
-                <span>🔧 <?php esc_html_e( 'Plugin Optimizer', 'cloudscale-devtools' ); ?></span>
-                <span class="cs-header-hint"><?php esc_html_e( 'Find plugins CloudScale replaces, reduce bloat, and diagnose errors with AI', 'cloudscale-devtools' ); ?></span>
-                <?php self::render_explain_btn( 'plugin-optimizer', 'Plugin Optimizer', [
-                    [ 'name' => 'Plugin Stack Scanner',    'rec' => 'Overview',    'html' => 'Compares your active plugins against a curated list of functionality that CloudScale already provides. Plugins flagged as redundant can usually be deactivated — reducing page load time, update surface area, and conflict risk.' ],
-                    [ 'name' => 'Plugin health check',     'rec' => 'Recommended', 'html' => 'Checks each active plugin against the WordPress.org API for last-updated date, compatibility with your WordPress version, and known vulnerabilities. Plugins not updated in over 2 years are flagged as high risk.' ],
-                    [ 'name' => 'Update Risk Scorer',           'rec' => 'Recommended', 'html' => 'Before applying plugin updates, scan for available updates and click Assess on any plugin to get an AI risk rating: 🟢 Patch (safe, apply now), 🟡 Minor (new features, low risk), or 🔴 Breaking (major changes — review changelog before updating).' ],
-                    [ 'name' => 'Uptime Monitor',               'rec' => 'Recommended', 'html' => 'Deploys a Cloudflare Worker that probes your readiness endpoint every 60 seconds from the edge — completely independent of your server. If any check fails (PHP-FPM, DB, or WP boot) the Worker sends an ntfy.sh push notification immediately, even if your server is offline. Requires Cloudflare Zone ID and an API token with Workers:Edit scope (set in Thumbnails tab). <strong>Dynamic endpoint path</strong>: set a custom path suffix (e.g. <code>abc123</code>) to prevent your readiness URL from being enumerated or DoS-targeted — only requests to the exact slugged path are answered; the plain <code>/ready</code> route returns 404 if a slug is configured.' ],
-                    [ 'name' => 'Database Intelligence Engine', 'rec' => 'Recommended', 'html' => 'Scans your WordPress database for hidden bloat: oversized autoload cache, expired transients, post revisions, and orphaned postmeta. Each issue found includes a one-click Fix It button that cleans up directly — no plugin needed.' ],
-                    [ 'name' => 'Inactive plugins',             'rec' => 'Important',   'html' => 'Inactive plugins still execute their autoloaded code and are still scanned for vulnerabilities. Deactivate and delete plugins you are not actively using — do not just deactivate them.' ],
-                ] ); ?>
-            </div>
-        </div>
-
         <!-- ── Plugin Stack Scanner ──────────────────────────────────────── -->
         <div class="cs-panel">
             <div class="cs-section-header" style="background:linear-gradient(90deg,#1a3a8f 0%,#1e6fd9 100%);border-left:3px solid #60a5fa;">
