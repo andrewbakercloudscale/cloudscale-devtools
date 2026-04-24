@@ -210,7 +210,16 @@
     }
 
     /* ── Recycle Bin ───────────────────────────── */
+    var trashBody    = document.getElementById('csdt-trash-body');
+    var trashChevron = document.getElementById('csdt-trash-chevron');
+    var trashLoaded  = false;
+
     function loadTrash() {
+        if (trashBody && trashBody.style.display === 'none') {
+            trashBody.style.display = '';
+            if (trashChevron) trashChevron.textContent = '▼';
+        }
+        trashLoaded = true;
         var res = document.getElementById('csdt-trash-results');
         if (!res) return;
         res.innerHTML = '<span style="color:#9ca3af;font-size:12px;">⏳ Loading…</span>';
@@ -225,7 +234,8 @@
             container.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">Recycle bin is empty.</p>';
             return;
         }
-        var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;">'
+        var html = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
+            + '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;min-width:520px;">'
             + '<thead><tr style="background:#fef2f2;text-align:left;">'
             + '<th style="padding:6px 8px;border:1px solid #fecaca;width:36px;"><input type="checkbox" id="csdt-trash-chk-all"></th>'
             + '<th style="padding:6px 8px;border:1px solid #fecaca;">Original Table</th>'
@@ -250,7 +260,7 @@
                 + '<td style="padding:5px 8px;border:1px solid #fecaca;">' + Number(t.rows||0).toLocaleString() + '</td>'
                 + '<td style="padding:5px 8px;border:1px solid #fecaca;">' + fmtKb(t.size_kb||0) + '</td></tr>';
         });
-        html += '</tbody></table>'
+        html += '</tbody></table></div>'
             + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
             + '<button id="csdt-trash-restore-btn" type="button" class="cs-btn-secondary">↩ Restore Selected</button>'
             + '<button id="csdt-trash-delete-btn" type="button" style="background:#ef4444;color:#fff;border:1px solid #dc2626;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">🗑 Delete Forever</button>'
@@ -294,7 +304,16 @@
 
     /* ── Init ──────────────────────────────────── */
     document.getElementById('csdt-orphan-scan-btn').addEventListener('click', runOrphanScan);
-    document.getElementById('csdt-trash-refresh-btn').addEventListener('click', loadTrash);
 
-    loadTrash();
+    document.getElementById('csdt-trash-toggle').addEventListener('click', function(){
+        var open = trashBody.style.display !== 'none';
+        trashBody.style.display = open ? 'none' : '';
+        trashChevron.textContent = open ? '▶' : '▼';
+        if (!open && !trashLoaded) { trashLoaded = true; loadTrash(); }
+    });
+
+    document.getElementById('csdt-trash-refresh-btn').addEventListener('click', function(e){
+        e.stopPropagation();
+        loadTrash();
+    });
 })();
