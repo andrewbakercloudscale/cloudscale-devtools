@@ -367,6 +367,17 @@ class CSDT_Uptime {
 
         $ntfy_url = esc_url_raw( wp_unslash( $_POST['ntfy_url'] ?? '' ) );
         update_option( 'csdt_uptime_ntfy_url', $ntfy_url, false );
+
+        $zone_id = sanitize_text_field( wp_unslash( $_POST['cf_zone_id'] ?? '' ) );
+        if ( $zone_id !== '' ) {
+            update_option( 'csdt_devtools_cf_zone_id', $zone_id, false );
+        }
+        $api_token = sanitize_text_field( wp_unslash( $_POST['cf_api_token'] ?? '' ) );
+        // Only update if a real value was submitted (not the masked placeholder)
+        if ( $api_token !== '' && strpos( $api_token, '•' ) === false ) {
+            update_option( 'csdt_devtools_cf_api_token', $api_token, false );
+        }
+
         $slug = sanitize_key( wp_unslash( $_POST['ready_slug'] ?? '' ) );
         update_option( 'csdt_readiness_slug', $slug, false );
         wp_send_json_success( [ 'saved' => true, 'ready_url' => self::readiness_url() ] );

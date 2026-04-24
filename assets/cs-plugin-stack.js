@@ -195,6 +195,8 @@
     var uptimeDeployRes   = document.getElementById('csdt-uptime-deploy-result');
     var uptimeManualWrap  = document.getElementById('csdt-uptime-manual-wrap');
     var uptimeNtfyInput   = document.getElementById('csdt-uptime-ntfy-url');
+    var uptimeCfZoneInput  = document.getElementById('csdt-cf-zone-id');
+    var uptimeCfTokenInput = document.getElementById('csdt-cf-api-token');
     var uptimeRefreshBtn  = document.getElementById('csdt-uptime-refresh-btn');
     var uptimePushStatus  = document.getElementById('csdt-uptime-push-status');
     var uptimeSaveBtn     = document.getElementById('csdt-uptime-save-btn');
@@ -325,9 +327,11 @@
 
     if (uptimeSaveBtn) {
         uptimeSaveBtn.addEventListener('click', function () {
-            var ntfy = uptimeNtfyInput ? uptimeNtfyInput.value.trim() : '';
+            var ntfy     = uptimeNtfyInput   ? uptimeNtfyInput.value.trim()   : '';
+            var zoneId   = uptimeCfZoneInput  ? uptimeCfZoneInput.value.trim()  : '';
+            var apiToken = uptimeCfTokenInput ? uptimeCfTokenInput.value.trim() : '';
             uptimeSaveBtn.disabled = true;
-            post('csdt_uptime_save_settings', { ntfy_url: ntfy }).then(function (res) {
+            post('csdt_uptime_save_settings', { ntfy_url: ntfy, cf_zone_id: zoneId, cf_api_token: apiToken }).then(function (res) {
                 uptimeSaveBtn.disabled = false;
                 if (!uptimeSaveStatus) return;
                 uptimeSaveStatus.style.display = '';
