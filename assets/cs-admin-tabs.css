@@ -32,25 +32,15 @@
         padding: 10px 14px;
         font-size: 12px;
     }
-    /* Nested panels: cancel out the parent padding so they use full width */
-    .cs-panel-body .cs-panel {
-        margin-left: -16px;
-        margin-right: -16px;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
+    /* Nested panels: tighten their own body padding to recover width */
+    .cs-panel-body > .cs-panel > .cs-panel-body {
+        padding-left: 10px;
+        padding-right: 10px;
     }
-    .cs-panel-body .cs-panel .cs-panel-body {
-        padding-left: 16px;
-        padding-right: 16px;
-    }
-    /* AI Cyber Audit content box: remove horizontal padding — parent already has it */
+    /* AI Cyber Audit content box — !important needed to beat inline padding:20px */
     .cs-audit-box {
-        padding-left: 0;
-        padding-right: 0;
-        border-left: none;
-        border-right: none;
-        border-radius: 0;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
     }
 }
 
