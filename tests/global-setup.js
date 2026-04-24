@@ -22,9 +22,10 @@ function wpCli(cmd) {
 
 module.exports = async function globalSetup() {
     console.log('\n[setup] Resetting WordPress login-security test state...');
-    // Reset hide-login slug only — leave 2FA state untouched
-    wpCli('option update csdt_devtools_hide_wp_login 0');
-    wpCli('option delete csdt_devtools_login_slug');
+    // DO NOT touch csdt_devtools_login_hide_enabled or csdt_devtools_login_slug —
+    // those are live production settings. Changing them here breaks the site.
+    // Tests use WP_LOGIN_SLUG env var to locate the login page.
+
     // Clear any test-user login-security state (not 2FA)
     wpCli('user meta delete cs_devtools_test csdt_devtools_totp_secret');
     wpCli('user meta delete cs_devtools_test csdt_devtools_totp_enabled');
