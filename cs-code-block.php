@@ -4130,7 +4130,7 @@ class CloudScale_DevTools {
     }
 
     /* ==================================================================
-       Optimizer tab — Plugin Stack Scanner + AI Debugging Assistant
+       Optimizer tab — Plugin Stack Scanner + Update Risk Scorer
        ================================================================== */
 
     private static function render_optimizer_panel(): void {
@@ -4147,7 +4147,6 @@ class CloudScale_DevTools {
                     [ 'name' => 'Update Risk Scorer',           'rec' => 'Recommended', 'html' => 'Before applying plugin updates, scan for available updates and click Assess on any plugin to get an AI risk rating: 🟢 Patch (safe, apply now), 🟡 Minor (new features, low risk), or 🔴 Breaking (major changes — review changelog before updating).' ],
                     [ 'name' => 'Uptime Monitor',               'rec' => 'Recommended', 'html' => 'Deploys a Cloudflare Worker that probes your readiness endpoint every 60 seconds from the edge — completely independent of your server. If any check fails (PHP-FPM, DB, or WP boot) the Worker sends an ntfy.sh push notification immediately, even if your server is offline. Requires Cloudflare Zone ID and an API token with Workers:Edit scope (set in Thumbnails tab). <strong>Dynamic endpoint path</strong>: set a custom path suffix (e.g. <code>abc123</code>) to prevent your readiness URL from being enumerated or DoS-targeted — only requests to the exact slugged path are answered; the plain <code>/ready</code> route returns 404 if a slug is configured.' ],
                     [ 'name' => 'Database Intelligence Engine', 'rec' => 'Recommended', 'html' => 'Scans your WordPress database for hidden bloat: oversized autoload cache, expired transients, post revisions, and orphaned postmeta. Each issue found includes a one-click Fix It button that cleans up directly — no plugin needed.' ],
-                    [ 'name' => 'AI Debugging',                 'rec' => 'Optional',    'html' => 'Paste any PHP error, JavaScript console error, or plugin conflict description into the AI Debugging Assistant. It identifies the root cause and gives specific numbered steps to fix it — no need to search Stack Overflow or support forums.' ],
                     [ 'name' => 'Inactive plugins',             'rec' => 'Important',   'html' => 'Inactive plugins still execute their autoloaded code and are still scanned for vulnerabilities. Deactivate and delete plugins you are not actively using — do not just deactivate them.' ],
                 ] ); ?>
             </div>
@@ -4179,54 +4178,6 @@ class CloudScale_DevTools {
                         </span>
                     </div>
                     <div id="csdt-optimizer-results" style="display:none;margin-top:20px;"></div>
-            </div>
-        </div>
-
-        <!-- ── AI Debugging Assistant ─────────────────────────────────────── -->
-        <div class="cs-panel">
-            <div class="cs-section-header" style="background:linear-gradient(90deg,#3730a3 0%,#6366f1 100%);border-left:3px solid #a5b4fc;">
-                <span>🤖 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></span>
-                <span class="cs-header-hint"><?php esc_html_e( 'Paste any PHP error or stack trace — AI pinpoints the root cause and fix', 'cloudscale-devtools' ); ?></span>
-                <?php self::render_explain_btn( 'ai-debug', 'AI Debugging Assistant', [
-                    [ 'name' => 'How it works',  'rec' => 'Overview',  'html' => 'Paste any PHP error, JavaScript console error, or plugin conflict description. The AI identifies the root cause and gives numbered steps to fix it — no need to search Stack Overflow or support forums.' ],
-                    [ 'name' => 'What it covers','rec' => 'Overview',  'html' => 'Works with PHP fatal errors, WordPress notices, plugin conflicts, database errors, white screens (500s), and memory exhaustion. Supports all AI providers configured on the Home tab.' ],
-                ] ); ?>
-            </div>
-            <div class="cs-panel-body">
-                <div>
-                    <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
-                        <?php esc_html_e( 'Paste an error message, PHP warning, or stack trace. The AI identifies the root cause and gives you specific steps to fix it — no more hunting through Stack Overflow.', 'cloudscale-devtools' ); ?>
-                    </p>
-                    <p style="color:#9ca3af;margin:0 0 16px;font-size:.88em;">
-                        <?php esc_html_e( 'Works with PHP fatal errors, WordPress notices, plugin conflicts, database errors, and 500s.', 'cloudscale-devtools' ); ?>
-                    </p>
-
-                    <?php if ( ! $has_key ) : ?>
-                    <div style="background:#fff7ed;border-left:3px solid #f59e0b;padding:11px 16px;border-radius:0 6px 6px 0;margin-bottom:16px;font-size:13px;color:#92400e;">
-                        <?php printf(
-                            /* translators: %s: link to security tab */
-                            esc_html__( 'AI analysis requires an API key. %s', 'cloudscale-devtools' ),
-                            '<a href="' . esc_url( $security_url ) . '" style="color:#b45309;font-weight:600;">' . esc_html__( 'Add your key on the Security tab →', 'cloudscale-devtools' ) . '</a>'
-                        ); ?>
-                    </div>
-                    <?php endif; ?>
-
-                    <textarea id="csdt-debug-input"
-                              rows="6"
-                              placeholder="<?php esc_attr_e( 'Paste your error message, stack trace, or describe the problem...', 'cloudscale-devtools' ); ?>"
-                              style="width:100%;font-family:'SF Mono','Fira Code',Consolas,monospace;font-size:12px;background:#f8fafc;color:#1e293b;border:1px solid #d1d5db;border-radius:6px;padding:12px;box-sizing:border-box;resize:vertical;line-height:1.6;"></textarea>
-
-                    <div style="display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap;">
-                        <button id="csdt-debug-analyze-btn" class="cs-btn-primary" <?php echo $has_key ? '' : 'disabled style="opacity:.5;cursor:not-allowed;"'; ?>>
-                            🤖 <?php esc_html_e( 'Diagnose with AI', 'cloudscale-devtools' ); ?>
-                        </button>
-                        <span id="csdt-debug-analyzing" style="display:none;color:#6b7280;font-size:13px;">
-                            ⏳ <?php esc_html_e( 'Analyzing...', 'cloudscale-devtools' ); ?>
-                        </span>
-                    </div>
-
-                    <div id="csdt-debug-result" style="display:none;margin-top:20px;"></div>
-                </div>
             </div>
         </div>
 
