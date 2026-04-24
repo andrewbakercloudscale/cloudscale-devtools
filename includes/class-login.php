@@ -764,7 +764,7 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
         }
 
         // Render the 2FA form.
-        self::login_2fa_render_form( $token, $method, $error );
+        self::login_2fa_render_form( $token, $method, $error, $user_id, count( $available ) > 1 );
         exit;
     }
 
@@ -777,16 +777,36 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
      * @param  string $error  Optional error message.
      * @return void
      */
-    private static function login_2fa_render_form( string $token, string $method, string $error = '' ): void {
-        // Use WordPress's own login page scaffolding.
+    private static function login_2fa_render_form( string $token, string $method, string $error = '', int $user_id = 0, bool $has_picker = false ): void {
         login_header( __( 'Two-Factor Authentication', 'cloudscale-devtools' ), '', null );
 
-        $nonce      = wp_create_nonce( 'csdt_devtools_2fa_verify_' . $token );
-        $method_txt = $method === 'email'
-            ? __( 'Enter the 6-digit code that was sent to your email address.', 'cloudscale-devtools' )
-            : __( 'Enter the 6-digit code from your authenticator app.', 'cloudscale-devtools' );
+        $nonce = wp_create_nonce( 'csdt_devtools_2fa_verify_' . $token );
 
-        $icon = $method === 'email' ? '📧' : '📱';
+        if ( $method === 'email' && $user_id ) {
+            $u     = get_user_by( 'id', $user_id );
+            $email = $u instanceof \WP_User ? $u->user_email : '';
+            if ( $email ) {
+                [ $local, $domain ] = explode( '@', $email, 2 );
+                $masked = ( strlen( $local ) > 2
+                    ? substr( $local, 0, 1 ) . str_repeat( '*', strlen( $local ) - 2 ) . substr( $local, -1 )
+                    : substr( $local, 0, 1 ) . '***' )
+                    . '@' . $domain;
+                $method_txt = sprintf(
+                    /* translators: %s = masked email address */
+                    __( 'Enter the 6-digit code sent to %s', 'cloudscale-devtools' ),
+                    $masked
+                );
+            } else {
+                $method_txt = __( 'Enter the 6-digit code sent to your email address.', 'cloudscale-devtools' );
+            }
+        } else {
+            $method_txt = __( 'Enter the 6-digit code from your authenticator app.', 'cloudscale-devtools' );
+        }
+
+        $icon       = $method === 'email' ? '📧' : '📱';
+        $picker_url = $has_picker
+            ? add_query_arg( [ 'action' => 'csdt_devtools_2fa', 'csdt_devtools_token' => rawurlencode( $token ), 'csdt_devtools_back_to_picker' => '1' ], wp_login_url() )
+            : '';
         ?>
         <form name="csdt_devtools_2faform" id="csdt_devtools_2faform" action="" method="post">
             <p style="text-align:center;font-size:48px;margin:0 0 8px"><?php echo $icon; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — emoji literal ?></p>
@@ -806,15 +826,14 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
             </p>
 
             <?php
-            // Pass redirect_to through if it was in the original login URL.
             $redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['redirect_to'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             if ( $redirect ) {
                 echo '<input type="hidden" name="redirect_to" value="' . esc_attr( $redirect ) . '">';
             }
             ?>
 
-            <input type="hidden" name="action"     value="csdt_devtools_2fa">
-            <input type="hidden" name="csdt_devtools_token"   value="<?php echo esc_attr( $token ); ?>">
+            <input type="hidden" name="action"               value="csdt_devtools_2fa">
+            <input type="hidden" name="csdt_devtools_token"  value="<?php echo esc_attr( $token ); ?>">
             <input type="hidden" name="csdt_devtools_2fa_nonce" value="<?php echo esc_attr( $nonce ); ?>">
 
             <p class="submit">
@@ -825,10 +844,18 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
 
             <?php if ( $method === 'email' ) : ?>
                 <p style="text-align:center;margin-top:12px;font-size:12px;color:#888">
-                    <?php esc_html_e( 'Didn\'t receive a code? Check your spam folder or wait up to 1 minute.', 'cloudscale-devtools' ); ?>
+                    <?php esc_html_e( "Didn't receive a code? Check your spam folder or wait up to 1 minute.", 'cloudscale-devtools' ); ?>
                 </p>
             <?php endif; ?>
         </form>
+
+        <?php if ( $picker_url ) : ?>
+        <p style="text-align:center;margin-top:14px;">
+            <a href="<?php echo esc_url( $picker_url ); ?>" style="font-size:12px;color:#6b7280;text-decoration:none;">
+                &larr; <?php esc_html_e( 'Other verification options', 'cloudscale-devtools' ); ?>
+            </a>
+        </p>
+        <?php endif; ?>
         <?php
         login_footer();
     }
