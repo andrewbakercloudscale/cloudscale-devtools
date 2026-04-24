@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.411
+ * Version: 1.9.413
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -4283,12 +4283,15 @@ class CloudScale_DevTools {
 
                     <!-- Recycle Bin -->
                     <div style="margin-top:28px;border-top:1px solid #fde68a;padding-top:20px;">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                        <div id="csdt-trash-toggle" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;user-select:none;">
+                            <span id="csdt-trash-chevron" style="font-size:11px;color:#6b7280;min-width:10px;">▶</span>
                             <h3 style="margin:0;font-size:1rem;font-weight:600;color:#374151;">♻️ <?php esc_html_e( 'Recycle Bin', 'cloudscale-devtools' ); ?></h3>
                             <button id="csdt-trash-refresh-btn" type="button" style="font-size:11px;background:none;border:1px solid #d1d5db;border-radius:4px;padding:2px 8px;cursor:pointer;color:#6b7280;">🔄 <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
                         </div>
-                        <p style="color:#9ca3af;font-size:.88em;margin:0 0 12px;"><?php esc_html_e( 'Archived tables can be restored to their original names or permanently deleted.', 'cloudscale-devtools' ); ?></p>
-                        <div id="csdt-trash-results"><span style="color:#9ca3af;font-size:13px;">⏳ <?php esc_html_e( 'Loading…', 'cloudscale-devtools' ); ?></span></div>
+                        <div id="csdt-trash-body" style="display:none;">
+                            <p style="color:#9ca3af;font-size:.88em;margin:0 0 12px;"><?php esc_html_e( 'Archived tables can be restored to their original names or permanently deleted.', 'cloudscale-devtools' ); ?></p>
+                            <div id="csdt-trash-results"></div>
+                        </div>
                     </div>
                 </div>
 
