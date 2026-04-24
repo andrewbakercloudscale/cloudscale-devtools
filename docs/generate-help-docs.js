@@ -380,6 +380,12 @@ helpLib.run({
 </div>`,
 
     sections: [
+        { id: 'home',       label: 'Home Dashboard',       file: 'panel-home.png',        tabSelector: 'a[href*="tab=home"]',       elementSelector: '#cs-panel-home',
+          intro: 'The Home tab is the starting point for every CloudScale session. Configure your AI provider and API key here, enable scheduled background scans, and set up email and push alert notifications. Everything in the plugin - the AI Cyber Audit, site audit, and debugging tools - flows from the credentials you enter on this tab.',
+          altText: 'CloudScale Cyber Devtools home dashboard showing AI provider setup with Claude and Gemini API key configuration',
+          jsBeforeShot: () => {
+            document.querySelectorAll('input[type="password"], input[id*="key"], input[id*="api"]').forEach(function(el){ el.value = ''; });
+          } },
         { id: 'hide-login', label: 'Hide Login URL',        file: 'panel-hide-login.png',  tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-hide-login',
           intro: 'Moves your WordPress login page from the default <code>/wp-login.php</code> to a secret URL you choose. Bots and automated attack scripts probe the default path thousands of times a day - if they can\'t find the login form, they can\'t attack it.',
           altText: 'WordPress Hide Login URL settings panel - move wp-login.php to a secret URL to block automated bot attacks',
@@ -395,6 +401,15 @@ helpLib.run({
         { id: 'passkeys',   label: 'Passkeys (WebAuthn)',   file: 'panel-passkeys.png',    tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-passkeys',
           intro: 'Replace passwords entirely with biometric login: Face ID, Touch ID, Windows Hello, or a hardware security key. Passkeys are cryptographically bound to your exact domain - unlike TOTP codes, they cannot be phished by a fake login page.',
           altText: 'WordPress passkeys WebAuthn registration supporting Face ID, Touch ID and hardware security key login' },
+        { id: 'session',    label: 'Session Duration',      file: 'panel-session.png',     tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-session',
+          intro: 'Controls how long WordPress login sessions remain valid before users must re-authenticate. The default is 2 days. Shorten this for high-security admin accounts or extend it for trusted internal teams who find frequent re-login disruptive.',
+          altText: 'WordPress session duration settings controlling how long login cookies remain valid' },
+        { id: 'brute-force',label: 'Brute-Force Protection',file: 'panel-brute-force.png', tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-brute-force',
+          intro: 'Locks an account temporarily after a configurable number of consecutive failed login attempts. Protection is per-username rather than per-IP, so distributed attacks spread across thousands of IP addresses are blocked just as effectively as single-source attacks.',
+          altText: 'WordPress brute force login protection with account lockout and username enumeration blocking' },
+        { id: 'ssh-monitor',label: 'SSH Brute-Force Monitor',file: 'panel-ssh-monitor.png', tabSelector: 'a[href*="tab=login"]',   elementSelector: '#cs-panel-ssh-monitor',
+          intro: 'Reads your server\'s auth.log every 60 seconds to count SSH failed login attempts. When the count exceeds your threshold in a rolling window, it fires an instant alert via email and push notification. Works alongside fail2ban - this plugin detects and alerts; fail2ban does the blocking.',
+          altText: 'WordPress SSH brute force monitor reading auth.log with email and ntfy.sh push notifications' },
         { id: 'security',   label: 'AI Cyber Audit',        file: 'panel-security.png',    tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-vuln-results',
           intro: 'Uses frontier AI - Anthropic Claude or Google Gemini - to analyse your entire WordPress installation and return a prioritised, scored security report in under 60 seconds. Unlike signature-based scanners, the AI reasons from first principles: it reads your actual configuration and code, identifies risk combinations no database can match, and gives you specific fix steps for your exact setup.',
           altText: 'WordPress AI security audit showing a perfect score with Claude 4 and Gemini 2.5 Pro on a free security plugin',
@@ -447,6 +462,9 @@ helpLib.run({
         { id: 'site-audit', label: 'AI Site Auditor',        file: 'panel-site-audit.png',  tabSelector: 'a[href*="tab=site-audit"]', elementSelector: '#cs-panel-site-audit',
           intro: 'One button scans all your published content and database, then returns a prioritised list of SEO gaps, thin content, missing images, database bloat, and security misconfigurations - each with a specific fix instruction. No external crawlers, no data sent to third parties, no Screaming Frog licence required.',
           altText: 'WordPress AI site auditor scanning SEO, content, performance, and database health with prioritised findings' },
+        { id: 'threat-monitor', label: 'Threat Monitor',    file: 'panel-threat-monitor.png', tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-panel-threat-monitor',
+          intro: 'Runs three passive background checks every 5 minutes: file integrity monitoring (detects unexpected changes to WordPress core files), new administrator alerts (fires the instant an admin account is created or promoted), and web probe detection (counts requests to sensitive endpoints and alerts on sudden spikes).',
+          altText: 'WordPress threat monitor showing file integrity checking, new admin alerts, and web probe detection' },
         { id: 'code-block', label: 'Code Block',             file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings',
           intro: 'Syntax-highlighted code blocks powered by highlight.js, running entirely on your own server with zero CDN calls. Supports 190+ languages and 14 professional colour themes - completely free, with no impact on your Core Web Vitals score.',
           altText: 'WordPress syntax-highlighted code block settings with 190 languages, 14 themes, no CDN, completely free' },
@@ -462,7 +480,16 @@ helpLib.run({
         { id: 'optimizer',  label: 'Plugin Optimizer',      file: 'panel-optimizer.png',   tabSelector: 'a[href*="tab=optimizer"]',  elementSelector: '.cs-tab-content.active',
           intro: 'Two tools in one tab: a plugin stack scanner that maps your installed plugins against everything CloudScale already replaces (so you know exactly which ones to remove), and an AI debugging assistant that diagnoses PHP errors, stack traces, and WordPress warnings instantly with step-by-step fix instructions.',
           altText: 'WordPress plugin stack scanner showing which plugins CloudScale replaces with AI debugging assistant' },
-        { id: 'cs-monitor', label: 'CS Monitor',             file: 'panel-cs-monitor.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings',
+        { id: 'plugin-stack',label: 'Plugin Stack Scanner',   file: 'panel-plugin-stack.png', tabSelector: 'a[href*="tab=optimizer"]', elementSelector: '#cs-panel-plugin-stack', jsClip: true,
+          intro: 'Scans your installed plugins against a curated list of functionality that CloudScale already provides - security scanners, 2FA plugins, SMTP mailers, code highlighting, SQL tools, and log viewers. Shows exactly which plugins are now redundant and safe to remove, reducing your attack surface and update burden.',
+          altText: 'WordPress plugin stack scanner showing redundant plugins that CloudScale replaces with fewer attack surface' },
+        { id: 'update-risk',label: 'Update Risk Scorer',     file: 'panel-update-risk.png',  tabSelector: 'a[href*="tab=optimizer"]', elementSelector: '#cs-panel-update-risk', jsClip: true,
+          intro: 'Uses AI to read each pending plugin update\'s changelog from WordPress.org and classify it as Patch (safe to apply now), Minor (new features, review first), or Breaking (major changes, test on staging). Prevents the most common cause of site breakage: blindly applying all updates at once.',
+          altText: 'WordPress AI update risk scorer rating pending plugin updates as Patch, Minor or Breaking before applying them' },
+        { id: 'uptime-monitor', label: 'Uptime Monitor',     file: 'panel-uptime-monitor.png', tabSelector: 'a[href*="tab=optimizer"]', elementSelector: '#cs-panel-uptime-monitor', jsClip: true,
+          intro: 'Deploys a Cloudflare Worker that probes a deep readiness endpoint every 60 seconds from the Cloudflare edge. Unlike basic uptime monitors that only check for a 200 response, this endpoint verifies database connectivity, PHP-FPM worker saturation, and WordPress boot. Alerts fire via push notification even if your server is completely offline.',
+          altText: 'WordPress Cloudflare uptime monitor showing deep readiness probe with database and PHP-FPM health checks' },
+        { id: 'cs-monitor', label: 'CS Monitor',             file: 'panel-cs-monitor.png',  tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-cs-monitor',
           intro: 'A floating DevTools-style performance panel that appears on every WordPress admin screen and frontend page for logged-in administrators. Surfaces database queries, HTTP calls, hook timings, PHP errors, assets, and template resolution in one overlay - without switching tools or tailing log files.',
           altText: 'CS Monitor floating performance panel showing DB queries, hooks, HTTP calls, and PHP errors on every WordPress page' },
         { id: 'fpm-monitor',label: 'FPM Monitor',            file: 'panel-fpm-monitor.png', tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-debug',
@@ -473,6 +500,18 @@ helpLib.run({
         { id: 'test-accounts', label: 'Test Account Manager', file: 'panel-test-accounts.png', tabSelector: 'a[href*="tab=login"]', elementSelector: '#cs-panel-test-accounts',
           intro: 'Creates dedicated WordPress test users for Playwright and automated testing. Provides a session API that generates temporary admin cookies without triggering 2FA - so your test suite can log in as a real administrator without disabling the two-factor authentication protecting your live site.',
           altText: 'WordPress Playwright test account manager showing shared secret session API and test user list with active sessions' },
+        { id: 'opcache',    label: 'OPcache Monitor',        file: 'panel-opcache.png',     tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-opcache',
+          intro: 'Displays the current PHP OPcache status: memory usage, hit rate, and the number of cached vs. uncached scripts. A hit rate below 90% or a full cache means PHP is recompiling scripts on every request, significantly slowing your site. Includes a one-click Reset button to flush the cache after code deployments.',
+          altText: 'PHP OPcache status monitor showing memory usage, hit rate and cached script count in WordPress admin' },
+        { id: 'smtp',       label: 'SMTP Mailer',            file: 'panel-smtp.png',        tabSelector: 'a[href*="tab=mail"]',    elementSelector: '#cs-panel-smtp',
+          intro: 'Replaces WordPress\'s unreliable PHP mail() function with authenticated SMTP delivery. Supports Gmail, Outlook, Amazon SES, Mailgun, and any standard SMTP server. Includes a test-send button and a persistent activity log showing every outgoing message with delivery status.',
+          altText: 'WordPress SMTP mailer settings replacing PHP mail with authenticated Gmail Outlook or Mailgun delivery' },
+        { id: 'email-log',  label: 'Email Activity Log',     file: 'panel-email-log.png',   tabSelector: 'a[href*="tab=mail"]',    elementSelector: '#cs-panel-email-log',
+          intro: 'Logs every email sent by WordPress - regardless of whether SMTP is enabled - with the subject, recipient, timestamp, and delivery status. Click any row to view the full email body. Invaluable for debugging WooCommerce order notifications, password reset failures, and contact form delivery issues.',
+          altText: 'WordPress email activity log showing all sent emails with subject, recipient and delivery status in admin' },
+        { id: 'thumbnails', label: 'Thumbnails & Open Graph', file: 'panel-thumbnails.png', tabSelector: 'a[href*="tab=thumbnails"]', elementSelector: '#cs-panel-thumbs-checker',
+          intro: 'Diagnoses social sharing thumbnail failures: checks your Open Graph meta tags and featured image setup, scans recent posts for missing images, and audits your Cloudflare image caching configuration. Social media platforms and link preview tools (Slack, Teams, WhatsApp) rely on Open Graph tags to generate preview cards - when these are wrong, links share as plain text with no image.',
+          altText: 'WordPress Open Graph thumbnail diagnostics checking social sharing images, Cloudflare caching and media library' },
     ],
 
     docs: {
@@ -925,6 +964,211 @@ CSDT_TEST_LOGOUT_URL=https://yoursite.com/wp-json/csdt/v1/test-logout-{token}</p
 <p style="margin:0 0 10px;color:#374151;line-height:1.7;">The session endpoint is publicly accessible (no WordPress login required) but requires both the shared secret in the POST body AND the correct path token in the URL. An attacker would need to know both the secret and the path to request a session. Keep the <code>.env.test</code> file out of version control (<code>.gitignore</code> it) and regenerate the shared secret if you suspect it has leaked.</p>
 <p style="margin:0;color:#374151;line-height:1.7;">Test sessions created via the API are real WordPress sessions with full role permissions. Keep TTLs short (1200 seconds is the recommended default for most test runs) and always call the logout endpoint at the end of your suite. The test users list shows active session counts so you can spot stale sessions and kill them manually.</p>
 </div>`,
+
+        'home': `
+<div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:10px;padding:22px 26px;margin-bottom:24px;color:#fff;">
+<h2 style="margin:0 0 8px;font-size:1.2em;font-weight:800;color:#fff;background:transparent!important;padding:0!important;border:none!important;">Start Here: Configure Your AI Provider</h2>
+<p style="margin:0;color:#cbd5e1;line-height:1.7;">Every CloudScale AI feature - the security audit, site audit, and code analysis - runs through the AI provider you configure on this tab. You supply your own API key; your data goes directly from your server to the provider with no CloudScale middleman.</p>
+</div>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">AI Provider Setup</h3>
+<p>Two providers are supported. Both work equally well for security audits; the choice depends on your preference and budget:</p>
+<ul>
+<li><strong>Anthropic Claude</strong> - the recommended choice for the most capable security analysis. Claude Opus 4 and Claude Sonnet 4 are available. Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Paid plans required (no free tier).</li>
+<li><strong>Google Gemini</strong> - includes a free tier with no credit card required, making it the zero-cost entry point. Gemini 2.0 Flash (free) and Gemini 2.5 Pro (paid) are available. Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.</li>
+</ul>
+<p>After entering your key, click <strong>Test Key</strong> to verify it works before running a scan. The key is stored in your WordPress database (wp_options) and is never transmitted to CloudScale's servers - it goes only to the provider's API endpoint during scans.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Scheduled Scans</h3>
+<p>Enable scheduled scans to run the AI Cyber Audit automatically on a daily or weekly schedule. When a scan completes, results are saved to scan history on the Security tab. Enable email and push alerts to receive the AI summary in your inbox or on your phone the moment a scan finishes.</p>
+<ul>
+<li><strong>Frequency:</strong> daily or weekly. Daily is recommended for production sites with regular plugin updates or content changes.</li>
+<li><strong>Scan type:</strong> Standard (fast, covers WordPress config and plugin CVEs) or Deep Dive (adds live HTTP probes, DNS checks, and PHP code analysis).</li>
+<li><strong>Email alert:</strong> sends to the site's admin email address by default. Configure SMTP on the Mail tab first to ensure reliable delivery.</li>
+<li><strong>ntfy.sh push:</strong> enter any ntfy.sh topic URL to receive instant push notifications on your phone. Free and open-source. No account required - just install the ntfy app and create a topic.</li>
+</ul>`,
+
+        'session': `
+<div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">⏱ How Long Should a Login Session Last?</h2>
+<p style="margin:0;color:#374151;">WordPress's default is 2 days. That's a reasonable balance between security (re-authenticate regularly) and convenience (don't interrupt a working developer). Adjust this to match your team's workflow and your site's security posture.</p>
+</div>
+
+<p>Session duration controls how long the WordPress auth cookie is valid before the user must enter their password again. When a custom duration is set, the <strong>Remember Me</strong> checkbox at login is overridden - all sessions get the same lifetime, and it applies to browser restarts (the cookie persists rather than expiring when the browser closes).</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Recommended durations by context</h3>
+<ul>
+<li><strong>1–3 days:</strong> banking sites, client portals, any site with sensitive customer data. Force frequent re-authentication to limit the window of a stolen session cookie.</li>
+<li><strong>7–14 days:</strong> most business sites and WordPress blogs. Frequent enough to catch stolen credentials; infrequent enough to not frustrate legitimate users.</li>
+<li><strong>30–90 days:</strong> internal tools used by a small trusted team on known devices. Convenience wins when the threat model is low.</li>
+<li><strong>WordPress default (2 days):</strong> leave this setting empty or set to "Default" to keep WordPress's built-in behaviour.</li>
+</ul>
+
+<p><strong>Important:</strong> changing this setting only affects new logins. Users who are already logged in keep their current session until it expires or they log out manually. If you need to force a full re-login for all users immediately (e.g. after a suspected credential compromise), use the <strong>Log Out All Users</strong> option in the WordPress Users settings, or run <code>wp user session destroy --all</code> via WP-CLI.</p>`,
+
+        'brute-force': `
+<div style="background:#fff5f5;border-left:4px solid #dc2626;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔒 Stop Credential-Stuffing Attacks at the Login Form</h2>
+<p style="margin:0;color:#374151;">Automated bots try thousands of username/password combinations against every reachable WordPress login page. Brute-force protection locks an account after a configurable number of failed attempts, making mass credential-stuffing attacks economically unviable - the attacker's bot moves on to the next target.</p>
+</div>
+
+<p>The lockout works per-username, not per-IP address. This is the critical difference from IP-rate-limiting: a distributed attack that uses 10,000 different IP addresses (a botnet) is blocked just as effectively as a single-machine attack, because both result in failed attempts for the same target username. Once the threshold is crossed, that account is locked for the configured duration regardless of how many IPs are trying.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Settings</h3>
+<ul>
+<li><strong>Maximum login attempts:</strong> consecutive failures before lockout. Default is 5. Lower to 3 for maximum security; raise to 10 if legitimate users frequently mistype passwords and you receive lockout support requests.</li>
+<li><strong>Lockout duration:</strong> how long the account is blocked. Default is 10 minutes - enough to defeat most automated scripts. For admin-only sites with no public users, 60 minutes or longer adds significant friction to targeted attacks.</li>
+<li><strong>Account enumeration protection:</strong> WordPress normally reveals whether a username exists via different error messages (<em>"username not found"</em> vs <em>"wrong password"</em>). Enabling this makes both errors return the same generic message, removing a reconnaissance tool attackers use to build target lists. There is no downside to enabling this.</li>
+</ul>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Unlocking a locked account</h3>
+<p>If a legitimate user is locked out, you can clear their lockout immediately from the SQL Query Tool or WP-CLI without waiting for the timeout to expire:</p>
+<code style="background:#f8fafc;border:1px solid #e5e7eb;padding:8px 12px;border-radius:4px;font-size:.88em;display:block;margin:8px 0;">DELETE FROM wp_options WHERE option_name LIKE 'csdt_devtools_lockout_%'</code>
+<p>This clears all active lockouts. To clear a specific username: replace <code>%</code> with the exact username (e.g. <code>csdt_devtools_lockout_johndoe</code>).</p>`,
+
+        'ssh-monitor': `
+<div style="background:#fff5f5;border-left:4px solid #dc2626;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🖥️ Know the Moment Your SSH Port Is Under Attack</h2>
+<p style="margin:0;color:#374151;">A server with SSH port 22 open to the internet will be targeted by automated scanners within minutes of going online. Most sites never know they're under attack because these attempts are silent unless you're watching the auth log. The SSH monitor brings that visibility to your WordPress dashboard.</p>
+</div>
+
+<p>The monitor tails <code>/var/log/auth.log</code> via an AJAX poll every 60 seconds. It counts <em>Failed password</em> and <em>Invalid user</em> entries in a rolling time window. When the count exceeds your threshold, an alert fires to your configured email and ntfy.sh topic. Alerts are throttled to once per 5 minutes to prevent notification floods during sustained attacks.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Setup</h3>
+<ol>
+<li>The monitor requires the web server user (<code>www-data</code>) to be able to read <code>/var/log/auth.log</code>. If the panel shows a warning, run: <code>sudo usermod -a -G adm www-data &amp;&amp; sudo systemctl restart php-fpm</code></li>
+<li>Set your alert threshold - default is 10 failures in 60 seconds. This is calibrated to avoid false positives from a user mistyping their password, while catching any automated scanner instantly.</li>
+<li>Save settings. The monitor polls automatically from then on.</li>
+</ol>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Detection vs. Blocking: use fail2ban alongside this</h3>
+<p>The SSH Monitor detects attacks and alerts you. It does not block IPs. For automatic IP blocking, install <strong>fail2ban</strong>:</p>
+<code style="background:#f8fafc;border:1px solid #e5e7eb;padding:8px 12px;border-radius:4px;font-size:.88em;display:block;margin:8px 0;">sudo apt install fail2ban &amp;&amp; sudo systemctl enable fail2ban</code>
+<p>With fail2ban's default configuration, an IP is banned for 10 minutes after 5 failed SSH attempts. The CloudScale monitor shows you when attacks are happening at a volume that exceeds even fail2ban's tolerance - a sign that you're under a sustained, distributed attack that warrants additional action (firewall rules, port change, or contacting your hosting provider).</p>`,
+
+        'threat-monitor': `
+<div style="background:#fff5f5;border-left:4px solid #dc2626;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔎 Passive Threat Detection That Runs While You Sleep</h2>
+<p style="margin:0;color:#374151;">The AI Cyber Audit gives you an on-demand snapshot. The Threat Monitor runs in the background 24/7, watching for the specific events that indicate an active compromise: a core file being modified, a new admin account appearing, or a wave of probe requests hitting your login page.</p>
+</div>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">File Integrity Monitor</h3>
+<p>Scans <code>wp-includes/*.php</code> and <code>wp-admin/*.php</code> every 5 minutes and compares file modification times against a baseline. If any file changes outside of a WordPress core update, you get an immediate alert. This catches the most common post-compromise action: a backdoor dropped into a core PHP file.</p>
+<p><strong>Anti-spam:</strong> the baseline is rebuilt silently when WordPress updates (all core files change legitimately during updates). The same modification timestamp is never alerted twice. After a manual code change you authored, click <strong>Reset File Baseline</strong> to clear the alert state.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">New Administrator Alert</h3>
+<p>Fires the instant a WordPress user is created with the Administrator role, or an existing user is promoted to Administrator. Attacker privilege escalation - gaining admin access - is a critical step in most WordPress compromises. This alert catches it the moment it happens rather than during the next scheduled audit.</p>
+<p><strong>Anti-spam:</strong> each user ID is alerted exactly once. Acknowledging the alert (or adding the user legitimately) prevents repeated notifications for the same account.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Web Probe Detection</h3>
+<p>Reads the web server access log (byte-offset tracking, so only new entries are processed each check). Counts requests to sensitive endpoints: <code>wp-login.php</code>, <code>xmlrpc.php</code>, <code>wp-config.php</code>, <code>.env</code>, <code>.git/</code>, and shell-injection patterns. When the count exceeds the threshold (default: 25 in 5 minutes), an alert fires. Throttled to at most once per hour to prevent alert floods during sustained scans.</p>`,
+
+        'plugin-stack': `
+<div style="background:#f0f9ff;border-left:4px solid #1e6fd9;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔍 Fewer Plugins = Smaller Attack Surface</h2>
+<p style="margin:0;color:#374151;">Every plugin you run is a piece of code you trust to not get hacked, not conflict with anything, and not slow your site down. CloudScale already replaces entire categories of plugins. The Plugin Stack Scanner tells you exactly which of your current plugins are now redundant.</p>
+</div>
+
+<p>Click <strong>Scan My Plugin Stack</strong> to compare your active and inactive plugins against CloudScale's replacement list. The scan checks for plugins in these categories:</p>
+<ul>
+<li><strong>Security scanners</strong> - Wordfence, iThemes Security, All In One WP Security</li>
+<li><strong>2FA plugins</strong> - WP 2FA, Google Authenticator, Duo Security</li>
+<li><strong>SMTP mailers</strong> - WP Mail SMTP, Easy WP SMTP, FluentSMTP</li>
+<li><strong>Code highlighting</strong> - SyntaxHighlighter, Enlighter, Prismatic</li>
+<li><strong>SQL tools</strong> - Adminer, WP phpMyAdmin</li>
+<li><strong>Log viewers</strong> - Error Log Monitor, WP Log Viewer</li>
+</ul>
+<p>Each flagged plugin shows why it's redundant and which CloudScale feature replaces it. Inactive plugins are flagged with an extra warning: inactive plugins still load autoloaded code on every page request and are still scanned for vulnerabilities - deactivate and delete, don't just deactivate.</p>`,
+
+        'update-risk': `
+<div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔄 Know What You're Applying Before You Apply It</h2>
+<p style="margin:0;color:#374151;">Blindly applying all pending plugin updates is the most common cause of WordPress site breakage. A "minor" version bump can contain breaking API changes. A patch release can contain schema migrations. The Update Risk Scorer reads the changelog and tells you which updates are safe to apply right now and which need staging first.</p>
+</div>
+
+<p>Click <strong>Scan for Available Updates</strong> to fetch the list of plugins with pending updates from WordPress. For each one, the scorer reads the changelog from WordPress.org and sends it to the configured AI provider for risk assessment.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Risk Rating Meanings</h3>
+<ul>
+<li><strong style="color:#16a34a;">🟢 Patch</strong> - security fix or bug fix with no API changes. Safe to apply immediately on your live site.</li>
+<li><strong style="color:#d97706;">🟡 Minor</strong> - new features added. Low risk but review the changelog for anything that affects your configuration. Apply during off-peak hours.</li>
+<li><strong style="color:#dc2626;">🔴 Breaking</strong> - major version bump or significant API change. Test on a staging site before applying to production. The AI will describe what specifically changed and what to check.</li>
+</ul>
+
+<p>Requires an AI API key configured on the Home tab. Uses your configured provider (Claude or Gemini) to read and assess each changelog. The assessment runs locally on your server - no update decisions are sent to or logged by CloudScale.</p>`,
+
+        'opcache': `
+<div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">PHP OPcache: the Single Biggest PHP Performance Win</h2>
+<p style="margin:0;color:#374151;">PHP compiles source code to bytecode every time a script runs - unless OPcache is enabled. With OPcache, the bytecode is compiled once and stored in shared memory. Every subsequent request skips compilation entirely. On a WordPress site with 200+ PHP files loading per request, this typically cuts PHP execution time by 30-50%.</p>
+</div>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">Reading the Status Panel</h3>
+<ul>
+<li><strong>Hit rate:</strong> the percentage of PHP script requests served from cache. A healthy hit rate is 95% or higher. Below 90% means either the cache is too small, too many unique scripts are being loaded, or OPcache is not configured correctly.</li>
+<li><strong>Memory usage:</strong> how much of the configured OPcache memory is currently in use. If this is above 90%, increase <code>opcache.memory_consumption</code> in your php.ini - a full cache means PHP starts evicting cached scripts, causing recompilation and dramatically degrading performance.</li>
+<li><strong>Cached scripts:</strong> the number of PHP files currently compiled and stored in the cache. For a standard WordPress installation, expect 400-800 scripts.</li>
+<li><strong>Interned strings:</strong> OPcache also caches repeated string values (class names, function names, etc.) to reduce memory duplication across worker processes.</li>
+</ul>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Reset button</h3>
+<p>After deploying code changes (new plugin versions, theme updates, custom code), the cached bytecode may no longer match the files on disk. Click <strong>Reset OPcache</strong> to flush all cached scripts. WordPress will recompile them on the next few requests. The site remains available during the reset - there's no downtime.</p>`,
+
+        'smtp': `
+<div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">📧 Stop Losing Emails to the Spam Folder</h2>
+<p style="margin:0;color:#374151;">By default, WordPress sends email via PHP's <code>mail()</code> function. Email sent this way - directly from your server's IP with no authentication - is rejected by Gmail, Outlook, and most modern mail services, or silently dropped into spam. Authenticated SMTP delivery solves this permanently.</p>
+</div>
+
+<p>Once configured, all WordPress email goes through your SMTP server: WooCommerce order confirmations, password reset links, admin notifications, CloudScale scan alerts, 2FA OTP codes, and any plugin that calls <code>wp_mail()</code>. No code changes required anywhere else.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Supported providers</h3>
+<ul>
+<li><strong>Gmail (Google Workspace):</strong> use an App Password (not your account password). Enable 2-Step Verification in your Google account first, then go to Google Account → Security → App passwords → create one for "Mail". Host: <code>smtp.gmail.com</code>, Port: <code>587</code>, Encryption: TLS.</li>
+<li><strong>Outlook / Microsoft 365:</strong> Host: <code>smtp.office365.com</code>, Port: <code>587</code>, Encryption: TLS. Use your full email address as the username.</li>
+<li><strong>Amazon SES:</strong> create SMTP credentials in the SES console (IAM user with SMTP permissions). Host varies by region, e.g. <code>email-smtp.us-east-1.amazonaws.com</code>, Port: <code>587</code>.</li>
+<li><strong>Mailgun, SendGrid, Postmark:</strong> use the SMTP relay settings provided in your account dashboard. All use standard SMTP with API key as the password.</li>
+<li><strong>Custom SMTP server:</strong> enter your host, port, encryption type, username, and password directly.</li>
+</ul>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Test before you save</h3>
+<p>Use the <strong>Send Test Email</strong> button to confirm delivery before saving. The test sends a real email to your WordPress admin address. Check the Email Log tab if you don't receive it within a few minutes - the log shows whether the send was attempted and what error (if any) was returned.</p>`,
+
+        'email-log': `
+<div style="background:#fdf4ff;border-left:4px solid #9333ea;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">📬 See Every Email WordPress Has Sent</h2>
+<p style="margin:0;color:#374151;">The email activity log captures every outgoing email regardless of delivery method - PHP mail(), SMTP, or any third-party mailer that hooks into wp_mail(). If a user says they didn't receive a password reset or a WooCommerce order notification, this is the first place to look.</p>
+</div>
+
+<p>Each log entry records: timestamp, recipient address, subject line, and delivery status (sent successfully or failed with error). Click any row to open a modal showing the full email body - useful for verifying the content of automated emails without having to trigger them again.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Diagnosing email problems</h3>
+<p>If a recipient says they didn't get an email:</p>
+<ol>
+<li>Check the log for their address and the expected subject - if it shows "Sent", WordPress delivered it to your SMTP server. The problem is downstream (spam folder, SPF/DKIM failure, recipient's mail server).</li>
+<li>If the log shows "Failed" or the email isn't in the log at all, check the SMTP settings on the Mail tab. A common cause is an incorrect App Password or an outbound port blocked by the hosting provider.</li>
+<li>If the log is empty for a plugin's emails, that plugin may be bypassing <code>wp_mail()</code> and using its own mailer - in that case, CloudScale cannot intercept it.</li>
+</ol>
+
+<p>The log retains the last 200 entries. Use the <strong>Clear Log</strong> button to reset it after debugging.</p>`,
+
+        'thumbnails': `
+<div style="background:#fefce8;border-left:4px solid #d97706;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🖼️ Why Your Links Share Without a Preview Image</h2>
+<p style="margin:0;color:#374151;">When someone shares a WordPress post link on Slack, Twitter, WhatsApp, or LinkedIn, the platform fetches your page to build a preview card. That card is driven entirely by Open Graph meta tags - specifically <code>og:image</code>. If the tag is missing, wrong, or pointing to an image that Cloudflare is caching with a wrong content-type, the link shares as bare text. This diagnostic panel finds and fixes those problems.</p>
+</div>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">Open Graph URL Checker</h3>
+<p>Enter any public URL on your site to inspect its Open Graph tags. The checker fetches the page, parses the <code>&lt;head&gt;</code>, and reports all OG meta tags found (title, description, image, type) along with a visual preview of how the link will appear when shared. Immediately shows if <code>og:image</code> is missing or pointing to a non-existent URL.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Recent Posts Scan</h3>
+<p>Scans your 20 most recently published posts and checks each one for a set featured image. Posts without a featured image are listed so you can add images before they're shared on social media.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Cloudflare Image Cache</h3>
+<p>Cloudflare's aggressive caching can serve stale or incorrectly-typed image responses to social platform crawlers. This panel lets you configure Cloudflare cache settings for image URLs to ensure social crawlers always get a fresh, correctly-typed response. Enter your Cloudflare Zone ID and API token to enable the cache management tools.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Media Library Audit</h3>
+<p>Lists orphaned attachment records in your database - images that exist in wp_posts as attachments but whose files are missing from the uploads directory. These cause 404 errors when social crawlers try to fetch the referenced og:image. The audit lets you identify and clean up broken attachment records.</p>`,
 
         'uptime-monitor': `
 <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-left:4px solid #16a34a;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">

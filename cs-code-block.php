@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.433
+ * Version: 1.9.436
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.433';
+    const VERSION      = '1.9.436';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1955,7 +1955,7 @@ class CloudScale_DevTools {
         ?>
 
         <!-- ── CS Monitor toggle ── -->
-        <div class="cs-panel" style="margin-bottom:12px;">
+        <div class="cs-panel" id="cs-panel-cs-monitor" style="margin-bottom:12px;">
             <div class="cs-section-header" style="background:linear-gradient(90deg,#0f4c75 0%,#1b6ca8 100%);border-left:3px solid #38bdf8;">
                 <span>⚡ <?php esc_html_e( 'CS Monitor', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Frontend performance overlay panel', 'cloudscale-devtools' ); ?></span>
@@ -4115,7 +4115,7 @@ class CloudScale_DevTools {
         $security_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         ?>
         <!-- ── Plugin Stack Scanner ──────────────────────────────────────── -->
-        <div class="cs-panel">
+        <div class="cs-panel" id="cs-panel-plugin-stack">
             <div class="cs-section-header" style="background:linear-gradient(90deg,#1a3a8f 0%,#1e6fd9 100%);border-left:3px solid #60a5fa;">
                 <span>🔍 <?php esc_html_e( 'Plugin Stack Scanner', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Find plugins CloudScale already replaces — reduce bloat and attack surface', 'cloudscale-devtools' ); ?></span>
@@ -4144,7 +4144,7 @@ class CloudScale_DevTools {
         </div>
 
         <!-- ── Update Risk Scorer ────────────────────────────────────────── -->
-        <div class="cs-panel">
+        <div class="cs-panel" id="cs-panel-update-risk">
             <div class="cs-section-header cs-section-header-teal">
                 <span>🔄 <?php esc_html_e( 'Update Risk Scorer', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'AI-rates pending plugin updates: Patch / Minor / Breaking before you apply them', 'cloudscale-devtools' ); ?></span>
@@ -4175,7 +4175,7 @@ class CloudScale_DevTools {
         </div>
 
         <!-- ── Uptime Monitor ────────────────────────────────────────────── -->
-        <div class="cs-panel">
+        <div class="cs-panel" id="cs-panel-uptime-monitor">
             <div class="cs-section-header cs-section-header-green">
                 <span>⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'WordPress pushes a heartbeat to a Cloudflare Worker every minute. No heartbeat = site down alert.', 'cloudscale-devtools' ); ?></span>
