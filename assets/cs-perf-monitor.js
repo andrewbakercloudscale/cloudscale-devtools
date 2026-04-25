@@ -222,9 +222,9 @@
 
     // ── Panel open / close ────────────────────────────────────────────────────
     function restoreState() {
-        // Always start collapsed on each page load — localStorage only persists height and tab.
-        var h = parseInt(localStorage.getItem(LS_HEIGHT), 10) || DEFAULT_H;
-        if (h < MIN_H) { h = DEFAULT_H; localStorage.removeItem(LS_HEIGHT); }
+        // Always start collapsed — only the active tab is persisted.
+        localStorage.removeItem(LS_OPEN);
+        localStorage.removeItem(LS_HEIGHT);
         setPadding(48);
         switchTab(activeTab, false);
     }
@@ -271,7 +271,6 @@
         setPadding(clamped);
         document.getElementById('cs-perf-toggle-arrow').innerHTML = '&#9660;';
         toggleBtn.setAttribute('aria-expanded', 'true');
-        localStorage.setItem(LS_OPEN, '1');
         if (!animate) { void panel.offsetHeight; panel.style.transition = ''; }
     }
 
@@ -279,15 +278,14 @@
         panel.classList.remove('cs-perf-open');
         panel.classList.add('cs-perf-collapsed');
         panel.style.height = '';
-        setPadding(48); // collapsed header height
+        setPadding(48);
         document.getElementById('cs-perf-toggle-arrow').innerHTML = '&#9650;';
         toggleBtn.setAttribute('aria-expanded', 'false');
-        localStorage.setItem(LS_OPEN, '0');
     }
 
     function togglePanel() {
         if (panel.classList.contains('cs-perf-open')) closePanel();
-        else openPanel(parseInt(localStorage.getItem(LS_HEIGHT), 10) || DEFAULT_H, true);
+        else openPanel(DEFAULT_H, true);
     }
 
     // ── Tab switching ─────────────────────────────────────────────────────────
@@ -3133,7 +3131,7 @@
         function onUp() {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup',   onUp);
-            localStorage.setItem(LS_HEIGHT, panel.offsetHeight);
+            // Height not persisted — panel always opens at DEFAULT_H.
             panel.style.transition = '';
         }
     }
@@ -3220,7 +3218,7 @@
                 e.stopPropagation();
                 switchTab(btn.dataset.tab);
                 if (!panel.classList.contains('cs-perf-open'))
-                    openPanel(parseInt(localStorage.getItem(LS_HEIGHT), 10) || DEFAULT_H, true);
+                    openPanel(DEFAULT_H, true);
             });
         });
 

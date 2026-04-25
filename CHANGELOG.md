@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.506] - 2026-04-25
+
+### Fixed
+- CS Monitor: panel always opens at default height (340px) — height and open-state are no longer persisted to `localStorage`, so dragging to full-screen no longer causes it to reopen full-screen on the next visit; `LS_OPEN` and `LS_HEIGHT` keys are cleared on every page load
+
 ## [1.9.505] - 2026-04-25
 
 ### Fixed
