@@ -215,7 +215,7 @@ class CSDT_Uptime {
 
     public static function add_cron_schedules( array $schedules ): array {
         if ( ! isset( $schedules['csdt_minutely'] ) ) {
-            $schedules['csdt_minutely'] = [ 'interval' => 180, 'display' => 'Every 3 Minutes (CloudScale)' ];
+            $schedules['csdt_minutely'] = [ 'interval' => 600, 'display' => 'Every 10 Minutes (CloudScale)' ];
         }
         return $schedules;
     }

@@ -31,7 +31,7 @@ class CSDT_Optimizer {
             $slug = dirname( $plugin_file );
             // Map known plugin slugs to the table-suffix prefixes they own.
             $slug_suffix_map = [
-                'cloudscale-wordpress-free-analytics' => [ 'cspv_' ],
+                'cloudscale-wordpress-free-analytics' => [ 'cs_analytics_' ],
             ];
             if ( isset( $slug_suffix_map[ $slug ] ) ) {
                 foreach ( $slug_suffix_map[ $slug ] as $sfx ) {

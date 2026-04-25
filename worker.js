@@ -13,7 +13,7 @@
 //   action=csdt_heartbeat — record a heartbeat from WordPress (WP-Cron calls this)
 //   (no action)           — manual test, returns current watchdog state
 
-const STALE_MS   = 8 * 60 * 1000;  // 8 min without heartbeat = site down
+const STALE_MS   = 15 * 60 * 1000; // 15 min without heartbeat = site down (heartbeat every 10 min)
 const ALERT_COOL = 30 * 60 * 1000; // cooldown between repeat down-alerts
 
 async function watchdog(env, ctx) {
