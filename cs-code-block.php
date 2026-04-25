@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.499
+ * Version: 1.9.501
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.499';
+    const VERSION      = '1.9.501';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -345,6 +345,9 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_save_default_image',     [ 'CSDT_Thumbnails', 'ajax_save_default_image' ] );
         add_filter( 'post_thumbnail_html',                  [ 'CSDT_Thumbnails', 'default_image_html' ], 10, 5 );
         add_filter( 'has_post_thumbnail',                   [ 'CSDT_Thumbnails', 'default_image_has_thumbnail' ], 10, 3 );
+        // Hero image: swap to 1200×630 social format on single post pages.
+        add_filter( 'post_thumbnail_html',                  [ 'CSDT_Thumbnails', 'hero_image_html' ], 11, 5 );
+        add_action( 'wp_enqueue_scripts',                   [ 'CSDT_Thumbnails', 'enqueue_hero_styles' ] );
 
         // Thumbnails / Social Preview AJAX
         add_action( 'wp_ajax_csdt_devtools_social_check_url',   [ 'CSDT_Thumbnails', 'ajax_social_check_url' ] );

@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.499
+Stable tag: 1.9.501
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,9 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 5. SQL Query Tool with quick queries and paginated results
 
 == Changelog ==
+
+= 1.9.501 =
+* feat: Thumbnails — hero image on single post pages auto-swaps to the 1200x630 social format; aspect-ratio CSS applied so any uploaded image displays at the correct landscape ratio
 
 = 1.9.499 =
 * feat: Thumbnails — "Refresh Stale" button scans all posts, regens any where the featured image was replaced since last generation, and logs found/fixed counts with clickable post links

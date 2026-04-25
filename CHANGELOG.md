@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.501] - 2026-04-25
+
+### Added
+- Thumbnails: hero image auto-sizing on single post pages — `post_thumbnail_html` filter (priority 11) swaps the featured image `src` to the plugin's already-generated 1200×630 Facebook social format when available; strips `srcset`/`sizes` so the browser loads the correct crop; CSS `aspect-ratio: 1200/630; object-fit: cover` injected via `wp_enqueue_scripts` as a no-src registered style so the layout holds for posts that have not yet been processed
+
 ## [1.9.498] - 2026-04-25
 
 ### Added
