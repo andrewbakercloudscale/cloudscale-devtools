@@ -182,6 +182,8 @@
         renderEditor();
         restoreState();
         bindEvents();
+        // iOS Safari bfcache: DOMContentLoaded doesn't fire on tab restore — force-close here.
+        window.addEventListener('pageshow', function (e) { if (e.persisted) closePanel(); });
     });
 
     // ── Page context strip ────────────────────────────────────────────────────
@@ -226,7 +228,7 @@
         // Always start collapsed — only the active tab is persisted.
         localStorage.removeItem(LS_OPEN);
         localStorage.removeItem(LS_HEIGHT);
-        setPadding(48);
+        closePanel();
         switchTab(activeTab, false);
     }
 
@@ -3126,7 +3128,6 @@
             if (!panel.classList.contains('cs-perf-open')) {
                 panel.classList.add('cs-perf-open'); panel.classList.remove('cs-perf-collapsed');
                 document.getElementById('cs-perf-toggle-arrow').innerHTML = '&#9660;'; toggleBtn.setAttribute('aria-expanded', 'true');
-                localStorage.setItem(LS_OPEN, '1');
             }
         }
         function onUp() {

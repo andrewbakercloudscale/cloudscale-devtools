@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.512] - 2026-04-25
+
+### Fixed
+- CS Monitor: panel now always starts collapsed on every page load — `restoreState()` calls `closePanel()` (removes `cs-perf-open` class) instead of only adjusting padding; `pageshow` listener added for iOS Safari bfcache restores where `DOMContentLoaded` does not re-fire; stale `localStorage.setItem(LS_OPEN)` write removed from resize drag handler
+
 ## [1.9.511] - 2026-04-25
 
 ### Added
