@@ -219,8 +219,10 @@ class CSDT_Thumbnails {
                     <button type="button" class="cs-btn-primary" id="cs-thumb-audit-top-btn" data-mode="top" style="background:#1565c0">🔥 <?php esc_html_e( 'Scan Top 50 Posts', 'cloudscale-devtools' ); ?></button>
                     <button type="button" class="cs-btn-secondary" id="cs-thumb-fix-all-btn" style="display:none;background:#2271b1;color:#fff;padding:7px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px">🔧 <?php esc_html_e( 'Fix all', 'cloudscale-devtools' ); ?></button>
                     <button type="button" class="cs-btn-secondary" id="cs-thumb-fix-site-btn" style="background:#6a1b9a;color:#fff;padding:7px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px">🌐 <?php esc_html_e( 'Fix All Posts on Site', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-btn-secondary" id="cs-thumb-refresh-stale-btn" style="background:#1565c0;color:#fff;padding:7px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px">🔄 <?php esc_html_e( 'Refresh Stale', 'cloudscale-devtools' ); ?></button>
                     <span id="cs-thumb-audit-progress" style="font-size:12px;color:#888"></span>
                 </div>
+                <div id="cs-thumb-stale-log" style="display:none;margin-top:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-size:13px;"></div>
                 <div id="cs-thumb-audit-results" style="margin-top:14px;display:none"></div>
             </div>
         </div>
@@ -989,6 +991,67 @@ class CSDT_Thumbnails {
             'next_offset'  => $next_offset,
             'has_more'     => $next_offset < $total,
             'batch'        => $batch_results,
+        ] );
+    }
+
+    public static function ajax_social_refresh_stale_batch(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'upload_files' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $offset     = absint( $_POST['offset'] ?? 0 );
+        $batch_size = 10;
+
+        $total = (int) wp_count_posts( 'post' )->publish;
+
+        $posts = get_posts( [
+            'post_type'        => 'post',
+            'post_status'      => 'publish',
+            'posts_per_page'   => $batch_size,
+            'offset'           => $offset,
+            'orderby'          => 'ID',
+            'order'            => 'ASC',
+            'fields'           => 'ids',
+            'suppress_filters' => false,
+        ] );
+
+        $stale_posts = [];
+        foreach ( $posts as $post_id ) {
+            $thumb_id = (int) get_post_thumbnail_id( $post_id );
+            if ( ! $thumb_id ) continue;
+
+            $last_thumb    = (int) get_post_meta( $post_id, '_csdt_social_formats_thumb_id', true );
+            $last_gen_time = (int) get_post_meta( $post_id, '_csdt_social_formats_gen_time', true );
+            $thumb_post    = get_post( $thumb_id );
+            $thumb_mtime   = $thumb_post ? strtotime( $thumb_post->post_modified_gmt ) : 0;
+
+            $is_stale = ( $last_thumb !== $thumb_id ) || ( $last_gen_time < $thumb_mtime );
+            if ( ! $is_stale ) continue;
+
+            $results = self::generate_social_formats_for_post( $post_id );
+            $ok      = $results !== null;
+            if ( $ok ) {
+                update_post_meta( $post_id, '_csdt_social_formats_thumb_id', $thumb_id );
+                update_post_meta( $post_id, '_csdt_social_formats_gen_time', time() );
+            }
+
+            $stale_posts[] = [
+                'post_id' => $post_id,
+                'title'   => get_the_title( $post_id ),
+                'url'     => get_permalink( $post_id ),
+                'reason'  => $last_thumb !== $thumb_id ? 'thumb_id_changed' : 'file_replaced',
+                'ok'      => $ok,
+            ];
+        }
+
+        $next_offset = $offset + count( $posts );
+        wp_send_json_success( [
+            'total'       => $total,
+            'next_offset' => $next_offset,
+            'has_more'    => $next_offset < $total,
+            'checked'     => count( $posts ),
+            'stale'       => $stale_posts,
         ] );
     }
 

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.498] - 2026-04-25
+
+### Added
+- Thumbnails: "Refresh Stale" button — scans all published posts in batches of 10, identifies posts where the featured image was replaced (attachment ID changed or `post_modified_gmt` newer than `_csdt_social_formats_gen_time`), regenerates social formats for each, and shows a live log with found/fixed counts and clickable post links
+
 ## [1.9.496] - 2026-04-25
 
 ### Fixed

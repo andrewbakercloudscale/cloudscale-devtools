@@ -179,9 +179,11 @@
     const auditBtn      = document.getElementById( 'cs-thumb-audit-btn' );
     const auditTopBtn   = document.getElementById( 'cs-thumb-audit-top-btn' );
     const auditProgress = document.getElementById( 'cs-thumb-audit-progress' );
-    const auditResults  = document.getElementById( 'cs-thumb-audit-results' );
-    const fixAllBtn     = document.getElementById( 'cs-thumb-fix-all-btn' );
-    const fixSiteBtn    = document.getElementById( 'cs-thumb-fix-site-btn' );
+    const auditResults      = document.getElementById( 'cs-thumb-audit-results' );
+    const fixAllBtn         = document.getElementById( 'cs-thumb-fix-all-btn' );
+    const fixSiteBtn        = document.getElementById( 'cs-thumb-fix-site-btn' );
+    const refreshStaleBtn   = document.getElementById( 'cs-thumb-refresh-stale-btn' );
+    const staleLog          = document.getElementById( 'cs-thumb-stale-log' );
 
     let lastScanPosts = [];
 
@@ -248,6 +250,79 @@
                 } ).catch( () => { done++; next(); } );
             };
             next();
+        } );
+    }
+
+    // Refresh Stale — find posts where thumbnail was replaced and regen.
+    if ( refreshStaleBtn && staleLog ) {
+        refreshStaleBtn.addEventListener( 'click', () => {
+            refreshStaleBtn.disabled = true;
+            refreshStaleBtn.textContent = 'Scanning…';
+            staleLog.style.display = 'block';
+            staleLog.innerHTML = '<strong>Scanning for stale thumbnails…</strong>';
+
+            let totalPosts = 0;
+            let checked    = 0;
+            let staleFound = 0;
+            let fixed      = 0;
+            const fixedPosts = [];
+
+            function renderLog() {
+                let html = `<strong>Scanned ${checked} / ${totalPosts} posts — ${staleFound} stale found, ${fixed} fixed</strong>`;
+                if ( fixedPosts.length ) {
+                    html += '<ul style="margin:8px 0 0 16px;line-height:1.8;">';
+                    fixedPosts.forEach( p => {
+                        const icon = p.ok ? '✓' : '✗';
+                        const col  = p.ok ? '#166534' : '#dc2626';
+                        const reason = p.reason === 'file_replaced' ? 'file replaced' : 'thumbnail changed';
+                        html += `<li><span style="color:${col};font-weight:700;">${icon}</span> <a href="${p.url}" target="_blank" rel="noopener" style="color:#1d4ed8;">${p.title}</a> <span style="color:#6b7280;font-size:11px;">(${reason})</span></li>`;
+                    } );
+                    html += '</ul>';
+                }
+                staleLog.innerHTML = html;
+            }
+
+            function runBatch( offset ) {
+                post( 'csdt_devtools_social_refresh_stale_batch', { offset } ).then( res => {
+                    if ( ! res.success ) {
+                        refreshStaleBtn.disabled = false;
+                        refreshStaleBtn.textContent = '🔄 Refresh Stale';
+                        staleLog.innerHTML += '<br><span style="color:#dc2626;">✗ Error — see console.</span>';
+                        console.error( 'refresh_stale_batch error', res );
+                        return;
+                    }
+                    const d = res.data;
+                    if ( totalPosts === 0 ) totalPosts = d.total;
+                    checked += d.checked;
+
+                    ( d.stale || [] ).forEach( p => {
+                        staleFound++;
+                        if ( p.ok ) fixed++;
+                        fixedPosts.push( p );
+                    } );
+
+                    refreshStaleBtn.textContent = `Scanning ${checked} / ${totalPosts}…`;
+                    renderLog();
+
+                    if ( d.has_more ) {
+                        runBatch( d.next_offset );
+                    } else {
+                        refreshStaleBtn.disabled = false;
+                        refreshStaleBtn.textContent = '🔄 Refresh Stale';
+                        const summary = staleFound === 0
+                            ? '<strong style="color:#166534;">✓ All thumbnails are current — nothing to refresh.</strong>'
+                            : `<strong>Done — found ${staleFound} stale, fixed ${fixed}.</strong>`;
+                        staleLog.innerHTML = summary + staleLog.innerHTML.replace( /<strong>Scanned.*?<\/strong>/, '' );
+                    }
+                } ).catch( err => {
+                    refreshStaleBtn.disabled = false;
+                    refreshStaleBtn.textContent = '🔄 Refresh Stale';
+                    staleLog.innerHTML += '<br><span style="color:#dc2626;">✗ Network error.</span>';
+                    console.error( 'refresh_stale_batch network error', err );
+                } );
+            }
+
+            runBatch( 0 );
         } );
     }
 
