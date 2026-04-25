@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.522
+Stable tag: 1.9.523
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,7 +85,7 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
-= 1.9.522 =
+= 1.9.523 =
 * feat: expand CSP preset library with Stripe, Hotjar, Intercom, Twitter/X embeds, Disqus, and WooCommerce Payments; fix AdSense preset missing csi.gstatic.com in connect-src (was causing violations on sites using AdSense); JS serviceMap kept in sync so the live CSP preview updates correctly when any new preset is ticked
 * feat: CSP violation logging and fixes log; "Log violations" toggle adds report-uri to the CSP header in both enforce and report-only modes so violations are captured in production; fixes log records every service added to the allowlist with a timestamp; both logs have clear buttons and the violation log auto-refreshes every 30 seconds
 
