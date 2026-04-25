@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.519
+Stable tag: 1.9.521
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,7 +85,7 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
-= 1.9.519 =
+= 1.9.521 =
 * feat: CSP violation logging and fixes log; "Log violations" toggle adds report-uri to the CSP header in both enforce and report-only modes so violations are captured in production; fixes log records every service added to the allowlist with a timestamp; both logs have clear buttons and the violation log auto-refreshes every 30 seconds
 
 = 1.9.515 =
