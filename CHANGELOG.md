@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.504] - 2026-04-25
+
+### Fixed
+- CSP: `style-src` now includes the per-request nonce when nonces are enabled — WordPress 6.x adds the nonce attribute to enqueued `<link>` stylesheet tags, so the nonce must also appear in `style-src` for non-self CDN stylesheets (e.g. highlight.js themes from cdnjs) to load; previously only `script-src` had the nonce, causing CDN CSS to be blocked and syntax highlighting colours to disappear
+
 ## [1.9.501] - 2026-04-25
 
 ### Added
