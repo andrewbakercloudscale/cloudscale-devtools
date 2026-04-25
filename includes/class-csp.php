@@ -39,16 +39,12 @@ class CSDT_CSP {
         $script_src  = $use_nonces
             ? [ "'self'", "'nonce-" . self::get_csp_nonce() . "'", "'strict-dynamic'" ]
             : [ "'self'", "'unsafe-inline'", "'unsafe-eval'" ];
-        // When nonces are active WordPress adds them to <link rel="stylesheet"> tags too,
-        // so style-src must include the nonce to allow non-self stylesheets (e.g. hljs CDN).
-        $style_src   = $use_nonces
-            ? [ "'self'", "'nonce-" . self::get_csp_nonce() . "'", "'unsafe-inline'" ]
-            : [ "'self'", "'unsafe-inline'" ];
-
+        // style-src must NOT use nonces: CSP3 ignores 'unsafe-inline' when a nonce is present,
+        // which breaks all style="" attributes site-wide. Instead, allow the hljs CDN host directly.
         $d = [
             'default-src' => [ "'self'" ],
             'script-src'  => $script_src,
-            'style-src'   => $style_src,
+            'style-src'   => [ "'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com' ],
             'img-src'     => [ "'self'", 'data:', 'https:' ],
             'font-src'    => [ "'self'", 'data:' ],
             'connect-src' => [ "'self'" ],

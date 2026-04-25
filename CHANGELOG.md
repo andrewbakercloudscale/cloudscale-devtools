@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.509] - 2026-04-25
+
+### Fixed
+- CSP: removed nonce from `style-src` — CSP Level 3 ignores `'unsafe-inline'` when a nonce is present in `style-src`, which was silently blocking all `style=""` attributes site-wide (broke the AI SEO summary box and any other inline-styled elements); `https://cdnjs.cloudflare.com` added to `style-src` directly to allow the hljs CDN CSS
+
 ## [1.9.508] - 2026-04-25
 
 ### Removed
