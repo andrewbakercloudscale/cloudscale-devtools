@@ -182,8 +182,16 @@
         renderEditor();
         restoreState();
         bindEvents();
+        // Block ghost taps on initial load (iOS fires synthetic touches at last-tap coordinates).
+        panelLocked = true;
+        setTimeout(function () { panelLocked = false; }, 600);
         // iOS Safari bfcache: DOMContentLoaded doesn't fire on tab restore — force-close here.
-        window.addEventListener('pageshow', function (e) { if (e.persisted) closePanel(); });
+        window.addEventListener('pageshow', function (e) {
+            if (!e.persisted) return;
+            closePanel();
+            panelLocked = true;
+            setTimeout(function () { panelLocked = false; }, 600);
+        });
     });
 
     // ── Page context strip ────────────────────────────────────────────────────
@@ -286,7 +294,10 @@
         toggleBtn.setAttribute('aria-expanded', 'false');
     }
 
+    var panelLocked = false;
+
     function togglePanel() {
+        if (panelLocked) return;
         if (panel.classList.contains('cs-perf-open')) closePanel();
         else openPanel(DEFAULT_H, true);
     }
@@ -3204,7 +3215,7 @@
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 switchTab(btn.dataset.tab);
-                if (!panel.classList.contains('cs-perf-open'))
+                if (!panelLocked && !panel.classList.contains('cs-perf-open'))
                     openPanel(DEFAULT_H, true);
             });
         });

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.513] - 2026-04-25
+
+### Fixed
+- CS Monitor: `panelLocked` flag blocks `togglePanel()` and tab-click `openPanel()` for 600ms after every page load and bfcache restore — prevents iOS Safari ghost taps (phantom touches fired at the last navigation coordinates) from re-opening the panel immediately after it is force-collapsed
+
 ## [1.9.512] - 2026-04-25
 
 ### Fixed
