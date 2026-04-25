@@ -65,7 +65,7 @@ class CSDT_CSP {
                 'script-src'  => [ 'https://*.googlesyndication.com', 'https://*.googletagservices.com', 'https://*.googleadservices.com', 'https://adservice.google.com', 'https://fundingchoicesmessages.google.com' ],
                 'frame-src'   => [ 'blob:', 'https://*.googlesyndication.com', 'https://*.safeframe.googlesyndication.com', 'https://googleads.g.doubleclick.net', 'https://ep2.adtrafficquality.google' ],
                 'img-src'     => [ 'https://*.googlesyndication.com', 'https://googleads.g.doubleclick.net' ],
-                'connect-src' => [ 'https://*.googlesyndication.com', 'https://*.googletagservices.com', 'https://adservice.google.com', 'https://ep1.adtrafficquality.google', 'https://ep2.adtrafficquality.google', 'https://fundingchoicesmessages.google.com' ],
+                'connect-src' => [ 'https://*.googlesyndication.com', 'https://*.googletagservices.com', 'https://adservice.google.com', 'https://ep1.adtrafficquality.google', 'https://ep2.adtrafficquality.google', 'https://fundingchoicesmessages.google.com', 'https://csi.gstatic.com' ],
             ],
             'google_fonts'        => [
                 'style-src'   => [ 'https://fonts.googleapis.com' ],
@@ -93,6 +93,40 @@ class CSDT_CSP {
             ],
             'vimeo'               => [
                 'frame-src'   => [ 'https://player.vimeo.com' ],
+            ],
+            'stripe'              => [
+                'script-src'  => [ 'https://js.stripe.com' ],
+                'frame-src'   => [ 'https://js.stripe.com', 'https://hooks.stripe.com' ],
+                'connect-src' => [ 'https://api.stripe.com' ],
+            ],
+            'hotjar'              => [
+                'script-src'  => [ 'https://static.hotjar.com', 'https://script.hotjar.com' ],
+                'connect-src' => [ 'https://*.hotjar.com', 'wss://*.hotjar.com' ],
+                'img-src'     => [ 'https://*.hotjar.com' ],
+                'frame-src'   => [ 'https://*.hotjar.com' ],
+            ],
+            'intercom'            => [
+                'script-src'  => [ 'https://widget.intercom.io', 'https://js.intercomcdn.com' ],
+                'connect-src' => [ 'https://api.intercom.io', 'https://api-iam.intercom.io', 'wss://nexus-websocket-a.intercom.io', 'wss://nexus-websocket-b.intercom.io' ],
+                'img-src'     => [ 'https://*.intercom.io', 'https://*.intercomcdn.com' ],
+                'frame-src'   => [ 'https://intercom-sheets.com' ],
+            ],
+            'twitter_embeds'      => [
+                'script-src'  => [ 'https://platform.twitter.com' ],
+                'frame-src'   => [ 'https://platform.twitter.com', 'https://syndication.twitter.com' ],
+                'connect-src' => [ 'https://api.twitter.com' ],
+                'img-src'     => [ 'https://pbs.twimg.com', 'https://abs.twimg.com' ],
+            ],
+            'disqus'              => [
+                'script-src'  => [ 'https://*.disqus.com', 'https://*.disquscdn.com' ],
+                'frame-src'   => [ 'https://disqus.com' ],
+                'connect-src' => [ 'https://*.disqus.com' ],
+                'img-src'     => [ 'https://*.disquscdn.com', 'https://referrer.disqus.com' ],
+            ],
+            'woocommerce_payments' => [
+                'script-src'  => [ 'https://js.stripe.com', 'https://pay.google.com' ],
+                'frame-src'   => [ 'https://js.stripe.com', 'https://hooks.stripe.com', 'https://pay.google.com' ],
+                'connect-src' => [ 'https://api.stripe.com' ],
             ],
         ];
 
@@ -176,15 +210,21 @@ class CSDT_CSP {
         if ( ! is_array( $fixes_log ) ) { $fixes_log = []; }
 
         $services = [
-            'google_analytics'    => 'Google Analytics (GA4 / gtag.js)',
-            'google_adsense'      => 'Google AdSense',
-            'google_tag_manager'  => 'Google Tag Manager',
-            'google_fonts'        => 'Google Fonts',
-            'cloudflare_insights' => 'Cloudflare Web Analytics',
-            'facebook_pixel'      => 'Facebook Pixel',
-            'recaptcha'           => 'Google reCAPTCHA',
-            'youtube'             => 'YouTube embeds',
-            'vimeo'               => 'Vimeo embeds',
+            'google_analytics'     => 'Google Analytics (GA4 / gtag.js)',
+            'google_adsense'       => 'Google AdSense',
+            'google_tag_manager'   => 'Google Tag Manager',
+            'google_fonts'         => 'Google Fonts',
+            'cloudflare_insights'  => 'Cloudflare Web Analytics',
+            'facebook_pixel'       => 'Facebook Pixel',
+            'recaptcha'            => 'Google reCAPTCHA',
+            'youtube'              => 'YouTube embeds',
+            'vimeo'                => 'Vimeo embeds',
+            'stripe'               => 'Stripe Payments',
+            'hotjar'               => 'Hotjar',
+            'intercom'             => 'Intercom',
+            'twitter_embeds'       => 'Twitter / X embeds',
+            'disqus'               => 'Disqus Comments',
+            'woocommerce_payments' => 'WooCommerce Payments',
         ];
         ?>
         <hr class="cs-sec-divider">
@@ -364,7 +404,7 @@ class CSDT_CSP {
         $reporting_enabled = isset( $_POST['reporting_enabled'] ) ? sanitize_key( wp_unslash( $_POST['reporting_enabled'] ) )                : '0';
 
         if ( ! is_array( $services ) ) { $services = []; }
-        $allowed_services = [ 'google_analytics', 'google_adsense', 'google_tag_manager', 'google_fonts', 'cloudflare_insights', 'facebook_pixel', 'recaptcha', 'youtube', 'vimeo' ];
+        $allowed_services = [ 'google_analytics', 'google_adsense', 'google_tag_manager', 'google_fonts', 'cloudflare_insights', 'facebook_pixel', 'recaptcha', 'youtube', 'vimeo', 'stripe', 'hotjar', 'intercom', 'twitter_embeds', 'disqus', 'woocommerce_payments' ];
         $services = array_values( array_intersect( $services, $allowed_services ) );
 
         $old = [
@@ -406,6 +446,9 @@ class CSDT_CSP {
                 'google_tag_manager' => 'Google Tag Manager', 'google_fonts' => 'Google Fonts',
                 'cloudflare_insights' => 'Cloudflare Insights', 'facebook_pixel' => 'Facebook Pixel',
                 'recaptcha' => 'reCAPTCHA', 'youtube' => 'YouTube', 'vimeo' => 'Vimeo',
+                'stripe' => 'Stripe', 'hotjar' => 'Hotjar', 'intercom' => 'Intercom',
+                'twitter_embeds' => 'Twitter/X embeds', 'disqus' => 'Disqus',
+                'woocommerce_payments' => 'WooCommerce Payments',
             ];
             $added_labels = array_map( fn( $s ) => $names[ $s ] ?? $s, $added_svcs );
             $fixes = json_decode( get_option( 'csdt_csp_fixes_log', '[]' ), true );

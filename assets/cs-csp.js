@@ -16,14 +16,20 @@
     };
     var serviceMap = {
         google_analytics:    { 'script-src':['https://www.googletagmanager.com','https://www.google-analytics.com'], 'img-src':['https://www.google-analytics.com','https://www.googletagmanager.com'], 'connect-src':['https://www.google-analytics.com','https://analytics.google.com','https://stats.g.doubleclick.net','https://region1.google-analytics.com'] },
-        google_adsense:      { 'script-src':['https://*.googlesyndication.com','https://*.googletagservices.com','https://*.googleadservices.com','https://adservice.google.com','https://fundingchoicesmessages.google.com'], 'frame-src':['blob:','https://*.googlesyndication.com','https://*.safeframe.googlesyndication.com','https://googleads.g.doubleclick.net'], 'img-src':['https://*.googlesyndication.com','https://googleads.g.doubleclick.net'], 'connect-src':['https://*.googlesyndication.com','https://*.googletagservices.com','https://adservice.google.com','https://ep1.adtrafficquality.google'] },
+        google_adsense:      { 'script-src':['https://*.googlesyndication.com','https://*.googletagservices.com','https://*.googleadservices.com','https://adservice.google.com','https://fundingchoicesmessages.google.com'], 'frame-src':['blob:','https://*.googlesyndication.com','https://*.safeframe.googlesyndication.com','https://googleads.g.doubleclick.net','https://ep2.adtrafficquality.google'], 'img-src':['https://*.googlesyndication.com','https://googleads.g.doubleclick.net'], 'connect-src':['https://*.googlesyndication.com','https://*.googletagservices.com','https://adservice.google.com','https://ep1.adtrafficquality.google','https://ep2.adtrafficquality.google','https://fundingchoicesmessages.google.com','https://csi.gstatic.com'] },
         google_tag_manager:  { 'script-src':['https://www.googletagmanager.com'], 'img-src':['https://www.googletagmanager.com'] },
         google_fonts:        { 'style-src':['https://fonts.googleapis.com'], 'font-src':['https://fonts.gstatic.com'] },
         cloudflare_insights: { 'script-src':['https://static.cloudflareinsights.com'], 'connect-src':['https://cloudflareinsights.com'] },
         facebook_pixel:      { 'script-src':['https://connect.facebook.net'], 'img-src':['https://www.facebook.com'], 'connect-src':['https://www.facebook.com'] },
         recaptcha:           { 'script-src':['https://www.google.com','https://www.gstatic.com'], 'frame-src':['https://www.google.com'] },
         youtube:             { 'frame-src':['https://www.youtube.com','https://www.youtube-nocookie.com'] },
-        vimeo:               { 'frame-src':['https://player.vimeo.com'] }
+        vimeo:               { 'frame-src':['https://player.vimeo.com'] },
+        stripe:              { 'script-src':['https://js.stripe.com'], 'frame-src':['https://js.stripe.com','https://hooks.stripe.com'], 'connect-src':['https://api.stripe.com'] },
+        hotjar:              { 'script-src':['https://static.hotjar.com','https://script.hotjar.com'], 'connect-src':['https://*.hotjar.com','wss://*.hotjar.com'], 'img-src':['https://*.hotjar.com'], 'frame-src':['https://*.hotjar.com'] },
+        intercom:            { 'script-src':['https://widget.intercom.io','https://js.intercomcdn.com'], 'connect-src':['https://api.intercom.io','https://api-iam.intercom.io','wss://nexus-websocket-a.intercom.io','wss://nexus-websocket-b.intercom.io'], 'img-src':['https://*.intercom.io','https://*.intercomcdn.com'], 'frame-src':['https://intercom-sheets.com'] },
+        twitter_embeds:      { 'script-src':['https://platform.twitter.com'], 'frame-src':['https://platform.twitter.com','https://syndication.twitter.com'], 'connect-src':['https://api.twitter.com'], 'img-src':['https://pbs.twimg.com','https://abs.twimg.com'] },
+        disqus:              { 'script-src':['https://*.disqus.com','https://*.disquscdn.com'], 'frame-src':['https://disqus.com'], 'connect-src':['https://*.disqus.com'], 'img-src':['https://*.disquscdn.com','https://referrer.disqus.com'] },
+        woocommerce_payments: { 'script-src':['https://js.stripe.com','https://pay.google.com'], 'frame-src':['https://js.stripe.com','https://hooks.stripe.com','https://pay.google.com'], 'connect-src':['https://api.stripe.com'] }
     };
 
     function buildPreview() {
