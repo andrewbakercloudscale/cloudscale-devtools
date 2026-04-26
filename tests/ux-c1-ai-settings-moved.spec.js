@@ -79,11 +79,8 @@ test.describe('C1 — AI Settings location', () => {
         await expect(page.locator('#cs-sec-save')).toHaveCount(0);
         await expect(page.locator('#cs-sched-enabled')).toHaveCount(0);
 
-        // Status card must be visible
-        const configured    = page.locator('text=AI Cyber Audit — Configured');
-        const notConfigured = page.locator('text=AI Cyber Audit — Not Configured');
-        const cardPresent   = (await configured.count()) > 0 || (await notConfigured.count()) > 0;
-        expect(cardPresent, 'AI status card should be visible on Home tab').toBe(true);
+        // Status dashboard must show the AI Cyber Scan card (H2 replaced single card with 6-card grid)
+        await expect(page.locator('#cs-panel-home').locator('text=AI CYBER SCAN').first()).toBeVisible();
 
         await ctx.close();
     });
