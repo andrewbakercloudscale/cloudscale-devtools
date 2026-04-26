@@ -285,7 +285,7 @@ class CSDT_Monitor {
         }
 
         $body = sprintf(
-            "%s on %s\n\nRecent entries:\n%s\n\nOpen Debug AI to analyze: %s",
+            "%s on %s\n\nRecent entries:\n%s\n\nOpen Diagnostics to analyze: %s",
             $subject,
             home_url(),
             $excerpt,
