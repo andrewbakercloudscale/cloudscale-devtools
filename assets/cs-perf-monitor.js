@@ -117,7 +117,7 @@
     }
 
     // ── Bootstrap ─────────────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function () {
+    function csdtPerfInit() {
         panel        = document.getElementById('cs-perf');
         toggleBtn    = document.getElementById('cs-perf-toggle');
         exportBtn    = document.getElementById('cs-perf-export');
@@ -192,7 +192,13 @@
             panelLocked = true;
             setTimeout(function () { panelLocked = false; }, 600);
         });
-    });
+    }
+
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', csdtPerfInit );
+    } else {
+        csdtPerfInit();
+    }
 
     // ── Page context strip ────────────────────────────────────────────────────
     function renderPageContext() {

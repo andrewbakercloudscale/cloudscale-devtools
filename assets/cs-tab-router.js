@@ -151,19 +151,21 @@
                 return r.text();
             } )
             .then( function ( html ) {
-                var doc   = new DOMParser().parseFromString( html, 'text/html' );
-                var loads = [];
+                var doc = new DOMParser().parseFromString( html, 'text/html' );
 
-                // Inject wp_localize_script data + wp_add_inline_style BEFORE loading scripts
+                // Step 1: inject wp_localize_script data + css before anything else.
                 injectAssetsFromDoc( doc );
 
-                // Load new external scripts
-                doc.querySelectorAll( 'script[src]' ).forEach( function ( s ) {
-                    var src = s.getAttribute( 'src' );
-                    if ( src && ! loadedSrcs[ src ] ) loads.push( loadScript( src ) );
-                } );
+                // Step 2: swap content NOW so scripts that run on load find the DOM.
+                var newContent = doc.querySelector( '.cs-tab-content' );
+                var curContent = document.querySelector( '.cs-tab-content' );
+                if ( newContent && curContent ) {
+                    curContent.className = newContent.className;
+                    curContent.innerHTML = newContent.innerHTML;
+                    execInlineScripts( curContent );
+                }
 
-                // Load new external stylesheets
+                // Step 3: load new external stylesheets.
                 doc.querySelectorAll( 'link[rel="stylesheet"]' ).forEach( function ( l ) {
                     var href = l.getAttribute( 'href' );
                     if ( href && ! loadedSrcs[ href ] ) {
@@ -175,18 +177,16 @@
                     }
                 } );
 
-                return Promise.all( loads ).then( function () { return doc; } );
+                // Step 4: load new external scripts (content already in DOM).
+                var loads = [];
+                doc.querySelectorAll( 'script[src]' ).forEach( function ( s ) {
+                    var src = s.getAttribute( 'src' );
+                    if ( src && ! loadedSrcs[ src ] ) loads.push( loadScript( src ) );
+                } );
+
+                return Promise.all( loads );
             } )
-            .then( function ( doc ) {
-                var newContent = doc.querySelector( '.cs-tab-content' );
-                var curContent = document.querySelector( '.cs-tab-content' );
-
-                if ( newContent && curContent ) {
-                    curContent.className = newContent.className;
-                    curContent.innerHTML = newContent.innerHTML;
-                    execInlineScripts( curContent );
-                }
-
+            .then( function () {
                 hideSpinner();
                 window.scrollTo( 0, 0 );
                 document.dispatchEvent( new CustomEvent( 'csdt:tab-shown', { detail: { tab: slug } } ) );

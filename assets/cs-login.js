@@ -409,10 +409,18 @@
                 isToday: i === 0,
             } );
         }
-        const max = Math.max( 1, ...days.map( d => d.count ) );
-        const mid = max === 1 ? 1 : Math.round( max / 2 );
+        // Outlier-resistant scale: if the top day is 4× the second-highest, cap the
+        // display max so the spike doesn't flatten every other bar.
+        const rawMax = Math.max( 1, ...days.map( d => d.count ) );
+        const sortedDesc = days.map( d => d.count ).sort( ( a, b ) => b - a );
+        const secondMax  = sortedDesc[ 1 ] || 0;
+        const isCapped   = secondMax > 0 && rawMax > secondMax * 4;
+        const displayMax = isCapped ? Math.max( 1, Math.ceil( secondMax * 2 ) ) : rawMax;
+
+        const mid = displayMax === 1 ? 1 : Math.round( displayMax / 2 );
+        const topLabel = isCapped ? displayMax + '+' : displayMax;
         const yAxis = `<div class="cs-bf-yaxis">
-            <span class="cs-bf-ytick">${max}</span>
+            <span class="cs-bf-ytick">${topLabel}</span>
             <span class="cs-bf-ytick">${mid}</span>
             <span class="cs-bf-ytick">0</span>
         </div>`;
@@ -424,14 +432,18 @@
         const barW    = Math.max( 24, Math.floor( ( chartW - YAXIS_W - VISIBLE * GAP ) / VISIBLE ) );
 
         const bars = days.map( d => {
-            const pct = Math.round( ( d.count / max ) * 100 );
-            let cls = d.count === 0 ? '' : d.count >= max * 0.75 ? ' cs-bf-bar-high' : d.count >= max * 0.4 ? ' cs-bf-bar-mid' : '';
+            const truncated = d.count > displayMax;
+            const pct = truncated ? 92 : Math.round( ( d.count / displayMax ) * 100 );
+            let cls = d.count === 0 ? '' : d.count >= displayMax * 0.75 ? ' cs-bf-bar-high' : d.count >= displayMax * 0.4 ? ' cs-bf-bar-mid' : '';
             const extraStyle = isAttack && d.count > 0
                 ? `background:#dc2626!important;${ d.isToday ? 'box-shadow:0 0 8px rgba(220,38,38,.6);' : 'opacity:.7;' }`
                 : '';
+            const truncLabel = truncated
+                ? `<span style="position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#dc2626;white-space:nowrap;">${d.count}</span>`
+                : '';
             return `<div class="cs-bf-day" style="width:${barW}px;flex-shrink:0;flex-grow:0;">
-                <div class="cs-bf-bar-track">
-                    <div class="cs-bf-bar${cls}" style="height:${pct}%;${extraStyle}" title="${d.count} failed attempt${d.count !== 1 ? 's' : ''}"></div>
+                <div class="cs-bf-bar-track" style="position:relative;">
+                    ${truncLabel}<div class="cs-bf-bar${cls}" style="height:${pct}%;${extraStyle}" title="${d.count} failed attempt${d.count !== 1 ? 's' : ''}"></div>
                 </div>
                 <div class="cs-bf-day-label" style="${isAttack && d.isToday ? 'color:#dc2626;font-weight:700;' : ''}">${d.label}</div>
             </div>`;

@@ -145,7 +145,7 @@
         ].join('\n');
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function csdtTestAccountsInit() {
         var panel = el('cs-panel-test-accounts');
         if (!panel) { return; }
 
@@ -241,5 +241,11 @@
         /* Wire up initially rendered user rows and snippet */
         wireUserButtons();
         updateSnippet();
-    });
+    }
+
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', csdtTestAccountsInit );
+    } else {
+        csdtTestAccountsInit();
+    }
 }());

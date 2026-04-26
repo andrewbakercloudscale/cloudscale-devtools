@@ -410,7 +410,7 @@
         },
     };
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function csdtVulnInit() {
         var providerSel       = document.getElementById('cs-sec-provider');
         var rowAnthropicKey   = document.getElementById('cs-row-anthropic-key');
         var rowGeminiKey      = document.getElementById('cs-row-gemini-key');
@@ -691,7 +691,13 @@
                 renderScanHistoryChart(cfg.scanHistory || []);
             }, 150);
         });
-    });
+    }
+
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', csdtVulnInit );
+    } else {
+        csdtVulnInit();
+    }
 
     // ── Quick Fixes ──────────────────────────────────────────────────────
 
