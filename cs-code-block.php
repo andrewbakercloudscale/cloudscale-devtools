@@ -4071,10 +4071,10 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Run Scan', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php else : ?>
-            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'AI Cyber Scan', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:13px;font-weight:700;color:#92400e;">&#x26A0;&#xFE0F; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Free Gemini tier available, no card needed.', 'cloudscale-devtools' ); ?></div>
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'AI Cyber Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#dc2626;">&#x274C; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#dc2626;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Free Gemini tier available, no card needed.', 'cloudscale-devtools' ); ?></div>
                 <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Configure', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php endif; ?>
@@ -4104,10 +4104,10 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $mail_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Mail / SMTP', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php else : ?>
-            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'SMTP Mail', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:13px;font-weight:700;color:#92400e;">&#x26A0;&#xFE0F; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:11px;color:#92400e;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'WordPress default mail (unreliable).', 'cloudscale-devtools' ); ?></div>
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'SMTP Mail', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#dc2626;">&#x274C; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#dc2626;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'WordPress default mail (unreliable).', 'cloudscale-devtools' ); ?></div>
                 <a href="<?php echo esc_url( $mail_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Configure', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php endif; ?>
