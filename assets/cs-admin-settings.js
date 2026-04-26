@@ -35,7 +35,7 @@
                     savedMsg.textContent = resp.success ? '✅ Saved' : '❌ Error';
                     savedMsg.style.color = resp.success ? '' : '#e53e3e';
                     savedMsg.classList.add( 'visible' );
-                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 2500 );
+                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 5000 );
                 }
             } )
             .catch( function() {
@@ -45,7 +45,7 @@
                     savedMsg.textContent = '❌ Error';
                     savedMsg.style.color = '#e53e3e';
                     savedMsg.classList.add( 'visible' );
-                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 2500 );
+                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 5000 );
                 }
             } );
     } );

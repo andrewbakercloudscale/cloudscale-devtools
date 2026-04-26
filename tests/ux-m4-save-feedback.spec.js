@@ -138,8 +138,8 @@ test.describe('M4 — Save button inline feedback', () => {
         // First confirm it becomes visible
         await expect(savedMsg).toHaveClass(/visible/, { timeout: 5000 });
 
-        // After the 2500ms timer fires and CSS transition completes, the "visible" class is removed
-        await expect(savedMsg).not.toHaveClass(/visible/, { timeout: 5000 });
+        // After the 5000ms timer fires and CSS transition completes, the "visible" class is removed
+        await expect(savedMsg).not.toHaveClass(/visible/, { timeout: 7000 });
 
         await ctx.close();
     });

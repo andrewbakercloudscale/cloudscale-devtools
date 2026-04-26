@@ -553,7 +553,7 @@
                             savedMsg.textContent = res.success ? '✅ Saved' : '❌ Error';
                             savedMsg.style.color = res.success ? '' : '#e53e3e';
                             savedMsg.style.opacity = '1';
-                            setTimeout(function () { savedMsg.style.opacity = '0'; savedMsg.style.color = ''; }, 2500);
+                            setTimeout(function () { savedMsg.style.opacity = '0'; savedMsg.style.color = ''; }, 5000);
                         }
                         if (res.success) {
                             if (scanBtn) scanBtn.disabled = !res.data.has_key;
@@ -570,7 +570,7 @@
                             savedMsg.textContent = '❌ Error';
                             savedMsg.style.color = '#e53e3e';
                             savedMsg.style.opacity = '1';
-                            setTimeout(function () { savedMsg.style.opacity = '0'; savedMsg.style.color = ''; }, 2500);
+                            setTimeout(function () { savedMsg.style.opacity = '0'; savedMsg.style.color = ''; }, 5000);
                         }
                     });
             });
@@ -618,7 +618,7 @@
                             schedSavedMsg.textContent = res.success ? '✅ Saved' : '❌ Error';
                             schedSavedMsg.style.color = res.success ? '' : '#e53e3e';
                             schedSavedMsg.style.opacity = '1';
-                            setTimeout(function () { schedSavedMsg.style.opacity = '0'; schedSavedMsg.style.color = ''; }, 2500);
+                            setTimeout(function () { schedSavedMsg.style.opacity = '0'; schedSavedMsg.style.color = ''; }, 5000);
                         }
                         if (res.success && schedNtfyTok) { schedNtfyTok.value = ''; schedNtfyTok.placeholder = '••••••••'; }
                     })
@@ -628,7 +628,7 @@
                             schedSavedMsg.textContent = '❌ Error';
                             schedSavedMsg.style.color = '#e53e3e';
                             schedSavedMsg.style.opacity = '1';
-                            setTimeout(function () { schedSavedMsg.style.opacity = '0'; schedSavedMsg.style.color = ''; }, 2500);
+                            setTimeout(function () { schedSavedMsg.style.opacity = '0'; schedSavedMsg.style.color = ''; }, 5000);
                         }
                     });
             });
@@ -1145,7 +1145,7 @@
                     savedMsg.textContent = res.success ? '✅ Saved' : '❌ Error';
                     savedMsg.style.color = res.success ? '' : '#e53e3e';
                     savedMsg.classList.add('visible');
-                    setTimeout(function () { savedMsg.classList.remove('visible'); savedMsg.style.color = ''; }, 2500);
+                    setTimeout(function () { savedMsg.classList.remove('visible'); savedMsg.style.color = ''; }, 5000);
                 }
             }).catch(function () {
                 saveBtn.disabled = false;
@@ -1153,7 +1153,7 @@
                     savedMsg.textContent = '❌ Error';
                     savedMsg.style.color = '#e53e3e';
                     savedMsg.classList.add('visible');
-                    setTimeout(function () { savedMsg.classList.remove('visible'); savedMsg.style.color = ''; }, 2500);
+                    setTimeout(function () { savedMsg.classList.remove('visible'); savedMsg.style.color = ''; }, 5000);
                 }
             });
         });

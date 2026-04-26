@@ -568,12 +568,12 @@
                     fpmSaveBtn.disabled = false;
                     if ( fpmStatus ) {
                         fpmStatus.textContent = res.success ? '\u2705 Saved' : '\u274C ' + esc( ( res.data && res.data.message ) || 'Failed' );
-                        setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; } }, 3000 );
+                        setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; } }, 5000 );
                     }
                 } )
                 .catch( function () {
                     fpmSaveBtn.disabled = false;
-                    if ( fpmStatus ) { fpmStatus.textContent = 'Request failed.'; }
+                    if ( fpmStatus ) { fpmStatus.textContent = 'Request failed.'; setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; } }, 5000 ); }
                 } );
         } );
     }
@@ -613,12 +613,12 @@
                     saveBtn.disabled = false;
                     if ( saveStatus ) {
                         saveStatus.textContent = res.success ? '\u2705 Saved' : '\u274C ' + esc( ( res.data && res.data.message ) || 'Failed' );
-                        setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; } }, 3000 );
+                        setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; } }, 5000 );
                     }
                 } )
                 .catch( function () {
                     saveBtn.disabled = false;
-                    if ( saveStatus ) { saveStatus.textContent = 'Request failed.'; }
+                    if ( saveStatus ) { saveStatus.textContent = 'Request failed.'; setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; } }, 5000 ); }
                 } );
         } );
     }
@@ -644,7 +644,7 @@
                         savedEl.textContent = resp.success ? '✅ Saved' : '❌ Error';
                         savedEl.style.color = resp.success ? '' : '#e53e3e';
                         savedEl.classList.add( 'visible' );
-                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 2500 );
+                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 5000 );
                     }
                     if ( resp.success ) {
                         var perfPanel = document.getElementById( 'cs-perf' );
@@ -661,7 +661,7 @@
                         savedEl.textContent = '❌ Error';
                         savedEl.style.color = '#e53e3e';
                         savedEl.classList.add( 'visible' );
-                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 2500 );
+                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 5000 );
                     }
                 } );
         } );

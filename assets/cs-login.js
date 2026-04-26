@@ -33,7 +33,7 @@
         setTimeout( () => {
             el.classList.remove( 'visible' );
             el.style.color = '';
-        }, 2500 );
+        }, 5000 );
     }
 
     // ── Hide Login + 2FA site settings save ──────────────────────────────
