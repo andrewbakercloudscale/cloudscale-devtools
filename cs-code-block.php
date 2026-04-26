@@ -4104,10 +4104,10 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $mail_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Mail / SMTP', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php else : ?>
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'SMTP Mail', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'WordPress default mail (unreliable).', 'cloudscale-devtools' ); ?></div>
+            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'SMTP Mail', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#92400e;">&#x26A0;&#xFE0F; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#92400e;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'WordPress default mail (unreliable).', 'cloudscale-devtools' ); ?></div>
                 <a href="<?php echo esc_url( $mail_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Configure', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php endif; ?>
@@ -4150,10 +4150,10 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $debug_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Diagnostics', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php else : ?>
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Ping your site from Cloudflare edge every minute.', 'cloudscale-devtools' ); ?></div>
+            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#92400e;">&#x26A0;&#xFE0F; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#92400e;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Ping your site from Cloudflare edge every minute.', 'cloudscale-devtools' ); ?></div>
                 <a href="<?php echo esc_url( $debug_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Set up', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php endif; ?>
@@ -4169,17 +4169,17 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Settings', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php elseif ( $has_key ) : ?>
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Scheduled Scan', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'Not scheduled', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Auto-run a scan weekly or monthly.', 'cloudscale-devtools' ); ?></div>
+            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Scheduled Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#92400e;">&#x26A0;&#xFE0F; <?php esc_html_e( 'Not scheduled', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#92400e;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Auto-run a scan weekly or monthly.', 'cloudscale-devtools' ); ?></div>
                 <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Schedule', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php else : ?>
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Scheduled Scan', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'No AI key', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Configure AI to enable scheduled scans.', 'cloudscale-devtools' ); ?></div>
+            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Scheduled Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#92400e;">&#x26A0;&#xFE0F; <?php esc_html_e( 'No AI key', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#92400e;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Configure AI to enable scheduled scans.', 'cloudscale-devtools' ); ?></div>
                 <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Configure', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php endif; ?>
