@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.532
+ * Version: 1.9.535
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -4021,44 +4021,144 @@ class CloudScale_DevTools {
         $next_run       = wp_next_scheduled( 'csdt_scheduled_scan' );
         $sec_url        = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         $rollback_info  = get_option( 'csdt_db_prefix_rollback' );
+        // Status dashboard data
+        $history        = get_option( 'csdt_scan_history', [] );
+        $last_scan      = ! empty( $history ) ? $history[0] : null;
+        $tm_enabled     = get_option( 'csdt_threat_monitor_enabled', '1' ) === '1';
+        $smtp_enabled   = get_option( 'csdt_devtools_smtp_enabled', '0' ) === '1';
+        $smtp_host      = trim( (string) get_option( 'csdt_devtools_smtp_host', '' ) );
+        $login_slug     = get_option( 'csdt_devtools_login_slug', '' );
+        $bf_on          = get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1';
+        $force_2fa      = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1';
+        $uptime_enabled = get_option( 'csdt_uptime_enabled', '0' ) === '1';
+        $uptime_url     = trim( (string) get_option( 'csdt_uptime_worker_url', '' ) );
+        // URLs for status cards
+        $login_url      = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=login' );
+        $mail_url       = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=mail' );
+        $debug_url      = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=debug' );
         ?>
         <div id="cs-panel-home" class="cs-panel" style="margin-bottom:0;">
 
-        <!-- ── Intro ────────────────────────────────────────────────────── -->
-        <div class="cs-tab-intro" style="margin-bottom:0;">
-            <p><?php echo wp_kses( __( 'WordPress powers over <strong>40% of the internet</strong>, making it the single largest attack surface on the web. Automated scanners probe every exposed WordPress site every day, looking for unpatched plugins, exposed admin pages, weak credentials, and misconfigured headers. The attackers are tooled up. Most defenders aren&#8217;t.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
-            <p><?php echo wp_kses( __( '<strong>CloudScale Cyber &amp; Devtools</strong> is a free, all-in-one security and developer plugin that puts frontier AI in your corner. The built-in <strong>AI Cyber Audit</strong> performs a full <strong>AI-powered WordPress penetration test</strong>, analysing your entire installation and producing a prioritised, scored security report in under 60 seconds. The kind of assessment that used to require hiring a consultant or running a manual pen test is now instant and free. It runs locally inside your own server using your own API key: no third-party cloud, no subscription, no data leaving your site except the call to your chosen AI provider. A <strong>free Gemini tier</strong> is available with no credit card required.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
-            <p><?php echo wp_kses( __( 'Beyond the AI audit, the plugin replaces a stack of paid tools you may already be running: a <strong>security scanner</strong> with one-click Quick Fixes, a <strong>2FA &amp; login protection</strong> layer, an <strong>SMTP mailer</strong>, a <strong>SQL query tool</strong>, <strong>PHP-FPM monitoring</strong>, a <strong>server log viewer</strong>, and a <strong>plugin vulnerability scanner</strong>. All in one place, all free.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
-            <p><?php echo wp_kses( __( '<strong>To get started:</strong> head to the <strong>Security</strong> tab to configure your AI provider and API key, then apply the one-click <strong>Quick Fixes</strong> below to resolve common misconfigurations.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
-        </div>
+        <!-- ── Status Dashboard ─────────────────────────────────────────── -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;">
 
-        <!-- ── AI Cyber Audit Status ─────────────────────────────────────── -->
-        <?php if ( $has_key ) :
-            $provider_label = $ai_provider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude';
-            $next_run_str   = $next_run ? wp_date( 'D j M Y, g:ia', $next_run ) : null;
-        ?>
-        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:14px 18px;margin:14px 0 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <div style="flex-shrink:0;font-size:20px;line-height:1;">&#x2705;</div>
-            <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:#15803d;"><?php esc_html_e( 'AI Cyber Audit — Configured', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:12px;color:#374151;margin-top:2px;">
-                    <?php echo esc_html( $provider_label ); ?>
-                    <?php if ( $next_run_str ) : ?>&nbsp;&middot;&nbsp; <?php printf( esc_html__( 'Next scheduled scan: %s', 'cloudscale-devtools' ), esc_html( $next_run_str ) ); ?><?php endif; ?>
+            <?php
+            // ── Card helper: reuse to keep markup DRY
+            // Card 1: AI Cyber Scan
+            if ( $has_key ) :
+                $provider_label = $ai_provider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude';
+                $scan_detail    = $last_scan
+                    ? sprintf( __( 'Last scan: %s', 'cloudscale-devtools' ), human_time_diff( (int) ( $last_scan['scanned_at'] ?? 0 ) ) . ' ' . __( 'ago', 'cloudscale-devtools' ) )
+                    : $provider_label;
+            ?>
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'AI Cyber Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#15803d;">&#x2705; <?php esc_html_e( 'Configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php echo esc_html( $scan_detail ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Run Scan', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php else : ?>
+            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'AI Cyber Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#92400e;">&#x26A0;&#xFE0F; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Free Gemini tier available, no card needed.', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Configure', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php endif; ?>
+
+            <!-- Card 2: Threat Monitor -->
+            <div style="background:<?php echo $tm_enabled ? '#f0fdf4' : '#fef2f2'; ?>;border:1px solid <?php echo $tm_enabled ? '#86efac' : '#fca5a5'; ?>;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Threat Monitor', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:<?php echo $tm_enabled ? '#15803d' : '#dc2626'; ?>;">
+                    <?php echo $tm_enabled ? '&#x2705; ' . esc_html__( 'Active', 'cloudscale-devtools' ) : '&#x274C; ' . esc_html__( 'Disabled', 'cloudscale-devtools' ); ?>
                 </div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'File integrity, new-admin and probe detection.', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Security', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
-            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-primary cs-btn-sm">&#x1F50E; <?php esc_html_e( 'Run Scan', 'cloudscale-devtools' ); ?></a>
-            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-secondary cs-btn-sm">&#9881; <?php esc_html_e( 'Settings', 'cloudscale-devtools' ); ?></a>
-        </div>
-        <?php else : ?>
-        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:14px 18px;margin:14px 0 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <div style="flex-shrink:0;font-size:20px;line-height:1;">&#x26A0;&#xFE0F;</div>
-            <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:#92400e;"><?php esc_html_e( 'AI Cyber Audit — Not Configured', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:12px;color:#374151;margin-top:2px;"><?php esc_html_e( 'Select a provider and paste your API key on the Security tab to enable AI-powered security scans. A free Gemini tier is available with no credit card required.', 'cloudscale-devtools' ); ?></div>
+
+            <!-- Card 3: SMTP Mail -->
+            <?php if ( $smtp_enabled && $smtp_host ) : ?>
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'SMTP Mail', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#15803d;">&#x2705; <?php esc_html_e( 'Configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php echo esc_html( $smtp_host ); ?></div>
+                <a href="<?php echo esc_url( $mail_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Mail / SMTP', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
-            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-primary cs-btn-sm">&#x1F511; <?php esc_html_e( 'Configure AI', 'cloudscale-devtools' ); ?></a>
-        </div>
-        <?php endif; ?>
+            <?php else : ?>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'SMTP Mail', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'WordPress default mail (unreliable).', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $mail_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Configure', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php endif; ?>
+
+            <!-- Card 4: Login Security -->
+            <?php
+            $login_ok = $login_slug && $bf_on && $force_2fa;
+            $login_bg = $login_ok ? '#f0fdf4' : ( $login_slug || $bf_on ? '#fffbeb' : '#fef2f2' );
+            $login_bd = $login_ok ? '#86efac' : ( $login_slug || $bf_on ? '#fcd34d' : '#fca5a5' );
+            $login_tx = $login_ok ? '#15803d' : ( $login_slug || $bf_on ? '#92400e' : '#dc2626' );
+            $login_details = [];
+            if ( $login_slug ) $login_details[] = __( 'Hidden login', 'cloudscale-devtools' );
+            if ( $bf_on )      $login_details[] = __( 'Brute-force lock', 'cloudscale-devtools' );
+            if ( $force_2fa )  $login_details[] = __( 'Forced 2FA', 'cloudscale-devtools' );
+            ?>
+            <div style="background:<?php echo esc_attr( $login_bg ); ?>;border:1px solid <?php echo esc_attr( $login_bd ); ?>;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:<?php echo esc_attr( $login_tx ); ?>;">
+                    <?php echo $login_ok ? '&#x2705; ' . esc_html__( 'Hardened', 'cloudscale-devtools' ) : ( $login_details ? '&#x26A0;&#xFE0F; ' . esc_html__( 'Partial', 'cloudscale-devtools' ) : '&#x274C; ' . esc_html__( 'Default settings', 'cloudscale-devtools' ) ); ?>
+                </div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;">
+                    <?php echo $login_details ? esc_html( implode( ', ', $login_details ) ) : esc_html__( 'No protections active.', 'cloudscale-devtools' ); ?>
+                </div>
+                <a href="<?php echo esc_url( $login_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+
+            <!-- Card 5: Uptime Monitor -->
+            <?php if ( $uptime_enabled && $uptime_url ) : ?>
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#15803d;">&#x2705; <?php esc_html_e( 'Active', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Cloudflare Worker heartbeat enabled.', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $debug_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Diagnostics', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php else : ?>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Ping your site from Cloudflare edge every minute.', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $debug_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Set up', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php endif; ?>
+
+            <!-- Card 6: Scheduled Scan -->
+            <?php if ( $has_key && $next_run ) :
+                $next_run_str = wp_date( 'D j M, g:ia', $next_run );
+            ?>
+            <div style="background:#f0f9ff;border:1px solid #7dd3fc;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Scheduled Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#0284c7;">&#x1F551; <?php esc_html_e( 'Scheduled', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php echo esc_html( $next_run_str ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Settings', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php elseif ( $has_key ) : ?>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Scheduled Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'Not scheduled', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Auto-run a scan weekly or monthly.', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Schedule', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php else : ?>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Scheduled Scan', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#6b7280;">&#x2014; <?php esc_html_e( 'No AI key', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Configure AI to enable scheduled scans.', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Configure', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php endif; ?>
+
+        </div><!-- /status grid -->
 
         <!-- ── DB Prefix Rollback Banner ──────────────────────────────────── -->
         <?php
