@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.531
+ * Version: 1.9.532
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.531';
+    const VERSION      = '1.9.532';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1572,10 +1572,7 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'debug' ? 'active' : ''; ?>">
                     🩺 <?php esc_html_e( 'Diagnostics', 'cloudscale-devtools' ); ?>
                 </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=migrate' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'migrate' ? 'active' : ''; ?>">
-                    🔄 <?php esc_html_e( 'Code Migrator', 'cloudscale-devtools' ); ?>
-                </a>
+
                 <a href="<?php echo esc_url( $base_url . '&tab=mail' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'mail' ? 'active' : ''; ?>">
                     📧 <?php esc_html_e( 'Mail / SMTP', 'cloudscale-devtools' ); ?>
@@ -1596,11 +1593,7 @@ class CloudScale_DevTools {
                 <div class="cs-tab-content active">
                     <?php self::render_home_panel(); ?>
                 </div>
-            <?php elseif ( $active_tab === 'migrate' ) : ?>
-                <div class="cs-tab-content active">
-                    <?php self::render_settings_panel(); ?>
-                    <?php self::render_migrate_panel(); ?>
-                </div>
+
             <?php elseif ( $active_tab === 'login' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_login_panel(); ?>
@@ -1625,7 +1618,7 @@ class CloudScale_DevTools {
                 <div class="cs-tab-content active">
                     <?php CSDT_Site_Audit::render_site_audit_panel(); ?>
                 </div>
-            <?php elseif ( in_array( $active_tab, [ 'debug', 'logs', 'sql', '404' ], true ) ) : ?>
+            <?php elseif ( in_array( $active_tab, [ 'debug', 'logs', 'sql', '404', 'migrate' ], true ) ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_debug_panel(); ?>
                 </div>
@@ -2444,6 +2437,8 @@ class CloudScale_DevTools {
         self::render_server_logs_panel();
         self::render_sql_panel();
         CSDT_Custom_404::render_404_panel();
+        self::render_settings_panel();
+        self::render_migrate_panel();
     }
 
     private static function render_opcache_panel(): void {
@@ -4295,8 +4290,23 @@ class CloudScale_DevTools {
         $sched_ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
         $next_run       = wp_next_scheduled( 'csdt_scheduled_scan' );
         ?>
+        <?php $site_audit_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=site-audit' ); ?>
         <div class="cs-tab-intro" style="margin-bottom:20px;">
                     <p><?php echo wp_kses( __( 'The <strong>AI Cyber Audit</strong> uses frontier AI &#8212; Anthropic Claude or Google Gemini &#8212; to analyse your WordPress installation and produce a prioritised, scored security report in under 60 seconds. Configure your provider and API key in the <strong>AI Settings</strong> panel below, then run a scan from the <strong>AI Cyber Audit</strong> panel. A free Gemini tier is available with no credit card required.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
+
+                <!-- AI Security Scan vs Site Audit comparison -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;font-size:12px;">
+                    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px 14px;">
+                        <div style="font-weight:700;color:#15803d;margin-bottom:4px;">🛡️ AI Security Scan — this tab</div>
+                        <div style="color:#374151;line-height:1.5;"><?php esc_html_e( 'Security misconfigurations, exposed endpoints, headers, brute-force exposure. Finds issues attackers exploit.', 'cloudscale-devtools' ); ?></div>
+                    </div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;">
+                        <div style="font-weight:700;color:#374151;margin-bottom:4px;">🔍 Site Audit</div>
+                        <div style="color:#374151;line-height:1.5;"><?php esc_html_e( 'Content quality, SEO, database health, plugin status. Finds issues affecting visitors and search rankings.', 'cloudscale-devtools' ); ?></div>
+                        <a href="<?php echo esc_url( $site_audit_url ); ?>" style="display:inline-block;margin-top:6px;font-size:11px;color:#6366f1;font-weight:600;"><?php esc_html_e( 'Go to Site Audit →', 'cloudscale-devtools' ); ?></a>
+                    </div>
+                </div>
+
                 <!-- ── Threat Monitor ──────────────────────────── -->
                 <?php
                 $tm_enabled       = get_option( 'csdt_threat_monitor_enabled',        '1' ) === '1';

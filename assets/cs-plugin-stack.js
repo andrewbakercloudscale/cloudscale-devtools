@@ -668,10 +668,11 @@
     }
 
     var DB_SEV_COLOR = {
-        high:   { bg: '#fff7ed', border: '#fed7aa', badge: '#ea580c', text: '#7c2d12' },
-        medium: { bg: '#fefce8', border: '#fde68a', badge: '#ca8a04', text: '#713f12' },
-        low:    { bg: '#f0fdf4', border: '#86efac', badge: '#16a34a', text: '#14532d' },
-        info:   { bg: '#f0f9ff', border: '#7dd3fc', badge: '#0284c7', text: '#0c4a6e' },
+        critical: { bg: '#fef2f2', border: '#fca5a5', badge: '#dc2626', text: '#7f1d1d' },
+        high:     { bg: '#fff7ed', border: '#fed7aa', badge: '#ea580c', text: '#7c2d12' },
+        medium:   { bg: '#fefce8', border: '#fde68a', badge: '#ca8a04', text: '#713f12' },
+        low:      { bg: '#f0fdf4', border: '#86efac', badge: '#16a34a', text: '#14532d' },
+        info:     { bg: '#f0f9ff', border: '#7dd3fc', badge: '#0284c7', text: '#0c4a6e' },
     };
 
     function renderDbIntelligence(data) {

@@ -489,9 +489,22 @@ class CSDT_Site_Audit {
                 <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
                     <?php esc_html_e( 'Scans your published content and database, then uses AI to produce a prioritised issue list scored by impact. Covers SEO gaps, thin content, missing images, duplicate titles, database bloat, and plugin health — no external crawlers, no data leaving your server.', 'cloudscale-devtools' ); ?>
                 </p>
-                <p style="color:#9ca3af;margin:0 0 20px;font-size:.88em;">
+                <p style="color:#9ca3af;margin:0 0 14px;font-size:.88em;">
                     <?php esc_html_e( 'Without an AI key the audit still runs and returns rule-based findings. With an AI key you also get narrative summaries and prioritised recommendations.', 'cloudscale-devtools' ); ?>
                 </p>
+
+                <!-- Site Audit vs AI Security Scan comparison -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px;">
+                    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px 14px;">
+                        <div style="font-weight:700;color:#15803d;margin-bottom:4px;">🔍 Site Audit — this tab</div>
+                        <div style="color:#374151;line-height:1.5;"><?php esc_html_e( 'Content quality, SEO, database health, plugin status. Finds issues affecting visitors and search rankings.', 'cloudscale-devtools' ); ?></div>
+                    </div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;">
+                        <div style="font-weight:700;color:#374151;margin-bottom:4px;">🛡️ AI Security Scan</div>
+                        <div style="color:#374151;line-height:1.5;"><?php esc_html_e( 'Security misconfigurations, exposed endpoints, headers, brute-force exposure. Finds issues attackers exploit.', 'cloudscale-devtools' ); ?></div>
+                        <a href="<?php echo esc_url( $security_url ); ?>" style="display:inline-block;margin-top:6px;font-size:11px;color:#6366f1;font-weight:600;"><?php esc_html_e( 'Go to Security Scan →', 'cloudscale-devtools' ); ?></a>
+                    </div>
+                </div>
 
                 <?php if ( ! $has_key ) : ?>
                 <div style="background:#fff7ed;border-left:3px solid #f59e0b;padding:11px 16px;border-radius:0 6px 6px 0;margin-bottom:16px;font-size:13px;color:#92400e;">
@@ -2268,7 +2281,7 @@ PROMPT;
         } else {
             $findings[] = [
                 'category' => 'Security',
-                'severity' => 'warning',
+                'severity' => 'medium',
                 'title'    => 'Username enumeration protection is disabled',
                 'detail'   => 'WordPress reveals whether a username exists ("The username X is not registered on this site.") — attackers can automate this to enumerate all valid usernames in minutes.',
                 'fix'      => 'Enable "Prevent account enumeration" in Security → Brute-Force Settings.',
