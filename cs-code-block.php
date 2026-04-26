@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.528
+ * Version: 1.9.531
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.528';
+    const VERSION      = '1.9.531';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1566,11 +1566,11 @@ class CloudScale_DevTools {
                 </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=optimizer' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'optimizer' ? 'active' : ''; ?>">
-                    🔧 <?php esc_html_e( 'Optimizer', 'cloudscale-devtools' ); ?>
+                    ⚡ <?php esc_html_e( 'Performance', 'cloudscale-devtools' ); ?>
                 </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=debug' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'debug' ? 'active' : ''; ?>">
-                    🧠 <?php esc_html_e( 'Debug AI', 'cloudscale-devtools' ); ?>
+                    🩺 <?php esc_html_e( 'Diagnostics', 'cloudscale-devtools' ); ?>
                 </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=migrate' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'migrate' ? 'active' : ''; ?>">
@@ -2349,6 +2349,93 @@ class CloudScale_DevTools {
                     </div>
                 </div>
 
+            </div>
+        </div>
+
+        <!-- ── Uptime Monitor ────────────────────────────────────────────── -->
+        <div class="cs-panel" id="cs-panel-uptime-monitor">
+            <div class="cs-section-header cs-section-header-green">
+                <span>⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'WordPress pushes a heartbeat to a Cloudflare Worker every 3 minutes. No heartbeat for 8 minutes = site down alert.', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'uptime-monitor', 'Uptime Monitor', [
+                    [ 'name' => 'Setup — step by step', 'rec' => 'Required',    'html' => '<ol style="margin:0;padding-left:1.4em;line-height:1.8;"><li><strong>Cloudflare credentials</strong> — Enter your Cloudflare Zone ID and an API Token with <code>Workers:Edit</code> and <code>Workers KV Storage:Edit</code> permissions, then click <em>Save Settings</em>.</li><li><strong>ntfy.sh Alert URL</strong> (optional) — Enter your ntfy.sh topic URL to receive push notifications when the site goes down or recovers.</li><li><strong>Deploy Worker</strong> — Click <em>Deploy Worker to Cloudflare</em>. This creates a KV namespace, uploads the Worker, and schedules the <code>* * * * *</code> cron trigger.</li><li><strong>Host cron</strong> — Run <code>deploy-cf-worker.sh</code> on your server to install a host cron that triggers WP-Cron locally (bypasses Cloudflare cache). WP-Cron pushes a heartbeat to the Worker every 3 minutes. The cron line is shown in the Host cron section below.</li><li><strong>Test</strong> — Click <em>Test Endpoint</em> to send a heartbeat to the Worker immediately and confirm the connection.</li></ol>' ],
+                    [ 'name' => 'How it works',          'rec' => 'Overview',    'html' => 'A Pi host cron hits <code>http://127.0.0.1:PORT/wp-cron.php</code> (localhost, bypasses Cloudflare cache) every minute. PHP-FPM processes the request, WP-Cron runs, and WordPress pushes a small heartbeat POST to the Cloudflare Worker every 3 minutes. The Worker stores the timestamp in CF KV and its own cron checks every minute: no heartbeat for 8+ minutes = site down, ntfy fires. Recovery alert is sent when heartbeats resume. Localhost is required because Cloudflare caches the public wp-cron.php URL and returns a cached 200 without PHP ever executing.' ],
+                    [ 'name' => 'Down vs recovery',      'rec' => 'Overview',    'html' => 'Down alerts fire after ~8 minutes of missed heartbeats. Repeat alerts are throttled to once every 30 minutes while the site remains down. Recovery fires as soon as one heartbeat arrives after a down period, with the total outage duration included in the message.' ],
+                    [ 'name' => 'Test Alert (pause 5 min)', 'rec' => 'Testing',  'html' => 'Click <em>Test Alert (pause 5 min)</em> to pause heartbeats for 5 minutes. After about 8 minutes of silence the Cloudflare Worker will treat the site as down and fire your ntfy down alert. When the 5-minute pause ends, heartbeats resume automatically and you should receive a recovery alert. A live countdown is shown while paused. Click <em>Cancel Pause</em> at any time to resume heartbeats immediately (you will still get a recovery alert once the next heartbeat is sent).' ],
+                    [ 'name' => 'Alert notifications',   'rec' => 'Recommended', 'html' => 'Enter your ntfy.sh topic URL (e.g. <code>https://ntfy.sh/your-topic</code>) to receive instant push notifications. Alerts fire from the Cloudflare edge — they arrive even if your PHP, database, and server are all offline, because the down detection happens in the Worker watching for stale heartbeats.' ],
+                    [ 'name' => 'KV storage',            'rec' => 'Info',        'html' => 'A Cloudflare KV namespace (<code>csdt-uptime-state</code>) is created automatically on first deploy. It stores three small values: last heartbeat timestamp, down-since timestamp, and last-alert timestamp. The deploy script and Deploy button both handle KV creation — no manual setup needed.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div>
+                    <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
+                        <?php esc_html_e( 'A host cron job hits WordPress locally every minute (bypassing Cloudflare cache), triggering a heartbeat push to the Cloudflare Worker every 3 minutes. If no heartbeat arrives for 8 minutes, the Worker fires a down alert via ntfy.sh. When heartbeats resume, a recovery alert is sent automatically with outage duration.', 'cloudscale-devtools' ); ?>
+                    </p>
+                    <div id="csdt-uptime-setup-wrap">
+                        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:12px;">
+                            <p style="margin:0 0 12px;font-weight:700;color:#0f172a;font-size:.9em;">Cloudflare credentials <span style="font-weight:400;color:#6b7280;">(<?php esc_html_e( 'required — API Token needs Workers:Edit and Workers KV Storage:Edit permissions', 'cloudscale-devtools' ); ?>)</span></p>
+                            <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;">
+                                <div>
+                                    <label for="csdt-cf-zone-id" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Zone ID</label>
+                                    <input id="csdt-cf-zone-id" type="text" class="cs-input" style="width:100%;"
+                                           placeholder="<?php esc_attr_e( 'Cloudflare Zone ID', 'cloudscale-devtools' ); ?>"
+                                           value="<?php $z = get_option( 'csdt_devtools_cf_zone_id', '' ); echo esc_attr( $z ? str_repeat( '•', 16 ) . substr( $z, -4 ) : '' ); ?>"
+                                           autocomplete="off">
+                                </div>
+                                <div>
+                                    <label for="csdt-cf-api-token" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">API Token</label>
+                                    <input id="csdt-cf-api-token" type="password" class="cs-input" style="width:100%;"
+                                           placeholder="<?php esc_attr_e( 'Cloudflare API Token', 'cloudscale-devtools' ); ?>"
+                                           value="<?php echo esc_attr( get_option( 'csdt_devtools_cf_api_token', '' ) ? str_repeat( '•', 20 ) : '' ); ?>"
+                                           autocomplete="new-password">
+                                </div>
+                            </div>
+                        </div>
+                        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:16px;">
+                            <p style="margin:0 0 10px;font-weight:700;color:#0f172a;font-size:.9em;">ntfy.sh Alert URL <span style="font-weight:400;color:#6b7280;">(<?php esc_html_e( 'optional — push notification when site goes down or recovers', 'cloudscale-devtools' ); ?>)</span></p>
+                            <input id="csdt-uptime-ntfy-url" type="text" class="cs-input" style="max-width:420px;"
+                                   placeholder="https://ntfy.sh/your-topic"
+                                   value="<?php echo esc_attr( get_option( 'csdt_uptime_ntfy_url', get_option( 'csdt_scan_schedule_ntfy_url', '' ) ) ); ?>">
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                            <button id="csdt-uptime-save-btn" class="cs-btn-secondary">
+                                💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?>
+                            </button>
+                            <span id="csdt-uptime-save-status" style="display:none;font-size:.88em;"></span>
+                        </div>
+                        <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                            <button id="csdt-uptime-deploy-btn" class="cs-btn-primary">
+                                🚀 <?php esc_html_e( 'Deploy Worker to Cloudflare', 'cloudscale-devtools' ); ?>
+                            </button>
+                            <button id="csdt-uptime-test-btn" class="cs-btn-secondary">
+                                🧪 <?php esc_html_e( 'Test Endpoint', 'cloudscale-devtools' ); ?>
+                            </button>
+                            <span id="csdt-uptime-deploying" style="display:none;color:#6b7280;font-size:13px;">⏳ <?php esc_html_e( 'Deploying…', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                        <div id="csdt-uptime-deploy-result" style="margin-top:12px;"></div>
+                        <details style="margin-top:16px;">
+                            <summary style="cursor:pointer;font-size:.85em;font-weight:600;color:#6366f1;">🛠 Manual deploy (copy-paste Worker script)</summary>
+                            <div id="csdt-uptime-manual-wrap" style="margin-top:12px;"></div>
+                        </details>
+                        <details style="margin-top:10px;" open>
+                            <summary style="cursor:pointer;font-size:.85em;font-weight:600;color:#374151;">⏱ Host cron — reliable every-3-minute heartbeats</summary>
+                            <div style="margin-top:10px;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;padding:12px 14px;">
+                                <p style="margin:0 0 6px;font-size:.82em;color:#475569;"><?php esc_html_e( 'Must use localhost (not the public URL) — Cloudflare caches wp-cron.php and returns a cached 200 without WordPress ever executing. Hitting nginx directly bypasses CF. Replace PORT with your nginx host port (run', 'cloudscale-devtools' ); ?> <code>docker port pi_nginx 80/tcp</code><?php esc_html_e( '):', 'cloudscale-devtools' ); ?></p>
+                                <code id="csdt-uptime-cron-line" style="display:block;background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:8px 12px;font-size:.8em;color:#16a34a;word-break:break-all;margin-bottom:8px;">* * * * * curl -sf -m 10 -H 'Host: <?php echo esc_html( wp_parse_url( get_site_url(), PHP_URL_HOST ) ); ?>' 'http://127.0.0.1:PORT/wp-cron.php?doing_wp_cron' -o /dev/null 2&gt;/dev/null</code>
+                                <p style="margin:0;font-size:.78em;color:#64748b;"><?php esc_html_e( 'If FPM is down nginx returns 502, curl exits non-zero, WP-Cron does not run, no heartbeat is pushed, and the CF Worker alerts after 8 minutes. deploy-cf-worker.sh detects the port and installs this automatically.', 'cloudscale-devtools' ); ?></p>
+                            </div>
+                        </details>
+                    </div>
+                    <div id="csdt-uptime-status-wrap" style="display:none;margin-top:4px;">
+                        <div id="csdt-uptime-status-inner"></div>
+                        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <button id="csdt-uptime-refresh-btn" class="cs-btn-secondary" style="font-size:.82em;">↻ <?php esc_html_e( 'Push Heartbeat + Refresh', 'cloudscale-devtools' ); ?></button>
+                            <button id="csdt-uptime-pause-btn" class="cs-btn-secondary" style="font-size:.82em;">🔕 <?php esc_html_e( 'Test Alert (pause 5 min)', 'cloudscale-devtools' ); ?></button>
+                            <button id="csdt-uptime-cancel-pause-btn" class="cs-btn-secondary" style="font-size:.82em;display:none;">✕ <?php esc_html_e( 'Cancel Pause', 'cloudscale-devtools' ); ?></button>
+                            <span id="csdt-uptime-push-status" style="display:none;font-size:.82em;"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -3936,12 +4023,6 @@ class CloudScale_DevTools {
         $ai_cfg         = CSDT_AI_Dispatcher::get_config();
         $ai_provider    = $ai_cfg['provider'];
         $has_key        = ! empty( $ai_cfg['key'] );
-        $sched_enabled  = get_option( 'csdt_scan_schedule_enabled', '0' ) === '1';
-        $sched_freq     = get_option( 'csdt_scan_schedule_freq',    'weekly' );
-        $sched_type     = get_option( 'csdt_scan_schedule_type',    'deep' );
-        $sched_email    = get_option( 'csdt_scan_schedule_email',   '1' ) === '1';
-        $sched_ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
-        $sched_ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
         $next_run       = wp_next_scheduled( 'csdt_scheduled_scan' );
         $sec_url        = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         $rollback_info  = get_option( 'csdt_db_prefix_rollback' );
@@ -3953,177 +4034,36 @@ class CloudScale_DevTools {
             <p><?php echo wp_kses( __( 'WordPress powers over <strong>40% of the internet</strong>, making it the single largest attack surface on the web. Automated scanners probe every exposed WordPress site every day, looking for unpatched plugins, exposed admin pages, weak credentials, and misconfigured headers. The attackers are tooled up. Most defenders aren&#8217;t.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
             <p><?php echo wp_kses( __( '<strong>CloudScale Cyber &amp; Devtools</strong> is a free, all-in-one security and developer plugin that puts frontier AI in your corner. The built-in <strong>AI Cyber Audit</strong> performs a full <strong>AI-powered WordPress penetration test</strong>, analysing your entire installation and producing a prioritised, scored security report in under 60 seconds. The kind of assessment that used to require hiring a consultant or running a manual pen test is now instant and free. It runs locally inside your own server using your own API key: no third-party cloud, no subscription, no data leaving your site except the call to your chosen AI provider. A <strong>free Gemini tier</strong> is available with no credit card required.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
             <p><?php echo wp_kses( __( 'Beyond the AI audit, the plugin replaces a stack of paid tools you may already be running: a <strong>security scanner</strong> with one-click Quick Fixes, a <strong>2FA &amp; login protection</strong> layer, an <strong>SMTP mailer</strong>, a <strong>SQL query tool</strong>, <strong>PHP-FPM monitoring</strong>, a <strong>server log viewer</strong>, and a <strong>plugin vulnerability scanner</strong>. All in one place, all free.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
-            <p><?php echo wp_kses( __( '<strong>To get started:</strong> select an AI provider and paste your API key below, then apply the one-click <strong>Quick Fixes</strong> to resolve common misconfigurations. Head to the <strong>Security</strong> tab to run your first scan.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
+            <p><?php echo wp_kses( __( '<strong>To get started:</strong> head to the <strong>Security</strong> tab to configure your AI provider and API key, then apply the one-click <strong>Quick Fixes</strong> below to resolve common misconfigurations.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
         </div>
 
-        <!-- ── AI Cyber Audit Settings ──────────────────────────────────── -->
-        <div class="cs-section-header cs-section-header-red" style="margin-top:18px;">
-            <span>&#x1F916; <?php esc_html_e( 'AI Cyber Audit — Setup', 'cloudscale-devtools' ); ?></span>
-            <span class="cs-header-hint"><?php esc_html_e( 'Select a provider and paste your API key to enable AI-powered security scans', 'cloudscale-devtools' ); ?></span>
-            <?php self::render_explain_btn( 'cyber-audit', 'AI Cyber Audit', [
-                [ 'name' => 'AI Providers',        'rec' => 'Info',         'html' => '<p>Two AI providers are supported. You supply your own API key — stored only in your WordPress database (<code>wp_options</code>) and sent only to the provider&#39;s own API endpoint.</p><p><strong>Anthropic Claude</strong> — recommended for best results.<br>Get your key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a><br>Models: <code>claude-sonnet-4-6</code> (fast) · <code>claude-opus-4-7</code> (most capable)</p><p><strong>Google Gemini</strong> — free tier available.<br>Get your key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a><br>Models: <code>gemini-2.0-flash</code> (fast, free tier) · <code>gemini-2.5-pro</code> (most capable)</p>' ],
-                [ 'name' => 'Standard Scan',       'rec' => 'Recommended',  'html' => 'Checks your WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php for common misconfigurations. Results are scored as Critical / High / Medium / Low with specific fix steps. Takes a few seconds.' ],
-                [ 'name' => 'Deep Dive Scan',      'rec' => 'Recommended',  'html' => 'Extends the Standard scan with live HTTP probes, DNS checks (SPF, DMARC, DKIM), weak TLS detection, PHP end-of-life status, static PHP code analysis across your plugins, and AI-powered triage of suspicious code patterns.' ],
-                [ 'name' => 'Scheduled Scans',     'rec' => 'Optional',     'html' => 'Run a scan automatically on a daily or weekly schedule. Results are stored in scan history. Enable email and ntfy.sh alerts to receive the AI summary when a scan completes.' ],
-            ] ); ?>
+        <!-- ── AI Cyber Audit Status ─────────────────────────────────────── -->
+        <?php if ( $has_key ) :
+            $provider_label = $ai_provider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude';
+            $next_run_str   = $next_run ? wp_date( 'D j M Y, g:ia', $next_run ) : null;
+        ?>
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:14px 18px;margin:14px 0 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div style="flex-shrink:0;font-size:20px;line-height:1;">&#x2705;</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:#15803d;"><?php esc_html_e( 'AI Cyber Audit — Configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:12px;color:#374151;margin-top:2px;">
+                    <?php echo esc_html( $provider_label ); ?>
+                    <?php if ( $next_run_str ) : ?>&nbsp;&middot;&nbsp; <?php printf( esc_html__( 'Next scheduled scan: %s', 'cloudscale-devtools' ), esc_html( $next_run_str ) ); ?><?php endif; ?>
+                </div>
+            </div>
+            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-primary cs-btn-sm">&#x1F50E; <?php esc_html_e( 'Run Scan', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-secondary cs-btn-sm">&#9881; <?php esc_html_e( 'Settings', 'cloudscale-devtools' ); ?></a>
         </div>
-        <div class="cs-panel-body">
-        <div class="cs-sec-settings">
-
-            <div class="cs-sec-row">
-                <span class="cs-sec-label"><?php esc_html_e( 'AI Provider:', 'cloudscale-devtools' ); ?></span>
-                <div class="cs-sec-control">
-                    <select id="cs-sec-provider" class="cs-sec-select">
-                        <option value="anthropic"><?php esc_html_e( 'Anthropic Claude', 'cloudscale-devtools' ); ?></option>
-                        <option value="gemini"><?php esc_html_e( 'Google Gemini', 'cloudscale-devtools' ); ?></option>
-                    </select>
-                </div>
+        <?php else : ?>
+        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:14px 18px;margin:14px 0 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div style="flex-shrink:0;font-size:20px;line-height:1;">&#x26A0;&#xFE0F;</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:#92400e;"><?php esc_html_e( 'AI Cyber Audit — Not Configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:12px;color:#374151;margin-top:2px;"><?php esc_html_e( 'Select a provider and paste your API key on the Security tab to enable AI-powered security scans. A free Gemini tier is available with no credit card required.', 'cloudscale-devtools' ); ?></div>
             </div>
-
-            <div class="cs-sec-row" id="cs-row-anthropic-key">
-                <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
-                <div class="cs-sec-control">
-                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                        <input type="password" id="cs-sec-api-key" class="cs-text-input cs-sec-key-input"
-                               autocomplete="off" placeholder="sk-ant-api03-…">
-                        <button type="button" class="cs-btn-secondary" id="cs-sec-test-key">
-                            <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
-                        </button>
-                        <span id="cs-sec-key-status" class="cs-sec-key-status"></span>
-                    </div>
-                    <span class="cs-hint"><?php echo wp_kses(
-                        __( 'Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Stored in wp_options.', 'cloudscale-devtools' ),
-                        [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
-                    ); ?></span>
-                </div>
-            </div>
-
-            <div class="cs-sec-row" id="cs-row-gemini-key" style="display:none">
-                <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
-                <div class="cs-sec-control">
-                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                        <input type="password" id="cs-sec-gemini-key" class="cs-text-input cs-sec-key-input"
-                               autocomplete="off" placeholder="AIza…">
-                        <button type="button" class="cs-btn-secondary" id="cs-sec-test-gemini-key">
-                            <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
-                        </button>
-                        <span id="cs-sec-gemini-key-status" class="cs-sec-key-status"></span>
-                    </div>
-                    <span class="cs-hint"><?php echo wp_kses(
-                        __( 'Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored in wp_options.', 'cloudscale-devtools' ),
-                        [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
-                    ); ?></span>
-                </div>
-            </div>
-
-            <div class="cs-sec-row">
-                <span class="cs-sec-label"><?php esc_html_e( 'Audit model:', 'cloudscale-devtools' ); ?></span>
-                <div class="cs-sec-control">
-                    <select id="cs-sec-model" class="cs-sec-select">
-                        <option value="_auto">&#x2728; Auto</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="cs-sec-row">
-                <span class="cs-sec-label"><?php esc_html_e( 'Deep dive model:', 'cloudscale-devtools' ); ?></span>
-                <div class="cs-sec-control">
-                    <select id="cs-sec-deep-model" class="cs-sec-select">
-                        <option value="_auto_deep">&#x2728; Auto</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="cs-sec-row cs-sec-row-prompt">
-                <span class="cs-sec-label"><?php esc_html_e( 'System prompt:', 'cloudscale-devtools' ); ?></span>
-                <div class="cs-sec-control">
-                    <textarea id="cs-sec-prompt" class="cs-sec-prompt-area" rows="10"></textarea>
-                    <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
-                        <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-copy-prompt">&#x2398; <?php esc_html_e( 'Copy', 'cloudscale-devtools' ); ?></button>
-                        <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-reset-prompt"><?php esc_html_e( 'Reset to default', 'cloudscale-devtools' ); ?></button>
-                        <div style="flex:1"></div>
-                        <button type="button" class="cs-btn-primary" id="cs-sec-save">&#x1F4BE; <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
-                        <span class="cs-settings-saved" id="cs-sec-saved">&#x2713; <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
-                    </div>
-                </div>
-            </div>
-
+            <a href="<?php echo esc_url( $sec_url ); ?>" class="cs-btn-primary cs-btn-sm">&#x1F511; <?php esc_html_e( 'Configure AI', 'cloudscale-devtools' ); ?></a>
         </div>
-
-        <hr class="cs-sec-divider">
-
-        <!-- Scheduled scan -->
-        <div class="cs-sec-settings" style="margin-top:0;padding-top:0;">
-            <div class="cs-sec-row">
-                <span class="cs-sec-label"><?php esc_html_e( 'Scheduled Scan:', 'cloudscale-devtools' ); ?></span>
-                <div class="cs-sec-control">
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                        <input type="checkbox" id="cs-sched-enabled" <?php checked( $sched_enabled ); ?>>
-                        <span><?php esc_html_e( 'Run automatically on a schedule', 'cloudscale-devtools' ); ?></span>
-                    </label>
-                    <?php if ( $next_run ) : ?>
-                    <span class="cs-hint"><?php printf( esc_html__( 'Next run: %s', 'cloudscale-devtools' ), esc_html( wp_date( 'D j M Y, g:ia', $next_run ) ) ); ?></span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <div id="cs-sched-options" <?php echo $sched_enabled ? 'style="display:flex;flex-direction:column;gap:16px;"' : 'style="display:none"'; ?>>
-                <div class="cs-sec-row">
-                    <span class="cs-sec-label"><?php esc_html_e( 'Frequency:', 'cloudscale-devtools' ); ?></span>
-                    <div class="cs-sec-control">
-                        <select id="cs-sched-freq" class="cs-sec-select" style="width:auto;max-width:180px;">
-                            <option value="weekly"  <?php selected( $sched_freq, 'weekly' ); ?>><?php esc_html_e( 'Weekly', 'cloudscale-devtools' ); ?></option>
-                            <option value="monthly" <?php selected( $sched_freq, 'monthly' ); ?>><?php esc_html_e( 'Monthly', 'cloudscale-devtools' ); ?></option>
-                        </select>
-                    </div>
-                </div>
-                <div class="cs-sec-row">
-                    <span class="cs-sec-label"><?php esc_html_e( 'Scan type:', 'cloudscale-devtools' ); ?></span>
-                    <div class="cs-sec-control">
-                        <select id="cs-sched-type" class="cs-sec-select" style="width:auto;max-width:280px;">
-                            <option value="standard" <?php selected( $sched_type, 'standard' ); ?>><?php esc_html_e( 'AI Cyber Audit (fast)', 'cloudscale-devtools' ); ?></option>
-                            <option value="deep"     <?php selected( $sched_type, 'deep' ); ?>><?php esc_html_e( 'AI Deep Dive Cyber Audit (comprehensive)', 'cloudscale-devtools' ); ?></option>
-                        </select>
-                    </div>
-                </div>
-                <div class="cs-sec-row">
-                    <span class="cs-sec-label"><?php esc_html_e( 'Notify via email:', 'cloudscale-devtools' ); ?></span>
-                    <div class="cs-sec-control">
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                            <input type="checkbox" id="cs-sched-email" <?php checked( $sched_email ); ?>>
-                            <span><?php printf( esc_html__( 'Send results to %s', 'cloudscale-devtools' ), '<strong>' . esc_html( get_option( 'admin_email' ) ) . '</strong>' ); ?></span>
-                        </label>
-                    </div>
-                </div>
-                <div class="cs-sec-row">
-                    <span class="cs-sec-label"><?php esc_html_e( 'ntfy.sh topic:', 'cloudscale-devtools' ); ?></span>
-                    <div class="cs-sec-control">
-                        <input type="text" id="cs-sched-ntfy-url" class="cs-text-input"
-                               placeholder="https://ntfy.sh/your-topic"
-                               value="<?php echo esc_attr( $sched_ntfy_url ); ?>"
-                               style="max-width:320px;">
-                        <span class="cs-hint"><?php echo wp_kses( __( 'Optional push notification via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a>.', 'cloudscale-devtools' ), [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></span>
-                    </div>
-                </div>
-                <div class="cs-sec-row">
-                    <span class="cs-sec-label"><?php esc_html_e( 'ntfy auth token:', 'cloudscale-devtools' ); ?></span>
-                    <div class="cs-sec-control">
-                        <input type="password" id="cs-sched-ntfy-token" class="cs-text-input"
-                               autocomplete="off" placeholder="<?php echo $sched_ntfy_tok ? '&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;' : esc_attr__( 'Optional &#8212; for protected topics', 'cloudscale-devtools' ); ?>"
-                               style="max-width:320px;">
-                    </div>
-                </div>
-                <div class="cs-sec-row">
-                    <span class="cs-sec-label"></span>
-                    <div class="cs-sec-control">
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <button type="button" class="cs-btn-primary" id="cs-sched-save">&#x1F4BE; <?php esc_html_e( 'Save Schedule', 'cloudscale-devtools' ); ?></button>
-                            <span class="cs-settings-saved" id="cs-sched-saved">&#x2713; <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        </div><!-- /AI settings -->
+        <?php endif; ?>
 
         <!-- ── DB Prefix Rollback Banner ──────────────────────────────────── -->
         <?php
@@ -4269,93 +4209,6 @@ class CloudScale_DevTools {
             </div>
         </div>
 
-        <!-- ── Uptime Monitor ────────────────────────────────────────────── -->
-        <div class="cs-panel" id="cs-panel-uptime-monitor">
-            <div class="cs-section-header cs-section-header-green">
-                <span>⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></span>
-                <span class="cs-header-hint"><?php esc_html_e( 'WordPress pushes a heartbeat to a Cloudflare Worker every 3 minutes. No heartbeat for 8 minutes = site down alert.', 'cloudscale-devtools' ); ?></span>
-                <?php self::render_explain_btn( 'uptime-monitor', 'Uptime Monitor', [
-                    [ 'name' => 'Setup — step by step', 'rec' => 'Required',    'html' => '<ol style="margin:0;padding-left:1.4em;line-height:1.8;"><li><strong>Cloudflare credentials</strong> — Enter your Cloudflare Zone ID and an API Token with <code>Workers:Edit</code> and <code>Workers KV Storage:Edit</code> permissions, then click <em>Save Settings</em>.</li><li><strong>ntfy.sh Alert URL</strong> (optional) — Enter your ntfy.sh topic URL to receive push notifications when the site goes down or recovers.</li><li><strong>Deploy Worker</strong> — Click <em>Deploy Worker to Cloudflare</em>. This creates a KV namespace, uploads the Worker, and schedules the <code>* * * * *</code> cron trigger.</li><li><strong>Host cron</strong> — Run <code>deploy-cf-worker.sh</code> on your server to install a host cron that triggers WP-Cron locally (bypasses Cloudflare cache). WP-Cron pushes a heartbeat to the Worker every 3 minutes. The cron line is shown in the Host cron section below.</li><li><strong>Test</strong> — Click <em>Test Endpoint</em> to send a heartbeat to the Worker immediately and confirm the connection.</li></ol>' ],
-                    [ 'name' => 'How it works',          'rec' => 'Overview',    'html' => 'A Pi host cron hits <code>http://127.0.0.1:PORT/wp-cron.php</code> (localhost, bypasses Cloudflare cache) every minute. PHP-FPM processes the request, WP-Cron runs, and WordPress pushes a small heartbeat POST to the Cloudflare Worker every 3 minutes. The Worker stores the timestamp in CF KV and its own cron checks every minute: no heartbeat for 8+ minutes = site down, ntfy fires. Recovery alert is sent when heartbeats resume. Localhost is required because Cloudflare caches the public wp-cron.php URL and returns a cached 200 without PHP ever executing.' ],
-                    [ 'name' => 'Down vs recovery',      'rec' => 'Overview',    'html' => 'Down alerts fire after ~8 minutes of missed heartbeats. Repeat alerts are throttled to once every 30 minutes while the site remains down. Recovery fires as soon as one heartbeat arrives after a down period, with the total outage duration included in the message.' ],
-                    [ 'name' => 'Test Alert (pause 5 min)', 'rec' => 'Testing',  'html' => 'Click <em>Test Alert (pause 5 min)</em> to pause heartbeats for 5 minutes. After about 8 minutes of silence the Cloudflare Worker will treat the site as down and fire your ntfy down alert. When the 5-minute pause ends, heartbeats resume automatically and you should receive a recovery alert. A live countdown is shown while paused. Click <em>Cancel Pause</em> at any time to resume heartbeats immediately (you will still get a recovery alert once the next heartbeat is sent).' ],
-                    [ 'name' => 'Alert notifications',   'rec' => 'Recommended', 'html' => 'Enter your ntfy.sh topic URL (e.g. <code>https://ntfy.sh/your-topic</code>) to receive instant push notifications. Alerts fire from the Cloudflare edge — they arrive even if your PHP, database, and server are all offline, because the down detection happens in the Worker watching for stale heartbeats.' ],
-                    [ 'name' => 'KV storage',            'rec' => 'Info',        'html' => 'A Cloudflare KV namespace (<code>csdt-uptime-state</code>) is created automatically on first deploy. It stores three small values: last heartbeat timestamp, down-since timestamp, and last-alert timestamp. The deploy script and Deploy button both handle KV creation — no manual setup needed.' ],
-                ] ); ?>
-            </div>
-            <div class="cs-panel-body">
-                <div>
-                    <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
-                        <?php esc_html_e( 'A host cron job hits WordPress locally every minute (bypassing Cloudflare cache), triggering a heartbeat push to the Cloudflare Worker every 3 minutes. If no heartbeat arrives for 8 minutes, the Worker fires a down alert via ntfy.sh. When heartbeats resume, a recovery alert is sent automatically with outage duration.', 'cloudscale-devtools' ); ?>
-                    </p>
-                    <div id="csdt-uptime-setup-wrap">
-                        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:12px;">
-                            <p style="margin:0 0 12px;font-weight:700;color:#0f172a;font-size:.9em;">Cloudflare credentials <span style="font-weight:400;color:#6b7280;">(<?php esc_html_e( 'required — API Token needs Workers:Edit and Workers KV Storage:Edit permissions', 'cloudscale-devtools' ); ?>)</span></p>
-                            <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;">
-                                <div>
-                                    <label for="csdt-cf-zone-id" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Zone ID</label>
-                                    <input id="csdt-cf-zone-id" type="text" class="cs-input" style="width:100%;"
-                                           placeholder="<?php esc_attr_e( 'Cloudflare Zone ID', 'cloudscale-devtools' ); ?>"
-                                           value="<?php $z = get_option( 'csdt_devtools_cf_zone_id', '' ); echo esc_attr( $z ? str_repeat( '•', 16 ) . substr( $z, -4 ) : '' ); ?>"
-                                           autocomplete="off">
-                                </div>
-                                <div>
-                                    <label for="csdt-cf-api-token" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">API Token</label>
-                                    <input id="csdt-cf-api-token" type="password" class="cs-input" style="width:100%;"
-                                           placeholder="<?php esc_attr_e( 'Cloudflare API Token', 'cloudscale-devtools' ); ?>"
-                                           value="<?php echo esc_attr( get_option( 'csdt_devtools_cf_api_token', '' ) ? str_repeat( '•', 20 ) : '' ); ?>"
-                                           autocomplete="new-password">
-                                </div>
-                            </div>
-                        </div>
-                        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:16px;">
-                            <p style="margin:0 0 10px;font-weight:700;color:#0f172a;font-size:.9em;">ntfy.sh Alert URL <span style="font-weight:400;color:#6b7280;">(<?php esc_html_e( 'optional — push notification when site goes down or recovers', 'cloudscale-devtools' ); ?>)</span></p>
-                            <input id="csdt-uptime-ntfy-url" type="text" class="cs-input" style="max-width:420px;"
-                                   placeholder="https://ntfy.sh/your-topic"
-                                   value="<?php echo esc_attr( get_option( 'csdt_uptime_ntfy_url', get_option( 'csdt_scan_schedule_ntfy_url', '' ) ) ); ?>">
-                        </div>
-                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                            <button id="csdt-uptime-save-btn" class="cs-btn-secondary">
-                                💾 <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?>
-                            </button>
-                            <span id="csdt-uptime-save-status" style="display:none;font-size:.88em;"></span>
-                        </div>
-                        <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                            <button id="csdt-uptime-deploy-btn" class="cs-btn-primary">
-                                🚀 <?php esc_html_e( 'Deploy Worker to Cloudflare', 'cloudscale-devtools' ); ?>
-                            </button>
-                            <button id="csdt-uptime-test-btn" class="cs-btn-secondary">
-                                🧪 <?php esc_html_e( 'Test Endpoint', 'cloudscale-devtools' ); ?>
-                            </button>
-                            <span id="csdt-uptime-deploying" style="display:none;color:#6b7280;font-size:13px;">⏳ <?php esc_html_e( 'Deploying…', 'cloudscale-devtools' ); ?></span>
-                        </div>
-                        <div id="csdt-uptime-deploy-result" style="margin-top:12px;"></div>
-                        <details style="margin-top:16px;">
-                            <summary style="cursor:pointer;font-size:.85em;font-weight:600;color:#6366f1;">🛠 Manual deploy (copy-paste Worker script)</summary>
-                            <div id="csdt-uptime-manual-wrap" style="margin-top:12px;"></div>
-                        </details>
-                        <details style="margin-top:10px;" open>
-                            <summary style="cursor:pointer;font-size:.85em;font-weight:600;color:#374151;">⏱ Host cron — reliable every-3-minute heartbeats</summary>
-                            <div style="margin-top:10px;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;padding:12px 14px;">
-                                <p style="margin:0 0 6px;font-size:.82em;color:#475569;"><?php esc_html_e( 'Must use localhost (not the public URL) — Cloudflare caches wp-cron.php and returns a cached 200 without WordPress ever executing. Hitting nginx directly bypasses CF. Replace PORT with your nginx host port (run', 'cloudscale-devtools' ); ?> <code>docker port pi_nginx 80/tcp</code><?php esc_html_e( '):', 'cloudscale-devtools' ); ?></p>
-                                <code id="csdt-uptime-cron-line" style="display:block;background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:8px 12px;font-size:.8em;color:#16a34a;word-break:break-all;margin-bottom:8px;">* * * * * curl -sf -m 10 -H 'Host: <?php echo esc_html( wp_parse_url( get_site_url(), PHP_URL_HOST ) ); ?>' 'http://127.0.0.1:PORT/wp-cron.php?doing_wp_cron' -o /dev/null 2&gt;/dev/null</code>
-                                <p style="margin:0;font-size:.78em;color:#64748b;"><?php esc_html_e( 'If FPM is down nginx returns 502, curl exits non-zero, WP-Cron does not run, no heartbeat is pushed, and the CF Worker alerts after 8 minutes. deploy-cf-worker.sh detects the port and installs this automatically.', 'cloudscale-devtools' ); ?></p>
-                            </div>
-                        </details>
-                    </div>
-                    <div id="csdt-uptime-status-wrap" style="display:none;margin-top:4px;">
-                        <div id="csdt-uptime-status-inner"></div>
-                        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                            <button id="csdt-uptime-refresh-btn" class="cs-btn-secondary" style="font-size:.82em;">↻ <?php esc_html_e( 'Push Heartbeat + Refresh', 'cloudscale-devtools' ); ?></button>
-                            <button id="csdt-uptime-pause-btn" class="cs-btn-secondary" style="font-size:.82em;">🔕 <?php esc_html_e( 'Test Alert (pause 5 min)', 'cloudscale-devtools' ); ?></button>
-                            <button id="csdt-uptime-cancel-pause-btn" class="cs-btn-secondary" style="font-size:.82em;display:none;">✕ <?php esc_html_e( 'Cancel Pause', 'cloudscale-devtools' ); ?></button>
-                            <span id="csdt-uptime-push-status" style="display:none;font-size:.82em;"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- ── Database Intelligence Engine ─────────────────────────────── -->
         <div class="cs-panel">
             <div class="cs-section-header cs-section-header-orange">
@@ -4432,9 +4285,18 @@ class CloudScale_DevTools {
     }
 
         private static function render_security_panel(): void {
+        $ai_cfg         = CSDT_AI_Dispatcher::get_config();
+        $ai_provider    = $ai_cfg['provider'];
+        $sched_enabled  = get_option( 'csdt_scan_schedule_enabled', '0' ) === '1';
+        $sched_freq     = get_option( 'csdt_scan_schedule_freq',    'weekly' );
+        $sched_type     = get_option( 'csdt_scan_schedule_type',    'deep' );
+        $sched_email    = get_option( 'csdt_scan_schedule_email',   '1' ) === '1';
+        $sched_ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
+        $sched_ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
+        $next_run       = wp_next_scheduled( 'csdt_scheduled_scan' );
         ?>
         <div class="cs-tab-intro" style="margin-bottom:20px;">
-                    <p><?php echo wp_kses( __( 'The <strong>AI Cyber Audit</strong> uses frontier AI &#8212; Anthropic Claude or Google Gemini &#8212; to analyse your WordPress installation and produce a prioritised, scored security report in under 60 seconds. Think of it as a security consultant in your admin panel: it doesn&#8217;t just list what&#8217;s wrong, it tells you what to fix first and exactly how to fix it. A Standard scan takes seconds; a Deep Dive goes further with live HTTP probes, DNS checks, TLS quality analysis, and static code scanning of your plugins. You need an API key from one of the two providers &#8212; a free Gemini tier is available with no credit card required. Configure your provider and key on the <a href="' . esc_url( admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=home' ) ) . '">Home tab</a>, then use the <strong>Quick Fixes</strong> below to resolve common misconfigurations before running a scan.', 'cloudscale-devtools' ), [ 'strong' => [], 'a' => [ 'href' => [] ] ] ); ?></p>
+                    <p><?php echo wp_kses( __( 'The <strong>AI Cyber Audit</strong> uses frontier AI &#8212; Anthropic Claude or Google Gemini &#8212; to analyse your WordPress installation and produce a prioritised, scored security report in under 60 seconds. Configure your provider and API key in the <strong>AI Settings</strong> panel below, then run a scan from the <strong>AI Cyber Audit</strong> panel. A free Gemini tier is available with no credit card required.', 'cloudscale-devtools' ), [ 'strong' => [] ] ); ?></p>
                 <!-- ── Threat Monitor ──────────────────────────── -->
                 <?php
                 $tm_enabled       = get_option( 'csdt_threat_monitor_enabled',        '1' ) === '1';
@@ -4545,6 +4407,177 @@ class CloudScale_DevTools {
                 <?php CSDT_Security_Headers::render_security_headers_panel(); ?>
 
                 <?php CSDT_CSP::render_csp_panel(); ?>
+
+                <!-- ── AI Settings ────────────────────────────────────────────── -->
+                <div class="cs-panel" id="cs-panel-ai-settings">
+                <div class="cs-section-header cs-section-header-red">
+                    <span>&#x1F916; <?php esc_html_e( 'AI Settings', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-header-hint"><?php esc_html_e( 'Select a provider and paste your API key to enable AI-powered security scans', 'cloudscale-devtools' ); ?></span>
+                    <?php self::render_explain_btn( 'cyber-audit', 'AI Cyber Audit', [
+                        [ 'name' => 'AI Providers',    'rec' => 'Info',        'html' => '<p>Two AI providers are supported. You supply your own API key — stored only in your WordPress database (<code>wp_options</code>) and sent only to the provider&#39;s own API endpoint.</p><p><strong>Anthropic Claude</strong> — recommended for best results.<br>Get your key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a><br>Models: <code>claude-sonnet-4-6</code> (fast) · <code>claude-opus-4-7</code> (most capable)</p><p><strong>Google Gemini</strong> — free tier available.<br>Get your key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a><br>Models: <code>gemini-2.0-flash</code> (fast, free tier) · <code>gemini-2.5-pro</code> (most capable)</p>' ],
+                        [ 'name' => 'Standard Scan',   'rec' => 'Recommended', 'html' => 'Checks your WordPress core settings, active plugins and themes, user accounts, file permissions, and wp-config.php for common misconfigurations. Results are scored as Critical / High / Medium / Low with specific fix steps. Takes a few seconds.' ],
+                        [ 'name' => 'Deep Dive Scan',  'rec' => 'Recommended', 'html' => 'Extends the Standard scan with live HTTP probes, DNS checks (SPF, DMARC, DKIM), weak TLS detection, PHP end-of-life status, static PHP code analysis across your plugins, and AI-powered triage of suspicious code patterns.' ],
+                        [ 'name' => 'Scheduled Scans', 'rec' => 'Optional',    'html' => 'Run a scan automatically on a daily or weekly schedule. Results are stored in scan history. Enable email and ntfy.sh alerts to receive the AI summary when a scan completes.' ],
+                    ] ); ?>
+                </div>
+                <div class="cs-panel-body">
+                <div class="cs-sec-settings">
+
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'AI Provider:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <select id="cs-sec-provider" class="cs-sec-select">
+                                <option value="anthropic"><?php esc_html_e( 'Anthropic Claude', 'cloudscale-devtools' ); ?></option>
+                                <option value="gemini"><?php esc_html_e( 'Google Gemini', 'cloudscale-devtools' ); ?></option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="cs-sec-row" id="cs-row-anthropic-key">
+                        <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                <input type="password" id="cs-sec-api-key" class="cs-text-input cs-sec-key-input"
+                                       autocomplete="off" placeholder="sk-ant-api03-…">
+                                <button type="button" class="cs-btn-secondary" id="cs-sec-test-key">
+                                    <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
+                                </button>
+                                <span id="cs-sec-key-status" class="cs-sec-key-status"></span>
+                            </div>
+                            <span class="cs-hint"><?php echo wp_kses(
+                                __( 'Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Stored in wp_options.', 'cloudscale-devtools' ),
+                                [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
+                            ); ?></span>
+                        </div>
+                    </div>
+
+                    <div class="cs-sec-row" id="cs-row-gemini-key" style="display:none">
+                        <span class="cs-sec-label"><?php esc_html_e( 'API Key:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                <input type="password" id="cs-sec-gemini-key" class="cs-text-input cs-sec-key-input"
+                                       autocomplete="off" placeholder="AIza…">
+                                <button type="button" class="cs-btn-secondary" id="cs-sec-test-gemini-key">
+                                    <?php esc_html_e( 'Test Key', 'cloudscale-devtools' ); ?>
+                                </button>
+                                <span id="cs-sec-gemini-key-status" class="cs-sec-key-status"></span>
+                            </div>
+                            <span class="cs-hint"><?php echo wp_kses(
+                                __( 'Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored in wp_options.', 'cloudscale-devtools' ),
+                                [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
+                            ); ?></span>
+                        </div>
+                    </div>
+
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'Audit model:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <select id="cs-sec-model" class="cs-sec-select">
+                                <option value="_auto">&#x2728; Auto</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'Deep dive model:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <select id="cs-sec-deep-model" class="cs-sec-select">
+                                <option value="_auto_deep">&#x2728; Auto</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="cs-sec-row cs-sec-row-prompt">
+                        <span class="cs-sec-label"><?php esc_html_e( 'System prompt:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <textarea id="cs-sec-prompt" class="cs-sec-prompt-area" rows="10"></textarea>
+                            <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+                                <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-copy-prompt">&#x2398; <?php esc_html_e( 'Copy', 'cloudscale-devtools' ); ?></button>
+                                <button type="button" class="cs-btn-secondary cs-btn-sm" id="cs-sec-reset-prompt"><?php esc_html_e( 'Reset to default', 'cloudscale-devtools' ); ?></button>
+                                <div style="flex:1"></div>
+                                <button type="button" class="cs-btn-primary" id="cs-sec-save">&#x1F4BE; <?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
+                                <span class="cs-settings-saved" id="cs-sec-saved">&#x2713; <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <hr class="cs-sec-divider">
+
+                <!-- Scheduled scan -->
+                <div class="cs-sec-settings" style="margin-top:0;padding-top:0;">
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'Scheduled Scan:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="cs-sched-enabled" <?php checked( $sched_enabled ); ?>>
+                                <span><?php esc_html_e( 'Run automatically on a schedule', 'cloudscale-devtools' ); ?></span>
+                            </label>
+                            <?php if ( $next_run ) : ?>
+                            <span class="cs-hint"><?php printf( esc_html__( 'Next run: %s', 'cloudscale-devtools' ), esc_html( wp_date( 'D j M Y, g:ia', $next_run ) ) ); ?></span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div id="cs-sched-options" <?php echo $sched_enabled ? 'style="display:flex;flex-direction:column;gap:16px;"' : 'style="display:none"'; ?>>
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'Frequency:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <select id="cs-sched-freq" class="cs-sec-select" style="width:auto;max-width:180px;">
+                                    <option value="weekly"  <?php selected( $sched_freq, 'weekly' ); ?>><?php esc_html_e( 'Weekly', 'cloudscale-devtools' ); ?></option>
+                                    <option value="monthly" <?php selected( $sched_freq, 'monthly' ); ?>><?php esc_html_e( 'Monthly', 'cloudscale-devtools' ); ?></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'Scan type:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <select id="cs-sched-type" class="cs-sec-select" style="width:auto;max-width:280px;">
+                                    <option value="standard" <?php selected( $sched_type, 'standard' ); ?>><?php esc_html_e( 'AI Cyber Audit (fast)', 'cloudscale-devtools' ); ?></option>
+                                    <option value="deep"     <?php selected( $sched_type, 'deep' ); ?>><?php esc_html_e( 'AI Deep Dive Cyber Audit (comprehensive)', 'cloudscale-devtools' ); ?></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'Notify via email:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="cs-sched-email" <?php checked( $sched_email ); ?>>
+                                    <span><?php printf( esc_html__( 'Send results to %s', 'cloudscale-devtools' ), '<strong>' . esc_html( get_option( 'admin_email' ) ) . '</strong>' ); ?></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'ntfy.sh topic:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <input type="text" id="cs-sched-ntfy-url" class="cs-text-input"
+                                       placeholder="https://ntfy.sh/your-topic"
+                                       value="<?php echo esc_attr( $sched_ntfy_url ); ?>"
+                                       style="max-width:320px;">
+                                <span class="cs-hint"><?php echo wp_kses( __( 'Optional push notification via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a>.', 'cloudscale-devtools' ), [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></span>
+                            </div>
+                        </div>
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'ntfy auth token:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <input type="password" id="cs-sched-ntfy-token" class="cs-text-input"
+                                       autocomplete="off" placeholder="<?php echo $sched_ntfy_tok ? '&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;' : esc_attr__( 'Optional — for protected topics', 'cloudscale-devtools' ); ?>"
+                                       style="max-width:320px;">
+                            </div>
+                        </div>
+                        <div class="cs-sec-row">
+                            <span class="cs-sec-label"></span>
+                            <div class="cs-sec-control">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <button type="button" class="cs-btn-primary" id="cs-sched-save">&#x1F4BE; <?php esc_html_e( 'Save Schedule', 'cloudscale-devtools' ); ?></button>
+                                    <span class="cs-settings-saved" id="cs-sched-saved">&#x2713; <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div><!-- /AI settings -->
+                </div>
 
                 <div class="cs-panel" id="cs-panel-ai-cyber-audit">
                 <div class="cs-section-header" style="background:linear-gradient(90deg,#022c22 0%,#065f46 100%);border-left:3px solid #34d399;">

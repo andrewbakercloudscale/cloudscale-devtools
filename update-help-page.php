@@ -557,7 +557,7 @@ $content = <<<'HTML'
 <div class="cs-panel-body">
 <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0e1628 100%);border-radius:10px;padding:24px 28px;margin-bottom:28px;color:#e2e8f0;">
 <p style="margin:0 0 10px;font-size:1.1em;font-weight:700;color:#a78bfa;">Your site broke. Find out why in seconds.</p>
-<p style="margin:0;opacity:.85;font-size:.95em;line-height:1.6;">The <strong>AI Debugging Assistant</strong> (Tools → Debug AI tab) connects your server logs directly to a frontier AI model. When something breaks — a PHP fatal, a plugin conflict, a failing cron job, a cryptic SMTP error — paste the error or click <em>Load Errors</em> to pull recent lines from your PHP, WordPress, or web server logs. The AI returns three things: the exact root cause, the mechanism behind it, and numbered steps to fix it. No tab-switching, no Stack Overflow, no guessing.</p>
+<p style="margin:0;opacity:.85;font-size:.95em;line-height:1.6;">The <strong>AI Debugging Assistant</strong> (Tools → Diagnostics tab) connects your server logs directly to a frontier AI model. When something breaks — a PHP fatal, a plugin conflict, a failing cron job, a cryptic SMTP error — paste the error or click <em>Load Errors</em> to pull recent lines from your PHP, WordPress, or web server logs. The AI returns three things: the exact root cause, the mechanism behind it, and numbered steps to fix it. No tab-switching, no Stack Overflow, no guessing.</p>
 </div>
 
 <h4 class="cs-sub-heading">How it works</h4>
@@ -588,7 +588,7 @@ $content = <<<'HTML'
 <div style="background:#fff7ed;border-left:4px solid #f97316;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:20px;">
 <p style="margin:0;"><strong>Stop finding out your site is broken from your users.</strong> PHP Error Alerting watches your error logs in the background and sends you a push notification + email the moment a new fatal or error appears — before any visitor has a chance to report it.</p>
 </div>
-<p>The <strong>PHP Error Alerting</strong> panel (Debug AI tab, bottom section) monitors your PHP error log and WordPress debug log on a 5-minute cron cycle. When new fatal or error lines are detected since the last check, you receive:</p>
+<p>The <strong>PHP Error Alerting</strong> panel (Diagnostics tab, bottom section) monitors your PHP error log and WordPress debug log on a 5-minute cron cycle. When new fatal or error lines are detected since the last check, you receive:</p>
 <ul>
 <li><strong>ntfy.sh push notification</strong> — delivered to your phone or desktop immediately. Priority is set to <em>urgent</em> for PHP fatals, <em>high</em> for warnings/errors. Uses the same ntfy.sh topic configured under Scheduled Scans.</li>
 <li><strong>Email alert</strong> — sent to the site administrator's registered email address with the error excerpt.</li>
