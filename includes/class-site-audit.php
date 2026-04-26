@@ -531,6 +531,14 @@ class CSDT_Site_Audit {
 
                 <div id="csdt-site-audit-results" style="display:none;"></div>
 
+                <?php $audit_cache_check = get_option( 'csdt_site_audit_cache', null ); if ( ! $audit_cache_check ) : ?>
+                <div id="csdt-site-audit-empty" style="text-align:center;padding:32px 20px;background:#f8fafc;border:2px dashed #d1fae5;border-radius:8px;margin-top:16px;">
+                    <div style="font-size:2rem;margin-bottom:10px;">🔍</div>
+                    <div style="font-weight:700;font-size:15px;color:#0f172a;margin-bottom:6px;"><?php esc_html_e( 'No audit results yet', 'cloudscale-devtools' ); ?></div>
+                    <div style="font-size:13px;color:#6b7280;max-width:380px;margin:0 auto;"><?php esc_html_e( 'Click Run Site Audit above to scan your content, SEO, database, and plugin health in under 60 seconds.', 'cloudscale-devtools' ); ?></div>
+                </div>
+                <?php endif; ?>
+
             </div>
         </div>
         <?php

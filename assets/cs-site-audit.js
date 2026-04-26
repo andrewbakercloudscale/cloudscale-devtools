@@ -183,7 +183,21 @@
         // Scorecard
         html += renderScorecard(counts);
 
-        // Filter buttons
+        // Severity filter chips
+        var SEV_KEYS = ['critical', 'high', 'medium', 'low', 'info'];
+        html += '<div id="csdt-sev-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">';
+        html += '<button class="csdt-sev-filter-btn csdt-sev-active" data-sev="all" style="font-size:.78em;padding:3px 11px;border-radius:20px;border:1px solid #6366f1;background:#6366f1;color:#fff;cursor:pointer;font-weight:600;">All</button>';
+        SEV_KEYS.forEach(function (sev) {
+            var cnt = findings.filter(function (f) { return (f.severity || 'info').toLowerCase() === sev; }).length;
+            if (cnt === 0) return;
+            var col = SEV_COLOR[sev];
+            html += '<button class="csdt-sev-filter-btn" data-sev="' + sev + '" style="font-size:.78em;padding:3px 11px;border-radius:20px;border:1px solid ' + col.border + ';background:#fff;color:' + col.badge + ';cursor:pointer;font-weight:600;">' +
+                sev.charAt(0).toUpperCase() + sev.slice(1) +
+                ' <span style="display:inline-block;background:' + col.badge + ';color:#fff;border-radius:10px;padding:0 5px;font-size:.82em;">' + cnt + '</span></button>';
+        });
+        html += '</div>';
+
+        // Category filter chips
         var categories = [];
         findings.forEach(function (f) {
             if (f.category && categories.indexOf(f.category) === -1) categories.push(f.category);
@@ -191,11 +205,11 @@
 
         if (categories.length > 1) {
             html += '<div id="csdt-audit-filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">' +
-                '<button class="csdt-audit-filter-btn csdt-filter-active" data-filter="all" style="font-size:.8em;padding:4px 12px;border-radius:20px;border:1px solid #6366f1;background:#6366f1;color:#fff;cursor:pointer;font-weight:600;">All</button>';
+                '<button class="csdt-audit-filter-btn csdt-filter-active" data-filter="all" style="font-size:.78em;padding:3px 11px;border-radius:20px;border:1px solid #6366f1;background:#6366f1;color:#fff;cursor:pointer;font-weight:600;">All</button>';
             categories.forEach(function (cat) {
                 var icon = CAT_ICON[cat] || '';
                 html += '<button class="csdt-audit-filter-btn" data-filter="' + escHtml(cat) +
-                    '" style="font-size:.8em;padding:4px 12px;border-radius:20px;border:1px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer;">' +
+                    '" style="font-size:.78em;padding:3px 11px;border-radius:20px;border:1px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer;">' +
                     icon + ' ' + escHtml(cat) + '</button>';
             });
             html += '</div>';
@@ -208,16 +222,52 @@
 
         resultsDiv.innerHTML = html;
         resultsDiv.style.display = '';
+        var emptyDiv = document.getElementById('csdt-site-audit-empty');
+        if (emptyDiv) { emptyDiv.style.display = 'none'; }
 
-        // Wire up filter buttons
+        // Combined severity + category filter logic
+        var filterState = { sev: 'all', cat: 'all' };
+        var cards = resultsDiv.querySelectorAll('#csdt-audit-cards > div');
+
+        function applyFilters() {
+            cards.forEach(function (card, i) {
+                var f = findings[i];
+                var matchSev = filterState.sev === 'all' || (f && (f.severity || 'info').toLowerCase() === filterState.sev);
+                var matchCat = filterState.cat === 'all' || (f && f.category === filterState.cat);
+                card.style.display = (matchSev && matchCat) ? '' : 'none';
+            });
+        }
+
+        // Severity chips
+        var sevBtns = resultsDiv.querySelectorAll('.csdt-sev-filter-btn');
+        sevBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                filterState.sev = btn.getAttribute('data-sev');
+                sevBtns.forEach(function (b) {
+                    var sev = b.getAttribute('data-sev');
+                    if (sev === 'all') {
+                        b.style.background  = filterState.sev === 'all' ? '#6366f1' : '#fff';
+                        b.style.color       = filterState.sev === 'all' ? '#fff'    : '#374151';
+                        b.style.borderColor = filterState.sev === 'all' ? '#6366f1' : '#e5e7eb';
+                    } else {
+                        var col = SEV_COLOR[sev];
+                        b.style.background  = filterState.sev === sev ? col.badge : '#fff';
+                        b.style.color       = filterState.sev === sev ? '#fff'    : col.badge;
+                        b.style.borderColor = col.border;
+                    }
+                });
+                applyFilters();
+            });
+        });
+
+        // Category chips
         var filterBtns = resultsDiv.querySelectorAll('.csdt-audit-filter-btn');
-        var cards      = resultsDiv.querySelectorAll('#csdt-audit-cards > div');
         filterBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var filter = btn.getAttribute('data-filter');
+                filterState.cat = btn.getAttribute('data-filter');
                 filterBtns.forEach(function (b) {
-                    b.style.background = '#fff';
-                    b.style.color      = '#374151';
+                    b.style.background  = '#fff';
+                    b.style.color       = '#374151';
                     b.style.borderColor = '#e5e7eb';
                     b.classList.remove('csdt-filter-active');
                 });
@@ -225,11 +275,7 @@
                 btn.style.color       = '#fff';
                 btn.style.borderColor = '#6366f1';
                 btn.classList.add('csdt-filter-active');
-
-                cards.forEach(function (card, i) {
-                    var cat = (findings[i] && findings[i].category) || '';
-                    card.style.display = ( filter === 'all' || cat === filter ) ? '' : 'none';
-                });
+                applyFilters();
             });
         });
 

@@ -27,12 +27,13 @@
 
     function flash( el, ok ) {
         if ( ! el ) return;
+        el.textContent = ok ? '✅ Saved' : '❌ Error';
+        el.style.color = ok ? '' : '#e53e3e';
         el.classList.add( 'visible' );
-        if ( ! ok ) el.style.color = '#e53e3e';
         setTimeout( () => {
             el.classList.remove( 'visible' );
             el.style.color = '';
-        }, 3000 );
+        }, 2500 );
     }
 
     // ── Hide Login + 2FA site settings save ──────────────────────────────
@@ -72,11 +73,11 @@
                     }
                     // (slug input already has the current value — no update needed)
                 } else {
-                    alert( res.data || 'Save failed.' );
+                    flash( hideSaved, false );
                 }
             } ).catch( () => {
                 hideSaveBtn.disabled = false;
-                alert( 'Save failed. Check your connection.' );
+                flash( hideSaved, false );
             } );
         } );
     }
@@ -89,14 +90,10 @@
             sessionSaveBtn.disabled = true;
             post( 'csdt_devtools_login_save', collectLoginPayload() ).then( res => {
                 sessionSaveBtn.disabled = false;
-                if ( res.success ) {
-                    flash( sessionSaved, true );
-                } else {
-                    alert( res.data || 'Save failed.' );
-                }
+                flash( sessionSaved, res.success );
             } ).catch( () => {
                 sessionSaveBtn.disabled = false;
-                alert( 'Save failed. Check your connection.' );
+                flash( sessionSaved, false );
             } );
         } );
     }
@@ -118,14 +115,10 @@
             bfSaveBtn.disabled = true;
             post( 'csdt_devtools_login_save', collectLoginPayload() ).then( res => {
                 bfSaveBtn.disabled = false;
-                if ( res.success ) {
-                    flash( bfSaved, true );
-                } else {
-                    alert( res.data || 'Save failed.' );
-                }
+                flash( bfSaved, res.success );
             } ).catch( () => {
                 bfSaveBtn.disabled = false;
-                alert( 'Save failed. Check your connection.' );
+                flash( bfSaved, false );
             } );
         } );
     }
@@ -135,14 +128,10 @@
             twoFaSaveBtn.disabled = true;
             post( 'csdt_devtools_login_save', collectLoginPayload() ).then( res => {
                 twoFaSaveBtn.disabled = false;
-                if ( res.success ) {
-                    flash( twoFaSaved, true );
-                } else {
-                    alert( res.data || 'Save failed.' );
-                }
+                flash( twoFaSaved, res.success );
             } ).catch( () => {
                 twoFaSaveBtn.disabled = false;
-                alert( 'Save failed. Check your connection.' );
+                flash( twoFaSaved, false );
             } );
         } );
     }
@@ -574,14 +563,10 @@
                 threshold: document.getElementById( 'cs-ssh-mon-threshold' )?.value || '10',
             } ).then( res => {
                 sshMonSaveBtn.disabled = false;
-                if ( res.success ) {
-                    flash( sshMonSaved, true );
-                } else {
-                    alert( res.data || 'Save failed.' );
-                }
+                flash( sshMonSaved, res.success );
             } ).catch( () => {
                 sshMonSaveBtn.disabled = false;
-                alert( 'Save failed. Check your connection.' );
+                flash( sshMonSaved, false );
             } );
         } );
     }

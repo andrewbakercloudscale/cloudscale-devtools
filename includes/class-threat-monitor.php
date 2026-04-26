@@ -19,6 +19,7 @@ class CSDT_Threat_Monitor {
         if ( get_option( 'csdt_threat_probe_enabled', '1' ) === '1' ) {
             self::check_probe_patterns();
         }
+        update_option( 'csdt_threat_last_run', time(), false );
     }
 
     private static function check_file_integrity(): void {

@@ -31,15 +31,22 @@
             .then( function( resp ) {
                 saveBtn.disabled    = false;
                 saveBtn.textContent = '💾 Save Settings';
-                if ( resp.success ) {
+                if ( savedMsg ) {
+                    savedMsg.textContent = resp.success ? '✅ Saved' : '❌ Error';
+                    savedMsg.style.color = resp.success ? '' : '#e53e3e';
                     savedMsg.classList.add( 'visible' );
-                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); }, 2000 );
+                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 2500 );
                 }
             } )
-            .catch( function( e ) {
+            .catch( function() {
                 saveBtn.disabled    = false;
                 saveBtn.textContent = '💾 Save Settings';
-                console.error( 'cs-code-block: settings save failed', e );
+                if ( savedMsg ) {
+                    savedMsg.textContent = '❌ Error';
+                    savedMsg.style.color = '#e53e3e';
+                    savedMsg.classList.add( 'visible' );
+                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 2500 );
+                }
             } );
     } );
 } )();

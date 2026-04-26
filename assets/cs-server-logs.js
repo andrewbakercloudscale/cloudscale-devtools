@@ -398,13 +398,23 @@
                     if ( resp.success ) {
                         rebuildSourceButtons( resp.data.sources );
                         loadStatuses();
-                        if ( savedMsg ) {
-                            savedMsg.style.display = 'inline';
-                            setTimeout( function () { savedMsg.style.display = 'none'; }, 2000 );
-                        }
+                    }
+                    if ( savedMsg ) {
+                        savedMsg.textContent = resp.success ? '✅ Saved' : '❌ Error';
+                        savedMsg.style.color = resp.success ? '' : '#e53e3e';
+                        savedMsg.classList.add( 'visible' );
+                        setTimeout( function () { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 2500 );
                     }
                 } )
-                .catch( function () { saveBtn.disabled = false; } );
+                .catch( function () {
+                    saveBtn.disabled = false;
+                    if ( savedMsg ) {
+                        savedMsg.textContent = '❌ Error';
+                        savedMsg.style.color = '#e53e3e';
+                        savedMsg.classList.add( 'visible' );
+                        setTimeout( function () { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 2500 );
+                    }
+                } );
         } );
     }
 

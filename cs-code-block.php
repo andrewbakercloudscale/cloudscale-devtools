@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.539
+ * Version: 1.9.541
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.532';
+    const VERSION      = '1.9.541';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -4039,8 +4039,10 @@ class CloudScale_DevTools {
         $login_slug     = get_option( 'csdt_devtools_login_slug', '' );
         $bf_on          = get_option( 'csdt_devtools_brute_force_enabled', '1' ) === '1';
         $force_2fa      = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1';
-        $uptime_enabled = get_option( 'csdt_uptime_enabled', '0' ) === '1';
-        $uptime_url     = trim( (string) get_option( 'csdt_uptime_worker_url', '' ) );
+        $uptime_enabled   = get_option( 'csdt_uptime_enabled', '0' ) === '1';
+        $uptime_url       = trim( (string) get_option( 'csdt_uptime_worker_url', '' ) );
+        $tm_last_run      = (int) get_option( 'csdt_threat_last_run', 0 );
+        $uptime_last_ping = get_option( 'csdt_uptime_last_ping', null );
         // URLs for status cards
         $login_url      = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=login' );
         $mail_url       = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=mail' );
@@ -4049,7 +4051,7 @@ class CloudScale_DevTools {
         <div id="cs-panel-home" class="cs-panel" style="margin-bottom:0;">
 
         <!-- ── Status Dashboard ─────────────────────────────────────────── -->
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:4px;">
 
             <?php
             // ── Card helper: reuse to keep markup DRY
@@ -4081,7 +4083,13 @@ class CloudScale_DevTools {
                 <div style="font-size:13px;font-weight:700;color:<?php echo $tm_enabled ? '#15803d' : '#dc2626'; ?>;">
                     <?php echo $tm_enabled ? '&#x2705; ' . esc_html__( 'Active', 'cloudscale-devtools' ) : '&#x274C; ' . esc_html__( 'Disabled', 'cloudscale-devtools' ); ?>
                 </div>
-                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'File integrity, new-admin and probe detection.', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;">
+                    <?php if ( $tm_last_run ) : ?>
+                        <?php printf( esc_html__( 'Last check: %s ago', 'cloudscale-devtools' ), esc_html( human_time_diff( $tm_last_run ) ) ); ?>
+                    <?php else : ?>
+                        <?php esc_html_e( 'File integrity, new-admin and probe detection.', 'cloudscale-devtools' ); ?>
+                    <?php endif; ?>
+                </div>
                 <a href="<?php echo esc_url( $sec_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Security', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
 
@@ -4129,7 +4137,14 @@ class CloudScale_DevTools {
             <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:12px 14px;">
                 <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></div>
                 <div style="font-size:13px;font-weight:700;color:#15803d;">&#x2705; <?php esc_html_e( 'Active', 'cloudscale-devtools' ); ?></div>
-                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Cloudflare Worker heartbeat enabled.', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;">
+                    <?php if ( $uptime_last_ping && isset( $uptime_last_ping['time'] ) ) : ?>
+                        <?php printf( esc_html__( 'Last ping: %s ago', 'cloudscale-devtools' ), esc_html( human_time_diff( (int) $uptime_last_ping['time'] ) ) ); ?>
+                        <?php if ( isset( $uptime_last_ping['ms'] ) ) : ?>&nbsp;&middot;&nbsp;<?php echo esc_html( $uptime_last_ping['ms'] ); ?>ms<?php endif; ?>
+                    <?php else : ?>
+                        <?php esc_html_e( 'Cloudflare Worker heartbeat enabled.', 'cloudscale-devtools' ); ?>
+                    <?php endif; ?>
+                </div>
                 <a href="<?php echo esc_url( $debug_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Diagnostics', 'cloudscale-devtools' ); ?> &rarr;</a>
             </div>
             <?php else : ?>
@@ -4791,7 +4806,12 @@ class CloudScale_DevTools {
                     style="width:100%;max-width:100%;display:block;margin-bottom:20px;border-radius:6px;background:#fff;border:1px solid #e2e8f0;"></canvas>
                 <?php endif; if ( empty( $history ) ) :
                 ?>
-                    <p style="color:#888;font-size:13px;margin:0;padding:8px 0;"><?php esc_html_e( 'No scan history yet. Run your first AI Cyber Audit above.', 'cloudscale-devtools' ); ?></p>
+                    <div style="text-align:center;padding:32px 20px;background:#f8fafc;border:2px dashed #e2e8f0;border-radius:8px;">
+                        <div style="font-size:2rem;margin-bottom:10px;">🛡️</div>
+                        <div style="font-weight:700;font-size:15px;color:#0f172a;margin-bottom:6px;"><?php esc_html_e( 'No scans yet', 'cloudscale-devtools' ); ?></div>
+                        <div style="font-size:13px;color:#6b7280;margin:0 auto 18px;max-width:380px;"><?php esc_html_e( 'Run your first AI Cyber Audit above. Each scan is saved here so you can track your security posture over time.', 'cloudscale-devtools' ); ?></div>
+                        <a href="#cs-panel-ai-cyber-audit" onclick="document.getElementById('cs-panel-ai-cyber-audit').scrollIntoView({behavior:'smooth'});return false;" style="display:inline-block;background:#6366f1;color:#fff;font-weight:600;font-size:13px;padding:7px 18px;border-radius:6px;text-decoration:none;">Run First Scan ↑</a>
+                    </div>
                 <?php else : ?>
                     <div style="display:flex;flex-direction:column;gap:6px;">
                     <?php foreach ( $history as $idx => $entry ) :
