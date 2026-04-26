@@ -28,12 +28,12 @@
     function flash( el, ok ) {
         if ( ! el ) return;
         el.textContent = ok ? '✅ Saved' : '❌ Error';
-        el.style.color = ok ? '' : '#e53e3e';
+        el.style.color = ok ? '#16a34a' : '#dc2626';
         el.classList.add( 'visible' );
         setTimeout( () => {
             el.classList.remove( 'visible' );
             el.style.color = '';
-        }, 5000 );
+        }, 10000 );
     }
 
     // ── Hide Login + 2FA site settings save ──────────────────────────────

@@ -33,9 +33,9 @@
                 saveBtn.textContent = '💾 Save Settings';
                 if ( savedMsg ) {
                     savedMsg.textContent = resp.success ? '✅ Saved' : '❌ Error';
-                    savedMsg.style.color = resp.success ? '' : '#e53e3e';
+                    savedMsg.style.color = resp.success ? '#16a34a' : '#dc2626';
                     savedMsg.classList.add( 'visible' );
-                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 5000 );
+                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 10000 );
                 }
             } )
             .catch( function() {
@@ -43,9 +43,9 @@
                 saveBtn.textContent = '💾 Save Settings';
                 if ( savedMsg ) {
                     savedMsg.textContent = '❌ Error';
-                    savedMsg.style.color = '#e53e3e';
+                    savedMsg.style.color = '#dc2626';
                     savedMsg.classList.add( 'visible' );
-                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 5000 );
+                    setTimeout( function() { savedMsg.classList.remove( 'visible' ); savedMsg.style.color = ''; }, 10000 );
                 }
             } );
     } );

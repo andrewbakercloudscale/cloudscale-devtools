@@ -94,9 +94,9 @@
         function flash( ok ) {
             if ( ! msg ) { return; }
             msg.textContent = ok ? '✓ Saved' : '❌ Error';
-            msg.style.color = ok ? '' : '#e53e3e';
+            msg.style.color = ok ? '#16a34a' : '#dc2626';
             msg.classList.add( 'visible' );
-            setTimeout( function () { msg.classList.remove( 'visible' ); msg.style.color = ''; }, 5000 );
+            setTimeout( function () { msg.classList.remove( 'visible' ); msg.style.color = ''; }, 10000 );
         }
 
         btn.addEventListener( 'click', function () {

@@ -514,7 +514,7 @@
                     .then(function(r){ return r.json(); })
                     .then(function(resp){
                         saveBtn.disabled = false;
-                        if (savedMsg) { savedMsg.style.display = 'inline'; setTimeout(function(){ savedMsg.style.display = 'none'; }, 2500); }
+                        if (savedMsg) { savedMsg.style.color = '#16a34a'; savedMsg.style.display = 'inline'; setTimeout(function(){ savedMsg.style.display = 'none'; savedMsg.style.color = ''; }, 10000); }
                         document.dispatchEvent(new CustomEvent('csdt:csp:saved'));
                         if (resp && resp.data && resp.data.has_backup) {
                             var rb = document.getElementById('cs-csp-rollback-btn');

@@ -24,11 +24,11 @@
     function flash( el, ok ) {
         if ( ! el ) return;
         el.classList.add( 'visible' );
-        if ( ! ok ) el.style.color = '#e53e3e';
+        el.style.color = ok ? '#16a34a' : '#dc2626';
         setTimeout( () => {
             el.classList.remove( 'visible' );
             el.style.color = '';
-        }, 3000 );
+        }, 10000 );
     }
 
     // ── Enable toggle — dim/enable fields ────────────────────────────────

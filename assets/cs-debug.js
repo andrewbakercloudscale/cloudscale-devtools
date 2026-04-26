@@ -567,13 +567,13 @@
                 .then( function ( res ) {
                     fpmSaveBtn.disabled = false;
                     if ( fpmStatus ) {
-                        fpmStatus.textContent = res.success ? '\u2705 Saved' : '\u274C ' + esc( ( res.data && res.data.message ) || 'Failed' );
-                        setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; } }, 5000 );
+                        fpmStatus.style.color = res.success ? '#16a34a' : '#dc2626'; fpmStatus.textContent = res.success ? '✅ Saved' : '❌ ' + esc( ( res.data && res.data.message ) || 'Failed' );
+                        setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; fpmStatus.style.color = ''; } }, 10000 );
                     }
                 } )
                 .catch( function () {
                     fpmSaveBtn.disabled = false;
-                    if ( fpmStatus ) { fpmStatus.textContent = 'Request failed.'; setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; } }, 5000 ); }
+                    if ( fpmStatus ) { fpmStatus.textContent = 'Request failed.'; setTimeout( function () { if ( fpmStatus ) { fpmStatus.textContent = ''; fpmStatus.style.color = ''; } }, 10000 ); }
                 } );
         } );
     }
@@ -612,13 +612,13 @@
                 .then( function ( res ) {
                     saveBtn.disabled = false;
                     if ( saveStatus ) {
-                        saveStatus.textContent = res.success ? '\u2705 Saved' : '\u274C ' + esc( ( res.data && res.data.message ) || 'Failed' );
-                        setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; } }, 5000 );
+                        saveStatus.style.color = res.success ? '#16a34a' : '#dc2626'; saveStatus.textContent = res.success ? '✅ Saved' : '❌ ' + esc( ( res.data && res.data.message ) || 'Failed' );
+                        setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; saveStatus.style.color = ''; } }, 10000 );
                     }
                 } )
                 .catch( function () {
                     saveBtn.disabled = false;
-                    if ( saveStatus ) { saveStatus.textContent = 'Request failed.'; setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; } }, 5000 ); }
+                    if ( saveStatus ) { saveStatus.textContent = 'Request failed.'; setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; saveStatus.style.color = ''; } }, 10000 ); }
                 } );
         } );
     }
@@ -642,9 +642,9 @@
                     saveBtn.disabled = false;
                     if ( savedEl ) {
                         savedEl.textContent = resp.success ? '✅ Saved' : '❌ Error';
-                        savedEl.style.color = resp.success ? '' : '#e53e3e';
+                        savedEl.style.color = resp.success ? '#16a34a' : '#dc2626';
                         savedEl.classList.add( 'visible' );
-                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 5000 );
+                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 10000 );
                     }
                     if ( resp.success ) {
                         var perfPanel = document.getElementById( 'cs-perf' );
@@ -659,9 +659,9 @@
                     saveBtn.disabled = false;
                     if ( savedEl ) {
                         savedEl.textContent = '❌ Error';
-                        savedEl.style.color = '#e53e3e';
+                        savedEl.style.color = '#dc2626';
                         savedEl.classList.add( 'visible' );
-                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 5000 );
+                        setTimeout( function () { savedEl.classList.remove( 'visible' ); savedEl.style.color = ''; }, 10000 );
                     }
                 } );
         } );

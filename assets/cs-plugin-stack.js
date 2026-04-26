@@ -337,7 +337,7 @@
                 uptimeSaveStatus.style.display = '';
                 uptimeSaveStatus.style.color = res.success ? '#16a34a' : '#dc2626';
                 uptimeSaveStatus.textContent = res.success ? '✓ Saved' : '✗ Save failed';
-                setTimeout(function () { uptimeSaveStatus.style.display = 'none'; }, 2500);
+                setTimeout(function () { uptimeSaveStatus.style.display = 'none'; }, 10000);
             }).catch(function () { uptimeSaveBtn.disabled = false; });
         });
     }

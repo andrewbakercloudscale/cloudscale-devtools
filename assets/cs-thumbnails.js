@@ -824,7 +824,7 @@
             } ).then( res => {
                 cfSaveBtn.disabled = false;
                 if ( res.success ) {
-                    if ( cfSaved ) { cfSaved.classList.add( 'visible' ); setTimeout( () => cfSaved.classList.remove( 'visible' ), 3000 ); }
+                    if ( cfSaved ) { cfSaved.classList.add( 'visible' ); setTimeout( () => cfSaved.classList.remove( 'visible' ), 10000 ); }
                     if ( cfApiToken ) cfApiToken.value = '';
                 } else {
                     alert( res.data?.message || 'Save failed.' );
@@ -882,7 +882,7 @@
                     if ( res.success ) {
                         if ( platformSaved ) {
                             platformSaved.classList.add( 'visible' );
-                            setTimeout( () => platformSaved.classList.remove( 'visible' ), 3000 );
+                            setTimeout( () => platformSaved.classList.remove( 'visible' ), 10000 );
                         }
                     } else {
                         alert( res.data?.message || 'Save failed.' );
