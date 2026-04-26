@@ -58,10 +58,37 @@ class CSDT_Security_Headers {
                 </label>
             </div>
 
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:0;">
                 <button type="button" id="csdt-sec-headers-save" class="cs-btn-primary cs-btn-sm"><?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?></button>
-                <span id="csdt-sec-headers-msg" style="display:none;font-size:13px;font-weight:600;color:#16a34a;">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                <span id="csdt-sec-headers-msg" class="cs-settings-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
             </div>
+
+            <?php
+            $sh_history = json_decode( get_option( 'csdt_sec_headers_history', '[]' ), true );
+            if ( is_array( $sh_history ) && ! empty( $sh_history ) ) :
+            ?>
+            <div id="csdt-sh-history-wrap" style="margin-top:18px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px;">
+                    <?php echo esc_html( sprintf( __( 'Change History (%d saves)', 'cloudscale-devtools' ), count( $sh_history ) ) ); ?>
+                </div>
+                <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+                <?php foreach ( $sh_history as $idx => $entry ) :
+                    $ts    = $entry['saved_at'] ?? 0;
+                    $label = esc_html( $entry['label'] ?? 'Settings saved' );
+                    $age   = $ts ? esc_html( human_time_diff( $ts ) . ' ago' ) : '';
+                    $bg    = $idx % 2 === 0 ? '#fff' : '#f8fafc';
+                ?>
+                    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:<?php echo esc_attr( $bg ); ?>;<?php echo $idx > 0 ? 'border-top:1px solid #e2e8f0;' : ''; ?>">
+                        <span style="color:#94a3b8;font-size:11px;white-space:nowrap;min-width:95px;"><?php echo $age; ?></span>
+                        <span style="flex:1;font-size:12px;color:#334155;"><?php echo $label; ?></span>
+                        <button type="button" class="csdt-sh-restore-btn" data-index="<?php echo (int) $idx; ?>"
+                                style="background:none;border:1px solid #94a3b8;color:#475569;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;">&#x21A9; <?php esc_html_e( 'Restore', 'cloudscale-devtools' ); ?></button>
+                    </div>
+                <?php endforeach; ?>
+                </div>
+                <div id="csdt-sh-restore-msg" style="display:none;margin-top:6px;font-size:12px;font-weight:600;color:#16a34a;"></div>
+            </div>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -73,10 +100,80 @@ class CSDT_Security_Headers {
         }
         $enabled = isset( $_POST['enabled'] ) && '1' === $_POST['enabled'] ? '1' : '0'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $ext_ack = isset( $_POST['ext_ack'] ) && '1' === $_POST['ext_ack']  ? '1' : '0'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+
+        $old = [
+            'enabled' => get_option( 'csdt_devtools_safe_headers_enabled', '0' ),
+            'ext_ack' => get_option( 'csdt_devtools_sec_headers_ack', '0' ),
+        ];
+        $new = [ 'enabled' => $enabled, 'ext_ack' => $ext_ack ];
+
+        // Push old state to rolling 10-entry history before overwriting.
+        $history = json_decode( get_option( 'csdt_sec_headers_history', '[]' ), true );
+        if ( ! is_array( $history ) ) { $history = []; }
+        array_unshift( $history, array_merge( $old, [
+            'saved_at' => time(),
+            'label'    => self::sec_headers_history_label( $old, $new ),
+        ] ) );
+        update_option( 'csdt_sec_headers_history', wp_json_encode( array_slice( $history, 0, 10 ) ) );
+
         update_option( 'csdt_devtools_safe_headers_enabled', $enabled );
         update_option( 'csdt_devtools_sec_headers_ack',      $ext_ack );
         delete_transient( 'csdt_sec_headers_check' );
-        wp_send_json_success();
+
+        wp_send_json_success( [
+            'history_entry' => [
+                'enabled'  => $old['enabled'],
+                'ext_ack'  => $old['ext_ack'],
+                'saved_at' => time(),
+                'label'    => self::sec_headers_history_label( $old, $new ),
+                'index'    => 0,
+            ],
+        ] );
+    }
+
+    public static function ajax_sec_headers_restore(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $idx     = isset( $_POST['index'] ) ? (int) wp_unslash( $_POST['index'] ) : -1;
+        $history = json_decode( get_option( 'csdt_sec_headers_history', '[]' ), true );
+        if ( ! is_array( $history ) || ! isset( $history[ $idx ] ) ) {
+            wp_send_json_error( 'History entry not found.' );
+        }
+
+        $entry = $history[ $idx ];
+
+        // Push current live state to history before restoring.
+        $current = [
+            'enabled'  => get_option( 'csdt_devtools_safe_headers_enabled', '0' ),
+            'ext_ack'  => get_option( 'csdt_devtools_sec_headers_ack', '0' ),
+            'saved_at' => time(),
+            'label'    => 'Before restore to: ' . ( $entry['label'] ?? 'previous state' ),
+        ];
+        array_unshift( $history, $current );
+        update_option( 'csdt_sec_headers_history', wp_json_encode( array_slice( $history, 0, 10 ) ) );
+
+        update_option( 'csdt_devtools_safe_headers_enabled', $entry['enabled'] ?? '0' );
+        update_option( 'csdt_devtools_sec_headers_ack',      $entry['ext_ack'] ?? '0' );
+        delete_transient( 'csdt_sec_headers_check' );
+
+        wp_send_json_success( [
+            'enabled' => $entry['enabled'] ?? '0',
+            'ext_ack' => $entry['ext_ack'] ?? '0',
+        ] );
+    }
+
+    private static function sec_headers_history_label( array $old, array $new ): string {
+        $parts = [];
+        if ( $old['enabled'] !== $new['enabled'] ) {
+            $parts[] = $new['enabled'] === '1' ? 'Headers enabled' : 'Headers disabled';
+        }
+        if ( $old['ext_ack'] !== $new['ext_ack'] ) {
+            $parts[] = $new['ext_ack'] === '1' ? 'Set Externally on' : 'Set Externally off';
+        }
+        return $parts ? implode( '; ', $parts ) : 'Settings saved';
     }
 
     public static function ajax_scan_headers(): void {

@@ -408,21 +408,26 @@ class CSDT_CSP {
         $services = array_values( array_intersect( $services, $allowed_services ) );
 
         $old = [
-            'enabled'  => get_option( 'csdt_devtools_csp_enabled', '0' ),
-            'mode'     => get_option( 'csdt_devtools_csp_mode', 'enforce' ),
-            'services' => json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true ),
-            'custom'   => get_option( 'csdt_devtools_csp_custom', '' ),
+            'enabled'           => get_option( 'csdt_devtools_csp_enabled', '0' ),
+            'mode'              => get_option( 'csdt_devtools_csp_mode', 'enforce' ),
+            'services'          => json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true ),
+            'custom'            => get_option( 'csdt_devtools_csp_custom', '' ),
+            'reporting_enabled' => get_option( 'csdt_csp_reporting_enabled', '0' ),
         ];
-        $new = [ 'enabled' => $enabled, 'mode' => $mode, 'services' => $services, 'custom' => $custom ];
+        $new = [ 'enabled' => $enabled, 'mode' => $mode, 'services' => $services, 'custom' => $custom, 'reporting_enabled' => $reporting_enabled ];
 
         // Push current state to rolling 10-entry history before overwriting.
         $history = json_decode( get_option( 'csdt_csp_history', '[]' ), true );
         if ( ! is_array( $history ) ) { $history = []; }
-        array_unshift( $history, array_merge( $old, [
-            'saved_at' => time(),
-            'label'    => self::csp_history_label( $old, $new ),
-            'services' => wp_json_encode( $old['services'] ),
-        ] ) );
+        array_unshift( $history, [
+            'enabled'           => $old['enabled'],
+            'mode'              => $old['mode'],
+            'services'          => wp_json_encode( $old['services'] ),
+            'custom'            => $old['custom'],
+            'reporting_enabled' => $old['reporting_enabled'],
+            'saved_at'          => time(),
+            'label'             => self::csp_history_label( $old, $new ),
+        ] );
         update_option( 'csdt_csp_history', wp_json_encode( array_slice( $history, 0, 10 ) ) );
 
         // Single-step rollback backup (legacy).
@@ -507,12 +512,13 @@ class CSDT_CSP {
         // Push current live state to the top of history before restoring.
         $current_services = json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true );
         $current = [
-            'enabled'  => get_option( 'csdt_devtools_csp_enabled', '0' ),
-            'mode'     => get_option( 'csdt_devtools_csp_mode', 'enforce' ),
-            'services' => wp_json_encode( is_array( $current_services ) ? $current_services : [] ),
-            'custom'   => get_option( 'csdt_devtools_csp_custom', '' ),
-            'saved_at' => time(),
-            'label'    => 'Before restore to: ' . ( $entry['label'] ?? 'previous state' ),
+            'enabled'           => get_option( 'csdt_devtools_csp_enabled', '0' ),
+            'mode'              => get_option( 'csdt_devtools_csp_mode', 'enforce' ),
+            'services'          => wp_json_encode( is_array( $current_services ) ? $current_services : [] ),
+            'custom'            => get_option( 'csdt_devtools_csp_custom', '' ),
+            'reporting_enabled' => get_option( 'csdt_csp_reporting_enabled', '0' ),
+            'saved_at'          => time(),
+            'label'             => 'Before restore to: ' . ( $entry['label'] ?? 'previous state' ),
         ];
         array_unshift( $history, $current );
         update_option( 'csdt_csp_history', wp_json_encode( array_slice( $history, 0, 10 ) ) );
@@ -520,16 +526,18 @@ class CSDT_CSP {
         $entry_services = json_decode( $entry['services'] ?? '[]', true );
         if ( ! is_array( $entry_services ) ) { $entry_services = []; }
 
-        update_option( 'csdt_devtools_csp_enabled',  $entry['enabled'] ?? '0' );
-        update_option( 'csdt_devtools_csp_mode',     $entry['mode']    ?? 'enforce' );
-        update_option( 'csdt_devtools_csp_services', wp_json_encode( $entry_services ) );
-        update_option( 'csdt_devtools_csp_custom',   $entry['custom']  ?? '' );
+        update_option( 'csdt_devtools_csp_enabled',    $entry['enabled'] ?? '0' );
+        update_option( 'csdt_devtools_csp_mode',       $entry['mode']    ?? 'enforce' );
+        update_option( 'csdt_devtools_csp_services',   wp_json_encode( $entry_services ) );
+        update_option( 'csdt_devtools_csp_custom',     $entry['custom']  ?? '' );
+        update_option( 'csdt_csp_reporting_enabled',   $entry['reporting_enabled'] ?? '0' );
 
         wp_send_json_success( [
-            'enabled'  => $entry['enabled']  ?? '0',
-            'mode'     => $entry['mode']     ?? 'enforce',
-            'services' => $entry_services,
-            'custom'   => $entry['custom']   ?? '',
+            'enabled'           => $entry['enabled']           ?? '0',
+            'mode'              => $entry['mode']              ?? 'enforce',
+            'services'          => $entry_services,
+            'custom'            => $entry['custom']            ?? '',
+            'reporting_enabled' => $entry['reporting_enabled'] ?? '0',
         ] );
     }
 

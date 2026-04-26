@@ -159,7 +159,8 @@ class CSDT_Monitor {
 
         // Email alert
         if ( get_option( 'csdt_scan_schedule_email', '1' ) === '1' ) {
-            wp_mail( get_option( 'admin_email' ), $subject, $body );
+            $to = get_option( 'csdt_notify_email', '' ) ?: get_option( 'admin_email' );
+            wp_mail( $to, $subject, $body );
         }
 
         // ntfy.sh push notification

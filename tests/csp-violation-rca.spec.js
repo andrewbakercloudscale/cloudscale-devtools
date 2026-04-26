@@ -1,6 +1,10 @@
 /**
- * CSP Violation RCA — enables violation reporting, browses key pages as a
- * visitor, then reads the violation log to surface root causes.
+ * CSP Health Check — two phases:
+ *   1. Discovery: runs with the production presets to verify the site is clean.
+ *      Prints a grouped violation report so any new third-party domains are easy
+ *      to spot. Fails if violations appear.
+ *   2. (Optional) Raw scan: re-run with no allowlist to surface any NEW domains
+ *      not yet in a preset. Prints only — does not fail.
  *
  * Run:  npx playwright test tests/csp-violation-rca.spec.js --headed --project=chromium
  */
@@ -18,17 +22,22 @@ const ROLE        = process.env.CSDT_TEST_ROLE       || '';
 const SESSION_URL = process.env.CSDT_TEST_SESSION_URL || '';
 const LOGOUT_URL  = process.env.CSDT_TEST_LOGOUT_URL  || '';
 const ADMIN_TAB   = `${SITE}/wp-admin/tools.php?page=cloudscale-devtools&tab=security`;
-const NONCE_URL   = `${SITE}/wp-admin/tools.php?page=cloudscale-devtools`;
 
-const PAGES_TO_BROWSE = [
-    '/',
-    '/blog/',
-    '/posts/',
+// Services that are known to be used on this site and are covered by presets.
+const PRODUCTION_SERVICES = [
+    'google_adsense',
+    'google_fonts',
+    'google_analytics',
+    'google_tag_manager',
+    'cloudflare_insights',
+    'recaptcha',
 ];
 
-test.setTimeout(120_000);
+const PAGES_TO_BROWSE = ['/', '/blog/', '/posts/'];
 
-async function getAdminSession(ttl = 1200) {
+test.setTimeout(180_000);
+
+async function getAdminSession(ttl = 1800) {
     const ctx  = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
     const resp = await ctx.post(SESSION_URL, { data: { secret: SECRET, role: ROLE, ttl } });
     const body = await resp.json().catch(() => resp.text());
@@ -50,15 +59,76 @@ async function wpAjax(page, action, extra = {}) {
     const nonce = await page.evaluate(() => {
         const el = document.querySelector('[data-nonce], #_csdt_nonce');
         if (el) return el.dataset.nonce || el.value;
-        // csdtVulnScan is inlined on the page
         return typeof csdtVulnScan !== 'undefined' ? csdtVulnScan.nonce : null;
     });
-
     const body = new URLSearchParams({ action, nonce: nonce || '', ...extra });
     return page.evaluate(async ({ url, b }) => {
         const r = await fetch(url, { method: 'POST', body: new URLSearchParams(b) });
         return r.json();
     }, { url: `${SITE}/wp-admin/admin-ajax.php`, b: Object.fromEntries(body) });
+}
+
+async function browsePages(browser) {
+    const ctx  = await browser.newContext({ ignoreHTTPSErrors: true });
+    const page = await ctx.newPage();
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(e.message));
+
+    for (const slug of PAGES_TO_BROWSE) {
+        console.log(`  → ${SITE}${slug}`);
+        try {
+            await page.goto(`${SITE}${slug}`, { waitUntil: 'networkidle', timeout: 30_000 });
+            await page.waitForTimeout(3_000);
+        } catch (e) {
+            console.warn(`  ! ${slug}: ${e.message}`);
+        }
+    }
+    // Browse a single post.
+    try {
+        await page.goto(SITE, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+        const postLink = await page.$('a[href*="/20"]');
+        if (postLink) {
+            const href = await postLink.getAttribute('href');
+            console.log(`  → ${href} (single post)`);
+            await page.goto(href, { waitUntil: 'networkidle', timeout: 30_000 });
+            await page.waitForTimeout(3_000);
+        }
+    } catch {}
+
+    await ctx.close();
+    return pageErrors;
+}
+
+function printViolationReport(violations, pageErrors, label) {
+    console.log('\n════════════════════════════════════════════════════════');
+    console.log(`  CSP VIOLATION REPORT — ${label}`);
+    console.log('════════════════════════════════════════════════════════');
+
+    if (!violations.length) {
+        console.log('  No violations recorded.');
+    } else {
+        const grouped = {};
+        violations.forEach(v => {
+            const key = `${v.directive} | ${v.blocked}`;
+            if (!grouped[key]) grouped[key] = { directive: v.directive, blocked: v.blocked, pages: new Set(), count: 0 };
+            grouped[key].count++;
+            if (v.page) grouped[key].pages.add(v.page.replace(/^https?:\/\/[^/]+/, ''));
+        });
+        const sorted = Object.values(grouped).sort((a, b) => b.count - a.count);
+        console.log(`  Total violations: ${violations.length} across ${sorted.length} unique blocked URIs\n`);
+        sorted.forEach((g, i) => {
+            console.log(`  ${i + 1}. [${g.directive}]`);
+            console.log(`     Blocked:  ${g.blocked || '(inline/eval)'}`);
+            console.log(`     Count:    ${g.count}`);
+            console.log(`     Pages:    ${[...g.pages].slice(0, 3).join(', ') || '/'}`);
+            console.log();
+        });
+    }
+    if (pageErrors.length) {
+        console.log('  Browser JS errors:');
+        [...new Set(pageErrors)].forEach(e => console.log(`    • ${e}`));
+    }
+    console.log('════════════════════════════════════════════════════════\n');
 }
 
 test.afterAll(async () => {
@@ -70,10 +140,8 @@ test.afterAll(async () => {
     } catch {}
 });
 
-test('CSP violation RCA', async ({ browser }) => {
-    // ── 1. Admin context: enable CSP report-only + logging, clear old log ──
-    console.log('\n[RCA] Step 1: enabling CSP report-only + violation logging…');
-    const sess    = await getAdminSession();
+test('CSP health check — production presets produce zero violations', async ({ browser }) => {
+    const sess     = await getAdminSession();
     const adminCtx = await browser.newContext({ ignoreHTTPSErrors: true });
     await injectCookies(adminCtx, sess);
     const adminPage = await adminCtx.newPage();
@@ -81,115 +149,64 @@ test('CSP violation RCA', async ({ browser }) => {
     await adminPage.goto(ADMIN_TAB, { waitUntil: 'domcontentloaded' });
     await adminPage.waitForSelector('#cs-csp-enabled', { timeout: 15_000 });
 
-    // Clear the existing violation log before the browse.
-    const clearResp = await wpAjax(adminPage, 'csdt_devtools_csp_violations_clear');
-    console.log('[RCA] Violation log cleared:', clearResp?.success ? 'OK' : JSON.stringify(clearResp));
-
-    // Enable CSP + report-only + logging via AJAX so we don't fight the UI state.
-    const saveResp = await wpAjax(adminPage, 'csdt_devtools_csp_save', {
+    // ── Phase 1: verify with production presets ──────────────────────────
+    console.log('\n[HEALTH] Enabling CSP report-only with production presets…');
+    await wpAjax(adminPage, 'csdt_devtools_csp_violations_clear');
+    await wpAjax(adminPage, 'csdt_devtools_csp_save', {
         enabled:           '1',
         mode:              'report_only',
         reporting_enabled: '1',
-        services:          JSON.stringify([]),   // no allowlist — capture everything
+        services:          JSON.stringify(PRODUCTION_SERVICES),
         custom:            '',
     });
-    console.log('[RCA] CSP settings saved:', saveResp?.success ? 'OK' : JSON.stringify(saveResp));
 
-    // ── 2. Visitor context: browse key pages so the browser sends violation reports ──
-    console.log('\n[RCA] Step 2: browsing site as visitor…');
-    const visitorCtx  = await browser.newContext({ ignoreHTTPSErrors: true });
-    const visitorPage = await visitorCtx.newPage();
-
-    // Collect browser-side pageerrors too (cross-origin errors show up here).
-    const pageErrors = [];
-    visitorPage.on('pageerror', e => pageErrors.push(e.message));
-
-    for (const slug of PAGES_TO_BROWSE) {
-        console.log(`  → ${SITE}${slug}`);
-        try {
-            await visitorPage.goto(`${SITE}${slug}`, { waitUntil: 'networkidle', timeout: 30_000 });
-            // Linger 3 s so the browser finishes sending CSP reports.
-            await visitorPage.waitForTimeout(3_000);
-        } catch (e) {
-            console.warn(`  ! ${slug}: ${e.message}`);
-        }
-    }
-
-    // Browse a single post if one exists.
-    try {
-        await visitorPage.goto(SITE, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-        const postLink = await visitorPage.$('a[href*="/20"]'); // year-based permalink
-        if (postLink) {
-            const href = await postLink.getAttribute('href');
-            console.log(`  → ${href} (single post)`);
-            await visitorPage.goto(href, { waitUntil: 'networkidle', timeout: 30_000 });
-            await visitorPage.waitForTimeout(3_000);
-        }
-    } catch {}
-
-    await visitorCtx.close();
-
-    // Give the server a moment to flush any in-flight violation POST bodies.
+    console.log('[HEALTH] Browsing as visitor…');
+    const pageErrors1 = await browsePages(browser);
     await adminPage.waitForTimeout(2_000);
 
-    // ── 3. Admin context: read the violation log ─────────────────────────
-    console.log('\n[RCA] Step 3: reading violation log…');
-    const violResp = await wpAjax(adminPage, 'csdt_devtools_csp_violations_get');
-    const violations = violResp?.data || [];
+    const resp1 = await wpAjax(adminPage, 'csdt_devtools_csp_violations_get');
+    const violations1 = resp1?.data || [];
+    printViolationReport(violations1, pageErrors1, 'with production presets');
 
-    // ── 4. Restore CSP to its previous state (enforce, reporting off) ────
+    // ── Phase 2: raw scan with no allowlist (informational only) ─────────
+    console.log('[DISCOVERY] Scanning with empty allowlist to surface unknown domains…');
+    await wpAjax(adminPage, 'csdt_devtools_csp_violations_clear');
     await wpAjax(adminPage, 'csdt_devtools_csp_save', {
         enabled:           '1',
-        mode:              'enforce',
-        reporting_enabled: '0',
-        services:          JSON.stringify(['google_adsense']),
+        mode:              'report_only',
+        reporting_enabled: '1',
+        services:          JSON.stringify([]),
         custom:            '',
     });
-    console.log('[RCA] CSP restored to enforce mode, reporting off.');
+
+    console.log('[DISCOVERY] Browsing as visitor…');
+    const pageErrors2 = await browsePages(browser);
+    await adminPage.waitForTimeout(2_000);
+
+    const resp2 = await wpAjax(adminPage, 'csdt_devtools_csp_violations_get');
+    const violations2 = resp2?.data || [];
+    printViolationReport(violations2, pageErrors2, 'raw scan (empty allowlist)');
+
+    // ── Restore to production settings ───────────────────────────────────
+    await wpAjax(adminPage, 'csdt_devtools_csp_violations_clear');
+    await wpAjax(adminPage, 'csdt_devtools_csp_save', {
+        enabled:           '1',
+        mode:              'report_only',
+        reporting_enabled: '1',
+        services:          JSON.stringify(PRODUCTION_SERVICES),
+        custom:            '',
+    });
+    console.log('[HEALTH] Restored to production settings (report_only, logging on).');
 
     await adminPage.close();
     await adminCtx.close();
 
-    // ── 5. Report ─────────────────────────────────────────────────────────
-    console.log('\n════════════════════════════════════════════════════════');
-    console.log('  CSP VIOLATION REPORT');
-    console.log('════════════════════════════════════════════════════════');
-
-    if (!violations.length) {
-        console.log('  No violations recorded — allowlist may already cover everything.');
-    } else {
-        // Group by blocked URI to find the most frequent offenders.
-        const grouped = {};
-        violations.forEach(v => {
-            const key = `${v.directive} | ${v.blocked}`;
-            if (!grouped[key]) grouped[key] = { directive: v.directive, blocked: v.blocked, pages: new Set(), count: 0 };
-            grouped[key].count++;
-            if (v.page) grouped[key].pages.add(v.page.replace(/^https?:\/\/[^/]+/, ''));
-        });
-
-        const sorted = Object.values(grouped).sort((a, b) => b.count - a.count);
-        console.log(`  Total violations: ${violations.length} across ${sorted.length} unique blocked URIs\n`);
-
-        sorted.forEach((g, i) => {
-            console.log(`  ${i + 1}. [${g.directive}]`);
-            console.log(`     Blocked:  ${g.blocked || '(inline/eval)'}`);
-            console.log(`     Count:    ${g.count}`);
-            console.log(`     Pages:    ${[...g.pages].slice(0, 3).join(', ') || '/'}`);
-            console.log();
-        });
-    }
-
-    if (pageErrors.length) {
-        console.log('  Browser JS errors captured:');
-        [...new Set(pageErrors)].forEach(e => console.log(`    • ${e}`));
-    }
-
-    console.log('════════════════════════════════════════════════════════\n');
-
-    // Fail the test only if there are unexpected violations (not 'inline'/'eval'
-    // which are expected with Google AdSense and analytics scripts).
-    const unexpected = violations.filter(v =>
+    // ── Assert: production presets must produce zero violations ──────────
+    const unexpected = violations1.filter(v =>
         v.blocked !== 'inline' && v.blocked !== 'eval' && v.blocked !== ''
     );
-    expect(unexpected.length, `${unexpected.length} unexpected violations — see console output above`).toBe(0);
+    expect(
+        unexpected.length,
+        `${unexpected.length} violation(s) not covered by production presets — see console output above`
+    ).toBe(0);
 });

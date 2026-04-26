@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.542
+ * Version: 1.9.545
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.542';
+    const VERSION      = '1.9.545';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -388,6 +388,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_logs_custom_save',       [ __CLASS__, 'ajax_logs_custom_save' ] );
         add_action( 'wp_ajax_csdt_devtools_scan_history',       [ 'CSDT_Site_Audit', 'ajax_scan_history' ] );
         add_action( 'wp_ajax_csdt_devtools_save_schedule',      [ 'CSDT_Site_Audit', 'ajax_save_schedule' ] );
+        add_action( 'wp_ajax_csdt_devtools_save_notify',        [ 'CSDT_Site_Audit', 'ajax_save_notify' ] );
+        add_action( 'wp_ajax_csdt_sec_headers_restore',         [ 'CSDT_Security_Headers', 'ajax_sec_headers_restore' ] );
         add_action( 'wp_ajax_csdt_devtools_quick_fix',          [ 'CSDT_Site_Audit', 'ajax_apply_quick_fix' ] );
         add_action( 'wp_ajax_csdt_db_prefix_preflight',         [ 'CSDT_Site_Audit', 'ajax_db_prefix_preflight' ] );
         add_action( 'wp_ajax_csdt_db_prefix_migrate',           [ 'CSDT_Site_Audit', 'ajax_db_prefix_migrate' ] );
@@ -4418,9 +4420,10 @@ class CloudScale_DevTools {
         $sched_enabled  = get_option( 'csdt_scan_schedule_enabled', '0' ) === '1';
         $sched_freq     = get_option( 'csdt_scan_schedule_freq',    'weekly' );
         $sched_type     = get_option( 'csdt_scan_schedule_type',    'deep' );
-        $sched_email    = get_option( 'csdt_scan_schedule_email',   '1' ) === '1';
-        $sched_ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
-        $sched_ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
+        $notify_enabled  = get_option( 'csdt_scan_schedule_email',   '1' ) === '1';
+        $notify_email    = get_option( 'csdt_notify_email', '' );
+        $notify_ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
+        $notify_ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
         $next_run       = wp_next_scheduled( 'csdt_scheduled_scan' );
         ?>
         <?php $site_audit_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=site-audit' ); ?>
@@ -4648,6 +4651,64 @@ class CloudScale_DevTools {
 
                 <hr class="cs-sec-divider">
 
+                <!-- Notifications -->
+                <div class="cs-sec-settings" style="margin-top:0;padding-top:0;">
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label" style="font-weight:600;"><?php esc_html_e( 'Notifications:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <span class="cs-hint"><?php esc_html_e( 'Global alert settings for scheduled scans, threat monitor, and uptime monitor.', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                    </div>
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'Send email alerts:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="cs-notify-email-enabled" <?php checked( $notify_enabled ); ?>>
+                                <span><?php printf( esc_html__( 'Send to %s', 'cloudscale-devtools' ), '<strong>' . esc_html( get_option( 'admin_email' ) ) . '</strong>' ); ?></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'Email override:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <input type="email" id="cs-notify-email" class="cs-text-input"
+                                   placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>"
+                                   value="<?php echo esc_attr( $notify_email ); ?>"
+                                   style="max-width:280px;">
+                            <span class="cs-hint"><?php esc_html_e( 'Leave blank to use the admin email above.', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                    </div>
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'ntfy.sh topic:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <input type="text" id="cs-notify-ntfy-url" class="cs-text-input"
+                                   placeholder="https://ntfy.sh/your-topic"
+                                   value="<?php echo esc_attr( $notify_ntfy_url ); ?>"
+                                   style="max-width:320px;">
+                            <span class="cs-hint"><?php echo wp_kses( __( 'Optional push notification via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a>.', 'cloudscale-devtools' ), [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></span>
+                        </div>
+                    </div>
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"><?php esc_html_e( 'ntfy auth token:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <input type="password" id="cs-notify-ntfy-token" class="cs-text-input"
+                                   autocomplete="off" placeholder="<?php echo $notify_ntfy_tok ? '&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;' : esc_attr__( 'Optional — for protected topics', 'cloudscale-devtools' ); ?>"
+                                   style="max-width:320px;">
+                        </div>
+                    </div>
+                    <div class="cs-sec-row">
+                        <span class="cs-sec-label"></span>
+                        <div class="cs-sec-control">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <button type="button" class="cs-btn-primary" id="cs-notify-save">&#x1F4BE; <?php esc_html_e( 'Save Notification Settings', 'cloudscale-devtools' ); ?></button>
+                                <span class="cs-settings-saved" id="cs-notify-saved">&#x2713; <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="cs-sec-divider">
+
                 <!-- Scheduled scan -->
                 <div class="cs-sec-settings" style="margin-top:0;padding-top:0;">
                     <div class="cs-sec-row">
@@ -4679,33 +4740,6 @@ class CloudScale_DevTools {
                                     <option value="standard" <?php selected( $sched_type, 'standard' ); ?>><?php esc_html_e( 'AI Cyber Audit (fast)', 'cloudscale-devtools' ); ?></option>
                                     <option value="deep"     <?php selected( $sched_type, 'deep' ); ?>><?php esc_html_e( 'AI Deep Dive Cyber Audit (comprehensive)', 'cloudscale-devtools' ); ?></option>
                                 </select>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'Notify via email:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                    <input type="checkbox" id="cs-sched-email" <?php checked( $sched_email ); ?>>
-                                    <span><?php printf( esc_html__( 'Send results to %s', 'cloudscale-devtools' ), '<strong>' . esc_html( get_option( 'admin_email' ) ) . '</strong>' ); ?></span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'ntfy.sh topic:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <input type="text" id="cs-sched-ntfy-url" class="cs-text-input"
-                                       placeholder="https://ntfy.sh/your-topic"
-                                       value="<?php echo esc_attr( $sched_ntfy_url ); ?>"
-                                       style="max-width:320px;">
-                                <span class="cs-hint"><?php echo wp_kses( __( 'Optional push notification via <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a>.', 'cloudscale-devtools' ), [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ] ); ?></span>
-                            </div>
-                        </div>
-                        <div class="cs-sec-row">
-                            <span class="cs-sec-label"><?php esc_html_e( 'ntfy auth token:', 'cloudscale-devtools' ); ?></span>
-                            <div class="cs-sec-control">
-                                <input type="password" id="cs-sched-ntfy-token" class="cs-text-input"
-                                       autocomplete="off" placeholder="<?php echo $sched_ntfy_tok ? '&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;' : esc_attr__( 'Optional — for protected topics', 'cloudscale-devtools' ); ?>"
-                                       style="max-width:320px;">
                             </div>
                         </div>
                         <div class="cs-sec-row">

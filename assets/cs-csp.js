@@ -162,9 +162,11 @@
                         cb.checked = Array.isArray(d.services) && d.services.indexOf(cb.value) !== -1;
                     });
                     if (customIn) customIn.value = d.custom || '';
+                    var repEl = document.getElementById('cs-csp-reporting');
+                    if (repEl) repEl.checked = d.reporting_enabled === '1';
                     buildPreview();
                     var msg = document.getElementById('cs-csp-restore-msg');
-                    if (msg) { msg.style.display = 'block'; msg.textContent = '↩ Restored — click Save CSP Settings to apply.'; }
+                    if (msg) { msg.style.display = 'block'; msg.textContent = '✅ Restored and saved.'; setTimeout(function(){ msg.style.display = 'none'; }, 5000); }
                     btn.textContent = '✅ Restored';
                 })
                 .catch(function() { btn.disabled = false; btn.textContent = '↩ Restore'; });

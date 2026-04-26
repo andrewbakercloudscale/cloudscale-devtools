@@ -582,9 +582,6 @@
         var schedOptions  = document.getElementById('cs-sched-options');
         var schedFreq     = document.getElementById('cs-sched-freq');
         var schedType     = document.getElementById('cs-sched-type');
-        var schedEmail    = document.getElementById('cs-sched-email');
-        var schedNtfyUrl  = document.getElementById('cs-sched-ntfy-url');
-        var schedNtfyTok  = document.getElementById('cs-sched-ntfy-token');
         var schedSaveBtn  = document.getElementById('cs-sched-save');
         var schedSavedMsg = document.getElementById('cs-sched-saved');
 
@@ -604,12 +601,9 @@
             schedSaveBtn.addEventListener('click', function () {
                 schedSaveBtn.disabled = true;
                 var params = {
-                    enabled:      schedEnabled && schedEnabled.checked ? '1' : '0',
-                    freq:         schedFreq    ? schedFreq.value    : 'weekly',
-                    type:         schedType    ? schedType.value    : 'deep',
-                    email_notify: schedEmail   && schedEmail.checked ? '1' : '0',
-                    ntfy_url:     schedNtfyUrl ? schedNtfyUrl.value.trim() : '',
-                    ntfy_token:   schedNtfyTok ? schedNtfyTok.value.trim() : '',
+                    enabled: schedEnabled && schedEnabled.checked ? '1' : '0',
+                    freq:    schedFreq    ? schedFreq.value    : 'weekly',
+                    type:    schedType    ? schedType.value    : 'deep',
                 };
                 post('csdt_devtools_save_schedule', params)
                     .then(function (res) {
@@ -617,18 +611,54 @@
                         if (schedSavedMsg) {
                             schedSavedMsg.textContent = res.success ? '✅ Saved' : '❌ Error';
                             schedSavedMsg.style.color = res.success ? '' : '#e53e3e';
-                            schedSavedMsg.style.opacity = '1';
-                            setTimeout(function () { schedSavedMsg.style.opacity = '0'; schedSavedMsg.style.color = ''; }, 5000);
+                            schedSavedMsg.classList.add('visible');
+                            setTimeout(function () { schedSavedMsg.classList.remove('visible'); schedSavedMsg.style.color = ''; }, 5000);
                         }
-                        if (res.success && schedNtfyTok) { schedNtfyTok.value = ''; schedNtfyTok.placeholder = '••••••••'; }
                     })
                     .catch(function () {
                         schedSaveBtn.disabled = false;
                         if (schedSavedMsg) {
                             schedSavedMsg.textContent = '❌ Error';
                             schedSavedMsg.style.color = '#e53e3e';
-                            schedSavedMsg.style.opacity = '1';
-                            setTimeout(function () { schedSavedMsg.style.opacity = '0'; schedSavedMsg.style.color = ''; }, 5000);
+                            schedSavedMsg.classList.add('visible');
+                            setTimeout(function () { schedSavedMsg.classList.remove('visible'); schedSavedMsg.style.color = ''; }, 5000);
+                        }
+                    });
+            });
+        }
+
+        // ── Notifications save ────────────────────────────────────────
+        var notifySaveBtn  = document.getElementById('cs-notify-save');
+        var notifySavedMsg = document.getElementById('cs-notify-saved');
+        var notifyNtfyTok  = document.getElementById('cs-notify-ntfy-token');
+
+        if (notifySaveBtn) {
+            notifySaveBtn.addEventListener('click', function () {
+                notifySaveBtn.disabled = true;
+                var params = {
+                    email_enabled: document.getElementById('cs-notify-email-enabled')?.checked ? '1' : '0',
+                    email_to:      (document.getElementById('cs-notify-email')?.value || '').trim(),
+                    ntfy_url:      (document.getElementById('cs-notify-ntfy-url')?.value || '').trim(),
+                    ntfy_token:    (notifyNtfyTok?.value || '').trim(),
+                };
+                post('csdt_devtools_save_notify', params)
+                    .then(function (res) {
+                        notifySaveBtn.disabled = false;
+                        if (notifySavedMsg) {
+                            notifySavedMsg.textContent = res.success ? '✅ Saved' : '❌ Error';
+                            notifySavedMsg.style.color = res.success ? '' : '#e53e3e';
+                            notifySavedMsg.classList.add('visible');
+                            setTimeout(function () { notifySavedMsg.classList.remove('visible'); notifySavedMsg.style.color = ''; }, 5000);
+                        }
+                        if (res.success && notifyNtfyTok) { notifyNtfyTok.value = ''; notifyNtfyTok.placeholder = '••••••••'; }
+                    })
+                    .catch(function () {
+                        notifySaveBtn.disabled = false;
+                        if (notifySavedMsg) {
+                            notifySavedMsg.textContent = '❌ Error';
+                            notifySavedMsg.style.color = '#e53e3e';
+                            notifySavedMsg.classList.add('visible');
+                            setTimeout(function () { notifySavedMsg.classList.remove('visible'); notifySavedMsg.style.color = ''; }, 5000);
                         }
                     });
             });

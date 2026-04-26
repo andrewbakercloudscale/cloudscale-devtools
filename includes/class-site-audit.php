@@ -673,19 +673,10 @@ bantime  = 86400</pre>
         $enabled   = ! empty( $_POST['enabled'] ) && $_POST['enabled'] === '1';
         $freq      = in_array( $_POST['freq']  ?? '', [ 'weekly', 'monthly' ], true ) ? sanitize_key( $_POST['freq'] ) : 'weekly';
         $type      = in_array( $_POST['type']  ?? '', [ 'standard', 'deep' ], true )  ? sanitize_key( $_POST['type'] ) : 'deep';
-        $email     = ! empty( $_POST['email_notify'] ) && $_POST['email_notify'] === '1';
-        $ntfy_url  = esc_url_raw( wp_unslash( $_POST['ntfy_url']   ?? '' ) );
-        $ntfy_tok  = sanitize_text_field( wp_unslash( $_POST['ntfy_token'] ?? '' ) );
-        $ntfy_tok  = trim( str_replace( '•', '', $ntfy_tok ) );
 
         update_option( 'csdt_scan_schedule_enabled',    $enabled ? '1' : '0', false );
         update_option( 'csdt_scan_schedule_freq',       $freq,                false );
         update_option( 'csdt_scan_schedule_type',       $type,                false );
-        update_option( 'csdt_scan_schedule_email',      $email ? '1' : '0',   false );
-        update_option( 'csdt_scan_schedule_ntfy_url',   $ntfy_url,            false );
-        if ( $ntfy_tok !== '' ) {
-            update_option( 'csdt_scan_schedule_ntfy_token', $ntfy_tok, false );
-        }
 
         // Re-register cron event
         wp_clear_scheduled_hook( 'csdt_scheduled_scan' );
@@ -700,6 +691,28 @@ bantime  = 86400</pre>
             'saved'    => true,
             'next_run' => $next_run ? wp_date( 'D j M Y, g:ia', $next_run ) : null,
         ] );
+    }
+
+    public static function ajax_save_notify(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $email_enabled = ! empty( $_POST['email_enabled'] ) && $_POST['email_enabled'] === '1';
+        $email_to      = sanitize_email( wp_unslash( $_POST['email_to'] ?? '' ) );
+        $ntfy_url      = esc_url_raw( wp_unslash( $_POST['ntfy_url']   ?? '' ) );
+        $ntfy_tok      = sanitize_text_field( wp_unslash( $_POST['ntfy_token'] ?? '' ) );
+        $ntfy_tok      = trim( str_replace( "\u{2022}", '', $ntfy_tok ) );
+
+        update_option( 'csdt_scan_schedule_email',  $email_enabled ? '1' : '0', false );
+        update_option( 'csdt_notify_email',         $email_to,                  false );
+        update_option( 'csdt_scan_schedule_ntfy_url', $ntfy_url,                false );
+        if ( $ntfy_tok !== '' ) {
+            update_option( 'csdt_scan_schedule_ntfy_token', $ntfy_tok, false );
+        }
+
+        wp_send_json_success( [ 'saved' => true ] );
     }
 
     public static function run_scheduled_scan(): void {
@@ -738,7 +751,8 @@ bantime  = 86400</pre>
 
         // Email notification
         if ( get_option( 'csdt_scan_schedule_email', '1' ) === '1' ) {
-            wp_mail( get_option( 'admin_email' ), $subject, $body );
+            $to = get_option( 'csdt_notify_email', '' ) ?: get_option( 'admin_email' );
+            wp_mail( $to, $subject, $body );
         }
 
         // ntfy.sh push notification
