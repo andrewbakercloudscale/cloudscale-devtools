@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.561
+ * Version: 1.9.562
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.561';
+    const VERSION      = '1.9.562';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -3130,79 +3130,83 @@ class CloudScale_DevTools {
                 </div>
 
                 <?php
-                // ── wp-login.php blocked hits ─────────────────────────────────
-                $daily_hits = isset( $wplogin_stats['daily'] ) && is_array( $wplogin_stats['daily'] ) ? $wplogin_stats['daily'] : [];
-                // Keep only last 7 days
-                $today = gmdate( 'Y-m-d' );
-                $days  = [];
+                // ── wp-login.php blocked hits — chart + probe IP table ────────
+                $daily_hits   = isset( $wplogin_stats['daily'] ) && is_array( $wplogin_stats['daily'] ) ? $wplogin_stats['daily'] : [];
+                $today        = gmdate( 'Y-m-d' );
+                $days         = [];
                 for ( $i = 6; $i >= 0; $i-- ) {
                     $d        = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
                     $days[$d] = $daily_hits[$d] ?? 0;
                 }
-                $total_hits  = array_sum( $days );
-                $last_hit_ts = $wplogin_stats['last_ts'] ?? 0;
-                $last_hit_ip = $wplogin_stats['last_ip'] ?? '';
+                $total_hits   = array_sum( $days );
+                $last_hit_ts  = $wplogin_stats['last_ts'] ?? 0;
+                $last_hit_ip  = $wplogin_stats['last_ip'] ?? '';
+                $day_max      = max( 1, max( array_values( $days ) ) );
+                $day_mid      = (int) round( $day_max / 2 );
+                $probe_recent = array_reverse( array_slice( $wplogin_hits, -20 ) );
                 ?>
-                <div style="margin-top:22px;">
-                    <div style="font-weight:600;font-size:13px;margin-bottom:10px;">🚫 <?php esc_html_e( 'wp-login.php Blocked — Last 7 Days', 'cloudscale-devtools' ); ?>
-                        <span style="font-weight:400;font-size:11px;color:#64748b;margin-left:8px;"><?php echo (int) $total_hits; ?> blocked</span>
+                <div style="margin-top:22px;border-top:1px solid #e8edf5;padding-top:20px;">
+                    <div class="cs-bf-log-header">
+                        <span class="cs-bf-log-title">🚫 <?php esc_html_e( 'wp-login.php Blocked — Last 7 Days', 'cloudscale-devtools' ); ?></span>
+                        <span class="cs-bf-log-total"><?php echo (int) $total_hits; ?> blocked</span>
                     </div>
-                    <div style="display:flex;gap:6px;align-items:flex-end;height:48px;margin-bottom:6px;">
-                        <?php foreach ( $days as $d => $cnt ) :
-                            $max = max( 1, max( array_values( $days ) ) );
-                            $pct = $cnt > 0 ? max( 8, (int) round( $cnt / $max * 100 ) ) : 2;
-                        ?>
-                        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
-                            <div title="<?php echo esc_attr( $cnt ); ?>" style="width:100%;background:<?php echo $cnt > 0 ? '#ef4444' : '#e2e8f0'; ?>;height:<?php echo $pct; ?>%;border-radius:3px 3px 0 0;min-height:3px;"></div>
-                            <span style="font-size:10px;color:#94a3b8;"><?php echo esc_html( gmdate( 'M j', strtotime( $d ) ) ); ?></span>
+                    <div class="cs-bf-layout">
+                        <div class="cs-bf-chart">
+                            <div class="cs-bf-yaxis">
+                                <span class="cs-bf-ytick"><?php echo esc_html( number_format( $day_max ) ); ?></span>
+                                <span class="cs-bf-ytick"><?php echo esc_html( number_format( $day_mid ) ); ?></span>
+                                <span class="cs-bf-ytick">0</span>
+                            </div>
+                            <?php foreach ( $days as $d => $cnt ) :
+                                $pct = $cnt > 0 ? max( 2, (int) round( $cnt / $day_max * 100 ) ) : 0;
+                                $cls = $cnt === 0 ? '' : ( $cnt >= $day_max * 0.75 ? ' cs-bf-bar-high' : ( $cnt >= $day_max * 0.4 ? ' cs-bf-bar-mid' : '' ) );
+                            ?>
+                            <div class="cs-bf-day" style="flex:1;min-width:28px;">
+                                <div class="cs-bf-bar-track" style="position:relative;">
+                                    <?php if ( $cnt > 0 ) : ?>
+                                    <span style="position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#64748b;white-space:nowrap;"><?php echo esc_html( number_format( $cnt ) ); ?></span>
+                                    <?php endif; ?>
+                                    <div class="cs-bf-bar<?php echo esc_attr( $cls ); ?>"
+                                         style="height:<?php echo $pct; ?>%;<?php echo $cnt === 0 ? 'background:#e2e8f0;' : ''; ?>"
+                                         title="<?php echo esc_attr( number_format( $cnt ) . ' blocked on ' . gmdate( 'M j', strtotime( $d ) ) ); ?>"></div>
+                                </div>
+                                <div class="cs-bf-day-label"><?php echo esc_html( gmdate( 'M j', strtotime( $d ) ) ); ?></div>
+                            </div>
+                            <?php endforeach; ?>
                         </div>
-                        <?php endforeach; ?>
+                        <div class="cs-bf-table-wrap">
+                            <?php if ( ! empty( $probe_recent ) ) : ?>
+                            <table class="cs-bf-table">
+                                <thead>
+                                    <tr>
+                                        <th class="cs-bf-th"><?php esc_html_e( 'When', 'cloudscale-devtools' ); ?></th>
+                                        <th class="cs-bf-th"><?php esc_html_e( 'IP address', 'cloudscale-devtools' ); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ( $probe_recent as $hit ) : ?>
+                                    <tr>
+                                        <td class="cs-bf-td cs-bf-td-time"><?php echo esc_html( human_time_diff( $hit[0] ) . ' ago' ); ?></td>
+                                        <td class="cs-bf-td cs-bf-td-ip"><?php echo esc_html( $hit[1] ); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <?php else : ?>
+                            <div class="cs-bf-empty"><?php echo $total_hits > 0 ? esc_html__( 'Per-IP log populates as new probes arrive.', 'cloudscale-devtools' ) : esc_html__( 'No wp-login.php hits recorded yet.', 'cloudscale-devtools' ); ?></div>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <?php if ( $last_hit_ts > 0 ) : ?>
-                    <div style="font-size:12px;color:#475569;margin-top:4px;">
+                    <div style="font-size:12px;color:#475569;margin-top:8px;">
                         <?php esc_html_e( 'Last attempt:', 'cloudscale-devtools' ); ?>
                         <strong><?php echo esc_html( human_time_diff( $last_hit_ts ) . ' ago' ); ?></strong>
                         <?php if ( $last_hit_ip ) : ?>
                         &nbsp;from&nbsp;<code style="font-size:11px;"><?php echo esc_html( $last_hit_ip ); ?></code>
                         <?php endif; ?>
                     </div>
-                    <?php else : ?>
-                    <div style="font-size:12px;color:#94a3b8;"><?php esc_html_e( 'No direct wp-login.php hits recorded yet.', 'cloudscale-devtools' ); ?></div>
                     <?php endif; ?>
                 </div>
-
-                <?php
-                // ── Recent wp-login.php probe IPs ────────────────────────────
-                // Newest 20 hits from the per-hit log stored in csdt_wplogin_blocked_stats.
-                $probe_recent = array_reverse( array_slice( $wplogin_hits, -20 ) );
-                ?>
-                <?php if ( ! empty( $probe_recent ) ) : ?>
-                <div style="margin-top:22px;">
-                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">📋 <?php esc_html_e( 'Recent wp-login.php Probe IPs', 'cloudscale-devtools' ); ?>
-                        <span style="font-weight:400;font-size:11px;color:#64748b;margin-left:8px;"><?php echo count( $wplogin_hits ); ?> <?php esc_html_e( 'total in last 14 days', 'cloudscale-devtools' ); ?></span>
-                    </div>
-                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                        <thead>
-                            <tr style="background:#fef2f2;">
-                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #fee2e2;color:#64748b;"><?php esc_html_e( 'When', 'cloudscale-devtools' ); ?></th>
-                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #fee2e2;color:#64748b;"><?php esc_html_e( 'IP address', 'cloudscale-devtools' ); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ( $probe_recent as $hit ) : ?>
-                            <tr style="border-bottom:1px solid #fef2f2;">
-                                <td style="padding:5px 10px;white-space:nowrap;color:#64748b;"><?php echo esc_html( human_time_diff( $hit[0] ) . ' ago' ); ?></td>
-                                <td style="padding:5px 10px;font-family:monospace;font-size:11px;color:#991b1b;"><?php echo esc_html( $hit[1] ); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php elseif ( $total_hits > 0 ) : ?>
-                <div style="margin-top:14px;font-size:12px;color:#64748b;">
-                    <?php esc_html_e( 'Per-IP log populates as new probes arrive (data recorded from this version onwards).', 'cloudscale-devtools' ); ?>
-                </div>
-                <?php endif; ?>
             </div>
         </div>
 
