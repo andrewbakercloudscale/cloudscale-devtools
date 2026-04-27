@@ -187,6 +187,13 @@ class CSDT_Custom_404 {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
         <?php echo esc_html__( 'Back to Home', 'cloudscale-devtools' ); ?>
     </a>
+    <a href="https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-cyber-devtools-help/" class="cs404-plugin-badge" target="_blank" rel="noopener noreferrer">
+        <span class="cs404-plugin-badge-icon">⚡</span>
+        <span>
+            <span class="cs404-plugin-badge-label">Powered by</span>
+            <span class="cs404-plugin-badge-name">CloudScale Devtools</span>
+        </span>
+    </a>
     <div class="cs404-brand">
         <?php if ( $logo_html ) : ?><div class="cs404-logo"><?php echo wp_kses_post( $logo_html ); ?></div><?php endif; ?>
         <p class="cs404-site-name"><?php echo esc_html( $site_name ); ?></p>
