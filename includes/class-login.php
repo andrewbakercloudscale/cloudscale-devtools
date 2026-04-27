@@ -246,6 +246,36 @@ class CSDT_Login {
         wp_add_inline_style( 'login', $css );
     }
 
+    /**
+     * Shared stats recorder for all default-login-path probes (wp-login.php and wp-admin).
+     * Updates the daily count, last-hit metadata, and per-IP hits log in csdt_wplogin_blocked_stats.
+     */
+    private static function record_default_login_probe( string $ip ): void {
+        $today  = gmdate( 'Y-m-d' );
+        $now    = time();
+        $stats  = get_option( 'csdt_wplogin_blocked_stats', [] );
+        if ( ! isset( $stats['daily'] ) || ! is_array( $stats['daily'] ) ) {
+            $stats['daily'] = [];
+        }
+        $stats['daily'][ $today ] = ( $stats['daily'][ $today ] ?? 0 ) + 1;
+        $cutoff = gmdate( 'Y-m-d', strtotime( '-7 days' ) );
+        foreach ( array_keys( $stats['daily'] ) as $k ) {
+            if ( $k < $cutoff ) unset( $stats['daily'][ $k ] );
+        }
+        $stats['last_ts'] = $now;
+        $stats['last_ip'] = $ip;
+        if ( ! isset( $stats['hits'] ) || ! is_array( $stats['hits'] ) ) {
+            $stats['hits'] = [];
+        }
+        $stats['hits'][] = [ $now, $ip ];
+        $hit_cutoff      = $now - 14 * DAY_IN_SECONDS;
+        $stats['hits']   = array_values( array_filter( $stats['hits'], fn( $h ) => isset( $h[0] ) && $h[0] >= $hit_cutoff ) );
+        if ( count( $stats['hits'] ) > 500 ) {
+            $stats['hits'] = array_slice( $stats['hits'], -500 );
+        }
+        update_option( 'csdt_wplogin_blocked_stats', $stats, false );
+    }
+
     public static function login_block_direct_access(): void {
         if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return;
@@ -278,32 +308,8 @@ class CSDT_Login {
             return;
         }
         // Record this blocked hit for the BF panel stats.
-        $ip    = CloudScale_DevTools::get_client_ip();
-        $today = gmdate( 'Y-m-d' );
-        $stats = get_option( 'csdt_wplogin_blocked_stats', [] );
-        if ( ! isset( $stats['daily'] ) || ! is_array( $stats['daily'] ) ) {
-            $stats['daily'] = [];
-        }
-        $stats['daily'][ $today ] = ( $stats['daily'][ $today ] ?? 0 ) + 1;
-        // Prune keys older than 7 days
-        $cutoff = gmdate( 'Y-m-d', strtotime( '-7 days' ) );
-        foreach ( array_keys( $stats['daily'] ) as $k ) {
-            if ( $k < $cutoff ) unset( $stats['daily'][ $k ] );
-        }
-        $stats['last_ts'] = time();
-        $stats['last_ip'] = $ip;
-        // Per-hit log [timestamp, ip] — drives the IP probe table in the BF panel.
-        if ( ! isset( $stats['hits'] ) || ! is_array( $stats['hits'] ) ) {
-            $stats['hits'] = [];
-        }
-        $stats['hits'][] = [ time(), $ip ];
-        // Prune to 14 days and cap at 500 entries.
-        $hit_cutoff   = time() - 14 * DAY_IN_SECONDS;
-        $stats['hits'] = array_values( array_filter( $stats['hits'], fn( $h ) => isset( $h[0] ) && $h[0] >= $hit_cutoff ) );
-        if ( count( $stats['hits'] ) > 500 ) {
-            $stats['hits'] = array_slice( $stats['hits'], -500 );
-        }
-        update_option( 'csdt_wplogin_blocked_stats', $stats, false );
+        $ip = CloudScale_DevTools::get_client_ip();
+        self::record_default_login_probe( $ip );
 
         // Block — redirect direct /wp-login.php access to home.
         wp_safe_redirect( home_url( '/' ) );
@@ -337,13 +343,8 @@ class CSDT_Login {
         $ip        = CloudScale_DevTools::get_client_ip();
         $site_name = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 
-        // Log the probe attempt.
-        $log   = get_option( 'csdt_devtools_admin_probe_log', [] );
-        $log[] = [ 'ts' => time(), 'ip' => $ip ];
-        if ( count( $log ) > 200 ) {
-            $log = array_slice( $log, -200 );
-        }
-        update_option( 'csdt_devtools_admin_probe_log', $log, false );
+        // Record in the shared wplogin blocked stats (same store as wp-login.php probes).
+        self::record_default_login_probe( $ip );
         status_header( 403 );
         header( 'Content-Type: text/html; charset=utf-8' );
         // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- custom 403 HTML page output after status_header(403); wp_head() has not fired so wp_enqueue_style() is unavailable.
