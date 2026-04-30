@@ -894,6 +894,203 @@
 
 } )();
 
+/* ── Generate Missing Thumbnails ────────────────────────────────────────────
+   Scan for missing WordPress image sizes, then regenerate in batches.
+ */
+( function () {
+    'use strict';
+
+    const { ajaxUrl, nonce } = window.csdtDevtoolsThumbs || {};
+
+    function post( action, data ) {
+        const body = new URLSearchParams( { action, nonce, ...data } );
+        return fetch( ajaxUrl, { method: 'POST', body } )
+            .then( r => r.json() )
+            .then( res => {
+                if ( res === -1 || res === 0 ) {
+                    return { success: false, data: { message: 'Session expired — please reload.' } };
+                }
+                return res;
+            } );
+    }
+
+    function esc( str ) {
+        return String( str )
+            .replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
+            .replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
+    }
+
+    const scanBtn      = document.getElementById( 'csdt-regen-scan-btn' );
+    const regenAllBtn  = document.getElementById( 'csdt-regen-all-btn' );
+    const progress     = document.getElementById( 'csdt-regen-progress' );
+    const log          = document.getElementById( 'csdt-regen-log' );
+    const resultsDiv   = document.getElementById( 'csdt-regen-results' );
+
+    let scanData = null; // last scan result
+
+    if ( scanBtn ) {
+        scanBtn.addEventListener( 'click', () => {
+            scanBtn.disabled = true;
+            scanBtn.textContent = 'Scanning…';
+            if ( progress ) progress.textContent = 'Checking all Media Library images…';
+            if ( log ) log.style.display = 'none';
+            if ( resultsDiv ) resultsDiv.style.display = 'none';
+            if ( regenAllBtn ) regenAllBtn.style.display = 'none';
+
+            post( 'csdt_devtools_regen_thumb_scan', {} ).then( res => {
+                scanBtn.disabled = false;
+                scanBtn.textContent = '🔍 Scan for Missing Sizes';
+                if ( progress ) progress.textContent = '';
+                if ( ! res.success ) {
+                    if ( resultsDiv ) {
+                        resultsDiv.style.display = 'block';
+                        resultsDiv.innerHTML = `<p style="color:#8c2020">${esc( res.data?.message || 'Scan failed.' )}</p>`;
+                    }
+                    return;
+                }
+                scanData = res.data;
+                renderScanResults( res.data );
+            } ).catch( () => {
+                scanBtn.disabled = false;
+                scanBtn.textContent = '🔍 Scan for Missing Sizes';
+                if ( progress ) progress.textContent = '';
+                if ( resultsDiv ) {
+                    resultsDiv.style.display = 'block';
+                    resultsDiv.innerHTML = '<p style="color:#8c2020">Request failed — check your connection.</p>';
+                }
+            } );
+        } );
+    }
+
+    function renderScanResults( data ) {
+        const { total, missing, images } = data;
+        if ( ! resultsDiv ) return;
+        resultsDiv.style.display = 'block';
+
+        if ( missing === 0 ) {
+            resultsDiv.innerHTML = `<p style="color:#276227;font-weight:600">✔ All ${esc( String( total ) )} images have their thumbnail sizes — nothing to regenerate.</p>`;
+            if ( regenAllBtn ) regenAllBtn.style.display = 'none';
+            return;
+        }
+
+        let html = `<div style="margin-bottom:10px;font-size:13px">
+            <span style="color:#8c2020;font-weight:600">⚠ ${esc( String( missing ) )} of ${esc( String( total ) )} images are missing one or more thumbnail sizes.</span>
+            <span style="color:#555;font-size:12px;margin-left:8px">These are the files your theme uses to display featured images.</span>
+        </div>`;
+
+        const used  = images.filter( i => i.used );
+        const other = images.filter( i => ! i.used );
+
+        if ( used.length ) {
+            html += `<div style="margin-bottom:8px">
+                <div style="font-size:12px;font-weight:700;color:#8c2020;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">
+                    ⚠ ${esc( String( used.length ) )} are active featured images — these affect how articles look right now
+                </div>`;
+            html += renderImageGrid( used );
+            html += '</div>';
+        }
+
+        if ( other.length ) {
+            html += `<div>
+                <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">
+                    ${esc( String( other.length ) )} other images
+                </div>`;
+            html += renderImageGrid( other );
+            html += '</div>';
+        }
+
+        resultsDiv.innerHTML = html;
+        if ( regenAllBtn ) regenAllBtn.style.display = '';
+    }
+
+    function renderImageGrid( images ) {
+        let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">';
+        const show = images.slice( 0, 24 );
+        for ( const img of show ) {
+            const badge = img.used
+                ? '<span style="position:absolute;bottom:3px;left:3px;background:rgba(140,32,32,.85);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;line-height:1.4">Featured</span>'
+                : '';
+            const thumb = img.thumb
+                ? `<img src="${esc( img.thumb )}" style="width:60px;height:60px;object-fit:cover;border-radius:3px;display:block" alt="" loading="lazy">`
+                : `<div style="width:60px;height:60px;background:#f0f0f0;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:20px">🖼</div>`;
+            html += `<div title="${esc( img.title )}" style="position:relative;width:60px;height:60px;border:1px solid #ddd;border-radius:3px;overflow:hidden;flex-shrink:0">
+                ${thumb}${badge}
+            </div>`;
+        }
+        if ( images.length > 24 ) {
+            html += `<div style="width:60px;height:60px;background:#f0f0f0;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#555;font-size:11px;font-weight:600;text-align:center;padding:4px;box-sizing:border-box">+${esc( String( images.length - 24 ) )}<br>more</div>`;
+        }
+        html += '</div>';
+        return html;
+    }
+
+    if ( regenAllBtn ) {
+        regenAllBtn.addEventListener( 'click', () => {
+            if ( ! confirm( 'This will regenerate missing thumbnail sizes for all affected images. It may take a minute or two. Continue?' ) ) return;
+            regenAllBtn.disabled = true;
+            scanBtn.disabled = true;
+            if ( log ) { log.style.display = 'block'; log.innerHTML = '<strong>Starting regeneration…</strong>'; }
+
+            let totalImages = scanData ? scanData.total : 0;
+            let processed   = 0;
+            let regenerated = 0;
+            let errors      = 0;
+
+            function updateLog() {
+                if ( ! log ) return;
+                const pct = totalImages ? Math.round( processed / totalImages * 100 ) : 0;
+                log.innerHTML = `<strong>Processing ${processed}${totalImages ? ' / ' + totalImages : ''} images (${pct}%)</strong> — ${regenerated} regenerated, ${errors} errors`;
+            }
+
+            function runBatch( offset ) {
+                post( 'csdt_devtools_regen_thumb_batch', { offset, total: totalImages } ).then( res => {
+                    if ( ! res.success ) {
+                        regenAllBtn.disabled = false;
+                        scanBtn.disabled = false;
+                        if ( log ) log.innerHTML += `<br><span style="color:#dc2626">✗ Error: ${esc( res.data?.message || 'Unknown error' )}</span>`;
+                        return;
+                    }
+                    const d = res.data;
+                    if ( ! totalImages ) totalImages = d.total;
+
+                    ( d.batch || [] ).forEach( item => {
+                        processed++;
+                        if ( item.regenerated ) regenerated++;
+                        else if ( ! item.ok )   errors++;
+                    } );
+
+                    updateLog();
+
+                    if ( d.has_more ) {
+                        runBatch( d.next_offset );
+                    } else {
+                        regenAllBtn.disabled = false;
+                        scanBtn.disabled = false;
+                        regenAllBtn.textContent = '✔ Done';
+                        if ( log ) {
+                            log.innerHTML = `<strong style="color:#166534">✔ Done — ${regenerated} images regenerated${errors ? ', ' + errors + ' errors' : ''}.</strong>`;
+                            if ( regenerated > 0 ) {
+                                log.innerHTML += '<br><span style="color:#555;font-size:12px">Refresh the page to see updated images. The article thumbnails should now display correctly.</span>';
+                            }
+                        }
+                        if ( regenAllBtn ) regenAllBtn.style.display = 'none';
+                        // Re-scan to confirm.
+                        scanBtn.click();
+                    }
+                } ).catch( err => {
+                    regenAllBtn.disabled = false;
+                    scanBtn.disabled = false;
+                    if ( log ) log.innerHTML += '<br><span style="color:#dc2626">✗ Network error — see console.</span>';
+                    console.error( 'regen_thumb_batch error', err );
+                } );
+            }
+
+            runBatch( 0 );
+        } );
+    }
+
+} )();
+
 /* ── Default Featured Image picker ──────────────────────────────────────────
    Uses wp.media (loaded via wp_enqueue_media on the thumbnails tab).
  */

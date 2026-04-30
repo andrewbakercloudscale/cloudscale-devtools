@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.582
+ * Version: 1.9.583
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.582';
+    const VERSION      = '1.9.583';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -360,6 +360,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_social_fix_all_batch',          [ 'CSDT_Thumbnails', 'ajax_social_fix_all_batch' ] );
         add_action( 'wp_ajax_csdt_devtools_social_refresh_stale_batch',    [ 'CSDT_Thumbnails', 'ajax_social_refresh_stale_batch' ] );
         add_action( 'wp_ajax_csdt_devtools_social_diagnose_formats', [ 'CSDT_Thumbnails', 'ajax_social_diagnose_formats' ] );
+        add_action( 'wp_ajax_csdt_devtools_regen_thumb_scan',  [ 'CSDT_Thumbnails', 'ajax_regen_thumb_scan' ] );
+        add_action( 'wp_ajax_csdt_devtools_regen_thumb_batch', [ 'CSDT_Thumbnails', 'ajax_regen_thumb_batch' ] );
         add_action( 'save_post_post',  [ 'CSDT_Thumbnails', 'on_post_saved' ], 100, 3 );
         add_action( 'transition_post_status', [ 'CSDT_Thumbnails', 'on_post_status_change' ], 10, 3 );
         add_action( 'admin_notices',   [ 'CSDT_Thumbnails', 'social_format_admin_notice' ] );

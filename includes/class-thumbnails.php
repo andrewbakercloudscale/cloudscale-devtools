@@ -239,6 +239,30 @@ class CSDT_Thumbnails {
             </div>
         </div>
 
+        <div class="cs-panel" id="cs-panel-regen-thumbnails">
+            <div class="cs-section-header" style="background:linear-gradient(135deg,#2e7d32,#1b5e20);">
+                <span>🔧 GENERATE MISSING THUMBNAILS</span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Regenerate WordPress image sizes deleted by a cleanup plugin', 'cloudscale-devtools' ); ?></span>
+                <?php CloudScale_DevTools::render_explain_btn( 'regen-thumbnails', 'Generate Missing Thumbnails', [
+                    [ 'name' => 'Why thumbnails go missing', 'rec' => 'Overview', 'html' => 'Image cleanup plugins delete "unused" files — including WordPress-generated intermediate sizes like <code>thumbnail</code>, <code>medium</code>, <code>medium_large</code>, and <code>large</code>. These are the files your theme requests when displaying featured images. When they are gone, WordPress falls back to the full-size original, which the theme then CSS-crops — causing edges to be cut off or the wrong portion to be shown.' ],
+                    [ 'name' => 'Scan',                      'rec' => 'Non-destructive', 'html' => 'Checks every image in your Media Library against all registered WordPress image sizes. Reports how many images are missing one or more sizes, and flags which images are actively used as featured images on posts.' ],
+                    [ 'name' => 'Regenerate All Missing',    'rec' => 'Safe to run',  'html' => 'Runs <code>wp_generate_attachment_metadata()</code> for each image that has missing sizes. Only generates what is missing — it does not touch images that are already complete. Original full-size files are never modified.' ],
+                    [ 'name' => 'In-use images',             'rec' => 'Important',    'html' => 'Images marked <strong>Featured image</strong> are set as the featured image on one or more posts. These are the most important to regenerate as they directly affect how your articles look. Consider excluding the <code>/wp-content/uploads/</code> folder from your cleanup plugin, or at minimum protecting any image shown here.' ],
+                    [ 'name' => 'Performance note',          'rec' => 'Info',         'html' => 'Processing runs in batches of 5 images per request to avoid server timeouts. A site with 200 images takes roughly 40 requests — expect 30–90 seconds total depending on your server speed.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <p class="cs-hint" style="margin-bottom:10px"><?php esc_html_e( 'If a cleanup plugin deleted your image thumbnails, articles will show the wrong crop. Scan to see how many are affected, then regenerate all missing sizes in one click.', 'cloudscale-devtools' ); ?></p>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <button type="button" class="cs-btn-primary" id="csdt-regen-scan-btn">🔍 <?php esc_html_e( 'Scan for Missing Sizes', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" class="cs-btn-primary" id="csdt-regen-all-btn" style="display:none;background:#2e7d32">⚙️ <?php esc_html_e( 'Regenerate All Missing', 'cloudscale-devtools' ); ?></button>
+                    <span id="csdt-regen-progress" style="font-size:12px;color:#888"></span>
+                </div>
+                <div id="csdt-regen-log" style="display:none;margin-top:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-size:13px;"></div>
+                <div id="csdt-regen-results" style="margin-top:14px;display:none"></div>
+            </div>
+        </div>
+
         <?php
         $enabled_platforms = get_option( 'csdt_devtools_social_platforms', array_keys( self::SOCIAL_PLATFORMS ) );
         ?>
@@ -1535,6 +1559,161 @@ class CSDT_Thumbnails {
                 ? sprintf( __( 'Recompressed to %s KB — within the WhatsApp 300 KB threshold.', 'cloudscale-devtools' ), $new_kb )
                 : sprintf( __( 'Recompressed to %s KB — still above threshold. Manual intervention needed.', 'cloudscale-devtools' ), $new_kb ),
         ];
+    }
+
+    // ─── AJAX: scan for missing WordPress thumbnail sizes ─────────────────
+
+    public static function ajax_regen_thumb_scan(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $sizes  = wp_get_registered_image_subsizes();
+        $upload = wp_upload_dir();
+
+        // Collect all attachment IDs used as featured images.
+        global $wpdb;
+        $used_ids = array_map( 'intval', $wpdb->get_col(
+            "SELECT DISTINCT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value != '0'"
+        ) );
+        $default_id = (int) get_option( 'cloudscale_default_image_id', 0 );
+        if ( $default_id ) {
+            $used_ids[] = $default_id;
+        }
+        $used_ids = array_unique( $used_ids );
+
+        $all_ids = get_posts( [
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'image',
+            'posts_per_page' => -1,
+            'post_status'    => 'inherit',
+            'fields'         => 'ids',
+            'orderby'        => 'ID',
+            'order'          => 'ASC',
+        ] );
+
+        $total   = count( $all_ids );
+        $missing = [];
+
+        foreach ( $all_ids as $id ) {
+            $meta = wp_get_attachment_metadata( $id );
+            if ( ! $meta || empty( $meta['file'] ) ) {
+                continue;
+            }
+            $dir      = trailingslashit( $upload['basedir'] ) . trailingslashit( dirname( $meta['file'] ) );
+            $has_miss = false;
+            foreach ( $sizes as $size_name => $size_data ) {
+                if ( isset( $meta['sizes'][ $size_name ] ) ) {
+                    if ( ! file_exists( $dir . $meta['sizes'][ $size_name ]['file'] ) ) {
+                        $has_miss = true;
+                        break;
+                    }
+                } else {
+                    $has_miss = true;
+                    break;
+                }
+            }
+            if ( $has_miss ) {
+                $is_used = in_array( $id, $used_ids, true );
+                $missing[] = [
+                    'id'      => $id,
+                    'used'    => $is_used,
+                    'title'   => get_the_title( $id ) ?: basename( get_attached_file( $id ) ?: '' ),
+                    'url'     => wp_get_attachment_url( $id ),
+                    'thumb'   => wp_get_attachment_image_url( $id, 'thumbnail' ) ?: '',
+                ];
+            }
+        }
+
+        wp_send_json_success( [
+            'total'   => $total,
+            'missing' => count( $missing ),
+            'images'  => $missing,
+        ] );
+    }
+
+    // ─── AJAX: regenerate missing thumbnail sizes in batches ──────────────
+
+    public static function ajax_regen_thumb_batch(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $offset     = absint( $_POST['offset'] ?? 0 );
+        $total      = absint( $_POST['total']  ?? 0 );
+        $batch_size = 5;
+        $sizes      = wp_get_registered_image_subsizes();
+        $upload     = wp_upload_dir();
+
+        $all_ids = get_posts( [
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'image',
+            'posts_per_page' => $batch_size,
+            'offset'         => $offset,
+            'post_status'    => 'inherit',
+            'fields'         => 'ids',
+            'orderby'        => 'ID',
+            'order'          => 'ASC',
+        ] );
+
+        if ( ! $total ) {
+            $total_q = new WP_Query( [
+                'post_type'      => 'attachment',
+                'post_mime_type' => 'image',
+                'posts_per_page' => -1,
+                'post_status'    => 'inherit',
+                'fields'         => 'ids',
+            ] );
+            $total = count( $total_q->posts );
+        }
+
+        $batch = [];
+        foreach ( $all_ids as $id ) {
+            $meta = wp_get_attachment_metadata( $id );
+            if ( ! $meta || empty( $meta['file'] ) ) {
+                $batch[] = [ 'id' => $id, 'ok' => true, 'skipped' => true ];
+                continue;
+            }
+            $dir      = trailingslashit( $upload['basedir'] ) . trailingslashit( dirname( $meta['file'] ) );
+            $has_miss = false;
+            foreach ( $sizes as $size_name => $size_data ) {
+                if ( isset( $meta['sizes'][ $size_name ] ) ) {
+                    if ( ! file_exists( $dir . $meta['sizes'][ $size_name ]['file'] ) ) {
+                        $has_miss = true;
+                        break;
+                    }
+                } else {
+                    $has_miss = true;
+                    break;
+                }
+            }
+            if ( ! $has_miss ) {
+                $batch[] = [ 'id' => $id, 'ok' => true, 'skipped' => true ];
+                continue;
+            }
+            $file = get_attached_file( $id );
+            if ( ! $file || ! file_exists( $file ) ) {
+                $batch[] = [ 'id' => $id, 'ok' => false, 'skipped' => true, 'error' => 'file_missing' ];
+                continue;
+            }
+            $new_meta = wp_generate_attachment_metadata( $id, $file );
+            if ( is_wp_error( $new_meta ) ) {
+                $batch[] = [ 'id' => $id, 'ok' => false, 'skipped' => false, 'error' => $new_meta->get_error_message() ];
+            } else {
+                wp_update_attachment_metadata( $id, $new_meta );
+                $batch[] = [ 'id' => $id, 'ok' => true, 'skipped' => false, 'regenerated' => true ];
+            }
+        }
+
+        $next_offset = $offset + $batch_size;
+        wp_send_json_success( [
+            'batch'       => $batch,
+            'next_offset' => $next_offset,
+            'has_more'    => $next_offset < $total,
+            'total'       => $total,
+        ] );
     }
 
     /* ==================================================================
