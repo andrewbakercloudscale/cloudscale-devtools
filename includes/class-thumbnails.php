@@ -2066,13 +2066,13 @@ BAD (over-directed, scene description):
             'minimalist'            => 'minimalist design with bold typography',
         ];
 
-        // On force_vary, pick a random style different from the current one.
-        if ( $force_vary && ( $style === 'auto' || ! isset( $style_map[ $style ] ) ) ) {
-            $style_keys = array_keys( $style_map );
-            $style      = $style_keys[ array_rand( $style_keys ) ];
-        } elseif ( $force_vary && isset( $style_map[ $style ] ) ) {
-            $other_styles = array_diff( array_keys( $style_map ), [ $style ] );
-            $style        = $other_styles[ array_rand( $other_styles ) ];
+        // Styles that make sense as blog headers — used when auto-varying on Regenerate.
+        $vary_pool = [ 'photorealistic', 'editorial', 'technical_infographic', 'minimalist', 'cartoon' ];
+
+        // On force_vary, cycle through sensible blog-header styles only.
+        if ( $force_vary ) {
+            $candidates = array_diff( $vary_pool, [ $style ] );
+            $style      = $candidates[ array_rand( $candidates ) ];
         }
 
         $style_instruction = isset( $style_map[ $style ] ) ? " Required visual style: {$style_map[$style]}." : '';
