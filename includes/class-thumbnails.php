@@ -515,7 +515,7 @@ BAD (over-directed, scene description):
                             <option value="technical_infographic" <?php selected( $saved_style, 'technical_infographic' ); ?>><?php esc_html_e( 'Technical infographic', 'cloudscale-devtools' ); ?></option>
                             <option value="photorealistic" <?php selected( $saved_style, 'photorealistic' ); ?>><?php esc_html_e( 'Photorealistic', 'cloudscale-devtools' ); ?></option>
                             <option value="editorial" <?php selected( $saved_style, 'editorial' ); ?>><?php esc_html_e( 'Editorial photography', 'cloudscale-devtools' ); ?></option>
-                            <option value="abstract" <?php selected( $saved_style, 'abstract' ); ?>><?php esc_html_e( 'Abstract / geometric art', 'cloudscale-devtools' ); ?></option>
+                            <option value="isometric" <?php selected( $saved_style, 'isometric' ); ?>><?php esc_html_e( 'Isometric 3D illustration', 'cloudscale-devtools' ); ?></option>
                             <option value="cartoon" <?php selected( $saved_style, 'cartoon' ); ?>><?php esc_html_e( 'Cartoon / illustration', 'cloudscale-devtools' ); ?></option>
                             <option value="dali" <?php selected( $saved_style, 'dali' ); ?>><?php esc_html_e( 'Surrealist (Salvador Dali)', 'cloudscale-devtools' ); ?></option>
                             <option value="minimalist" <?php selected( $saved_style, 'minimalist' ); ?>><?php esc_html_e( 'Minimalist', 'cloudscale-devtools' ); ?></option>
@@ -2060,14 +2060,14 @@ BAD (over-directed, scene description):
             'technical_infographic' => 'technical illustration or diagram aesthetic',
             'photorealistic'        => 'cinematic photorealistic photography',
             'editorial'             => 'professional editorial photography',
-            'abstract'              => 'abstract geometric or expressive art',
+            'isometric'             => 'clean isometric 3D illustration, flat vector art style',
             'cartoon'               => 'bold cartoon illustration',
             'dali'                  => 'surrealist dreamlike art',
             'minimalist'            => 'minimalist design with bold typography',
         ];
 
         // Styles that make sense as blog headers — used when auto-varying on Regenerate.
-        $vary_pool = [ 'photorealistic', 'editorial', 'technical_infographic', 'minimalist', 'cartoon' ];
+        $vary_pool = [ 'photorealistic', 'editorial', 'technical_infographic', 'minimalist', 'isometric', 'cartoon' ];
 
         // On force_vary, cycle through sensible blog-header styles only.
         if ( $force_vary ) {
