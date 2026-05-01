@@ -1522,7 +1522,7 @@
         // ── Render post list ──────────────────────────────────────────────
         function renderPostList( posts, sortBy, mode ) {
             if ( ! results ) return;
-            const sortLabel = sortBy === 'popular' ? 'by popularity' : sortBy === 'oldest' ? 'oldest first' : sortBy === 'longest' ? 'longest first' : 'newest first';
+            const sortLabel = sortBy === 'popular' ? 'by popularity' : sortBy === 'oldest' ? 'oldest first' : sortBy === 'longest' ? 'longest first' : sortBy === 'img_date' ? 'by image date' : 'newest first';
             const headerText = mode === 'with_image'
                 ? `Found <strong>${esc(String(posts.length))}</strong> post(s) with a featured image <span style="color:#94a3b8">(${esc(sortLabel)})</span> — click Regenerate to replace`
                 : `Found <strong>${esc(String(posts.length))}</strong> post(s) without a featured image <span style="color:#94a3b8">(${esc(sortLabel)})</span>`;
@@ -1531,9 +1531,10 @@
             for ( const p of posts ) {
                 const viewCount  = ( p.view_count !== null && p.view_count !== undefined ) ? p.view_count : 0;
                 const wordCount  = ( p.word_count !== null && p.word_count !== undefined ) ? p.word_count : 0;
-                const viewsBadge = `<span style="font-size:11px;color:#94a3b8;margin-left:8px">👁 ${esc(String(viewCount))}</span>`;
-                const wordsBadge = wordCount > 0 ? `<span style="font-size:11px;color:#94a3b8;margin-left:8px">📝 ${esc(wordCount.toLocaleString())} words</span>` : '';
-                const meta       = `<span style="font-size:11px;color:#94a3b8">${esc(p.date)}</span>${viewsBadge}${wordsBadge}`;
+                const viewsBadge  = `<span style="font-size:11px;color:#94a3b8;margin-left:8px">👁 ${esc(String(viewCount))}</span>`;
+                const wordsBadge  = wordCount > 0 ? `<span style="font-size:11px;color:#94a3b8;margin-left:8px">📝 ${esc(wordCount.toLocaleString())} words</span>` : '';
+                const imgDateBadge = p.thumb_date ? `<span style="font-size:11px;color:#94a3b8;margin-left:8px">🖼 ${esc(p.thumb_date)}</span>` : '';
+                const meta        = `<span style="font-size:11px;color:#94a3b8">${esc(p.date)}</span>${viewsBadge}${wordsBadge}${imgDateBadge}`;
                 const btnLabel   = p.has_thumb ? '↺ Regenerate' : '✨ Generate';
                 const existingThumb = p.has_thumb && p.thumb_url
                     ? `<img src="${esc(p.thumb_url)}" style="width:80px;height:42px;object-fit:cover;border-radius:3px;border:1px solid #ddd">`
@@ -1681,7 +1682,7 @@
             return { open };
         } )();
 
-        function triggerGenerate( btn ) {
+        function triggerGenerate( btn, forceVary = false ) {
             const postId       = btn.dataset.postId;
             const statusEl     = document.getElementById( 'cs-ai-status-' + postId );
             const thumbEl      = document.getElementById( 'cs-ai-thumb-'  + postId );
@@ -1690,6 +1691,7 @@
             const promptModel  = ( modelEl?.value || curModel || 'gpt-4o-mini' );
             const promptStyle  = styleEl?.value || 'auto';
             const dual         = document.getElementById( 'cs-ai-img-dual' )?.checked ? '1' : '0';
+            const noText       = document.getElementById( 'cs-ai-img-no-text' )?.checked ? '1' : '0';
 
             btn.disabled    = true;
             btn.textContent = '⏳ Writing prompt…';
@@ -1697,7 +1699,7 @@
             if ( thumbEl )  { thumbEl.innerHTML = ''; thumbEl.style.width = ''; }
 
             // Step 1 — ask AI to write the DALL-E prompt.
-            post( 'csdt_devtools_ai_image_write_prompt', { post_id: postId, prompt_vendor: promptVendor, prompt_model: promptModel, prompt_style: promptStyle } )
+            post( 'csdt_devtools_ai_image_write_prompt', { post_id: postId, prompt_vendor: promptVendor, prompt_model: promptModel, prompt_style: promptStyle, no_text: noText, force_vary: forceVary ? '1' : '0' } )
                 .then( res => {
                     btn.disabled    = false;
                     btn.textContent = '✨ Generate';
@@ -1743,7 +1745,7 @@
                                                         thumbEl.querySelector( '.cs-ai-thumb-preview' )?.addEventListener( 'click', function () {
                                                             imageModal.open( [ { thumb_url: this.dataset.fullUrl, attach_id: chosenId } ], {
                                                                 onAccept: () => {},
-                                                                onRegenerate: () => { btn.textContent = '✨ Generate'; triggerGenerate( btn ); },
+                                                                onRegenerate: () => { btn.textContent = '✨ Generate'; triggerGenerate( btn, true ); },
                                                                 onCancel: () => {},
                                                             }, dallePrompt );
                                                         } );
@@ -1759,7 +1761,7 @@
 
                                     imageModal.open( options, {
                                         onAccept:     ( chosenId ) => doAccept( chosenId ),
-                                        onRegenerate: () => { doDiscard(); btn.textContent = '✨ Generate'; triggerGenerate( btn ); },
+                                        onRegenerate: () => { doDiscard(); btn.textContent = '✨ Generate'; triggerGenerate( btn, true ); },
                                         onCancel:     () => { doDiscard(); btn.textContent = '✨ Generate'; if ( statusEl ) statusEl.textContent = ''; },
                                     }, dallePrompt );
                                 } )

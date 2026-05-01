@@ -492,10 +492,14 @@ BAD (over-directed, scene description):
 
                 <div class="cs-sec-row">
                     <span class="cs-sec-label"><?php esc_html_e( 'Options:', 'cloudscale-devtools' ); ?></span>
-                    <div class="cs-sec-control">
+                    <div class="cs-sec-control" style="display:flex;flex-direction:column;gap:8px">
                         <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                             <input type="checkbox" id="cs-ai-img-dual" style="width:16px;height:16px" <?php checked( $saved_dual ); ?>>
                             <?php esc_html_e( 'Generate 2 options per post (costs 2× per click)', 'cloudscale-devtools' ); ?>
+                        </label>
+                        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                            <input type="checkbox" id="cs-ai-img-no-text" style="width:16px;height:16px">
+                            <?php esc_html_e( 'No text in image (avoids misspellings — DALL-E draws no labels or titles)', 'cloudscale-devtools' ); ?>
                         </label>
                     </div>
                 </div>
@@ -2022,6 +2026,8 @@ BAD (over-directed, scene description):
         $prompt_vendor = isset( $_POST['prompt_vendor'] ) ? sanitize_key( wp_unslash( $_POST['prompt_vendor'] ) ) : 'openai';
         $prompt_model  = isset( $_POST['prompt_model'] )  ? sanitize_text_field( wp_unslash( $_POST['prompt_model'] ) ) : 'gpt-4o-mini';
         $style         = isset( $_POST['prompt_style'] )  ? sanitize_key( wp_unslash( $_POST['prompt_style'] ) ) : 'auto';
+        $no_text       = ! empty( $_POST['no_text'] ) && '1' === $_POST['no_text'];
+        $force_vary    = ! empty( $_POST['force_vary'] ) && '1' === $_POST['force_vary'];
 
         if ( ! $post_id ) {
             wp_send_json_error( [ 'message' => 'Invalid post ID.' ] );
@@ -2048,18 +2054,29 @@ BAD (over-directed, scene description):
         $context_str = implode( "\n\n", $context_parts );
 
         $style_map = [
-            'technical_infographic' => 'clean flat-design technical infographic, vector illustration aesthetic, no photorealism',
-            'photorealistic'        => 'cinematic photorealistic photography, ultra high quality, professional lighting',
-            'editorial'             => 'professional editorial photography, magazine quality, natural light',
-            'abstract'              => 'colourful abstract geometric art, vibrant creative composition',
-            'cartoon'               => 'bold cartoon illustration style, clear outlines, expressive and fun',
-            'dali'                  => 'surrealist dreamlike artwork inspired by Salvador Dali, melting forms, impossible juxtapositions',
-            'minimalist'            => 'clean minimalist design, ample white space, simple geometric shapes, muted pastel palette',
+            'technical_infographic' => 'technical illustration or diagram aesthetic',
+            'photorealistic'        => 'cinematic photorealistic photography',
+            'editorial'             => 'professional editorial photography',
+            'abstract'              => 'abstract geometric or expressive art',
+            'cartoon'               => 'bold cartoon illustration',
+            'dali'                  => 'surrealist dreamlike art',
+            'minimalist'            => 'minimalist design with bold typography',
         ];
+
+        // On force_vary, pick a random style different from the current one.
+        if ( $force_vary && ( $style === 'auto' || ! isset( $style_map[ $style ] ) ) ) {
+            $style_keys = array_keys( $style_map );
+            $style      = $style_keys[ array_rand( $style_keys ) ];
+        } elseif ( $force_vary && isset( $style_map[ $style ] ) ) {
+            $other_styles = array_diff( array_keys( $style_map ), [ $style ] );
+            $style        = $other_styles[ array_rand( $other_styles ) ];
+        }
+
         $style_instruction = isset( $style_map[ $style ] ) ? " Required visual style: {$style_map[$style]}." : '';
+        $no_text_suffix    = $no_text ? ' No text, labels, or typography anywhere in the image.' : '';
 
         $system_msg = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
-        $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}";
+        $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$no_text_suffix}";
 
         try {
             switch ( $prompt_vendor ) {
