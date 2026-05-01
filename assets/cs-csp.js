@@ -143,7 +143,7 @@
             if (violCount) violCount.style.display = 'none';
             return;
         }
-        if (violCount) { violCount.textContent = rows.length; violCount.style.display = 'inline'; }
+        if (violCount) { violCount.textContent = '(' + rows.length + ')'; violCount.style.display = 'inline'; }
 
         // Build quick-fix banner: group unfixed services that have violations.
         var suggestedServices = {};
@@ -167,11 +167,12 @@
         }
 
         var html = banner +
-            '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+            '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #e2e8f0;border-radius:6px;">' +
+            '<table style="width:100%;min-width:520px;border-collapse:collapse;font-size:12px;">' +
             '<thead><tr style="background:#f1f5f9;">' +
-            '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Time</th>' +
+            '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Time</th>' +
             '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Blocked</th>' +
-            '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Directive</th>' +
+            '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Directive</th>' +
             '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Fix</th>' +
             '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Page</th>' +
             '</tr></thead><tbody>';
@@ -207,7 +208,7 @@
                 '<td style="padding:5px 8px;color:#64748b;" title="' + (r.page||'').replace(/"/g,'&quot;') + '">' + pageDisplay + '</td>' +
                 '</tr>';
         });
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         violTable.innerHTML = html;
 
         // Wire up "tick [service]" links.
@@ -578,6 +579,29 @@
         var reportingEnabledCb = document.getElementById('cs-csp-reporting-enabled');
         if (cspEnabledCb)       cspEnabledCb.addEventListener('change', updateViolWrapVisibility);
         if (reportingEnabledCb) reportingEnabledCb.addEventListener('change', updateViolWrapVisibility);
+        // ── Violation log collapse toggle ────────────────────────────────
+        var violHeader    = document.getElementById('cs-csp-viol-header');
+        var violBody      = document.getElementById('cs-csp-viol-body');
+        var violChevron   = document.getElementById('cs-csp-viol-chevron');
+        var violCollapsed = true; // starts collapsed
+        var violLoaded    = false;
+        function setViolToggle(collapsed) {
+            if (!violChevron) return;
+            violChevron.textContent = collapsed ? 'Show ▼' : 'Hide ▲';
+        }
+        setViolToggle(true);
+        if (violHeader && violBody) {
+            violHeader.addEventListener('click', function(e) {
+                // Don't collapse when clicking Refresh or Clear buttons
+                if (e.target.closest && (e.target.closest('#cs-csp-viol-refresh') || e.target.closest('#cs-csp-viol-clear'))) return;
+                violCollapsed = !violCollapsed;
+                violBody.style.display = violCollapsed ? 'none' : '';
+                setViolToggle(violCollapsed);
+                // Load violations on first expand
+                if (!violCollapsed && !violLoaded) { violLoaded = true; fetchViolations(); }
+            });
+        }
+
         if (violRefresh) violRefresh.addEventListener('click', fetchViolations);
         if (violClear) {
             violClear.addEventListener('click', function() {
@@ -590,14 +614,11 @@
             });
         }
 
-        // Auto-load if violation log is visible on activation
-        var violWrap = document.getElementById('cs-csp-violation-wrap');
-        if (violWrap && violWrap.style.display !== 'none') fetchViolations();
-
-        // Fixes clear button
+        // Fixes clear button — stopPropagation prevents <details> summary from toggling
         var fixesClear = document.getElementById('cs-csp-fixes-clear');
         if (fixesClear) {
-            fixesClear.addEventListener('click', function() {
+            fixesClear.addEventListener('click', function(e) {
+                e.stopPropagation();
                 var fd = new FormData();
                 fd.append('action', 'csdt_devtools_csp_fixes_clear');
                 fd.append('nonce',  csdtVulnScan.nonce);

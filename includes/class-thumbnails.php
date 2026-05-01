@@ -62,7 +62,10 @@ class CSDT_Thumbnails {
                 <p class="cs-hint" style="margin-bottom:10px"><?php esc_html_e( 'Checks OG tags, og:image size/dimensions, HTTPS, robots.txt, and verifies each platform crawler can actually read the page.', 'cloudscale-devtools' ); ?></p>
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                     <?php
-                    $recent_post = get_posts( [ 'numberposts' => 1, 'post_status' => 'publish', 'post_type' => 'post' ] );
+                    $recent_post = get_posts( [ 'numberposts' => 1, 'post_status' => 'publish', 'post_type' => 'post', 'has_password' => false ] );
+                    if ( empty( $recent_post ) ) {
+                        $recent_post = get_posts( [ 'numberposts' => 1, 'post_status' => 'publish', 'post_type' => 'page', 'has_password' => false ] );
+                    }
                     $checker_default_url = ! empty( $recent_post ) ? get_permalink( $recent_post[0] ) : home_url( '/' );
                     ?>
                     <input type="url" id="cs-thumb-check-url" class="cs-input" style="max-width:520px;flex:1"
@@ -312,6 +315,108 @@ class CSDT_Thumbnails {
         // See get_thumbnails_admin_css() for the ruleset.
     }
 
+    // ─── Featured Images tab ─────────────────────────────────────────────────
+
+    public static function render_ai_images_panel(): void {
+        $openai_key = (string) get_option( 'csdt_devtools_openai_key', '' );
+        ?>
+        <div class="cs-panel" id="cs-panel-ai-image-gen">
+            <div class="cs-section-header" style="background:linear-gradient(135deg,#0d7377,#14a085);">
+                <span>🎨 FEATURED IMAGE GENERATOR</span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Generate DALL-E 3 featured images for posts that have none', 'cloudscale-devtools' ); ?></span>
+                <?php CloudScale_DevTools::render_explain_btn( 'ai-image-gen', 'AI Image Generator', [
+                    [ 'name' => 'What it does',          'rec' => 'Overview',             'html' => 'Finds your published posts that have no featured image, then uses DALL-E 3 (OpenAI) to generate a 1792×1024 landscape header image tailored to each post title. The generated image is automatically uploaded to your Media Library and set as the featured image.' ],
+                    [ 'name' => 'How to set up ChatGPT', 'rec' => 'Step-by-step',         'html' => '<strong>Step 1:</strong> Go to <a href="https://platform.openai.com" target="_blank" rel="noopener">platform.openai.com</a> and sign in (or create a free account).<br><strong>Step 2:</strong> Click your profile icon (top-right) → <strong>API keys</strong> → <strong>Create new secret key</strong>. Copy the key — it starts with <code>sk-proj-…</code><br><strong>Step 3:</strong> Click <strong>Billing</strong> in the left menu → <strong>Add payment method</strong> and add at least <strong>$5</strong> of prepaid credit (DALL-E 3 is $0.04/image so $5 = ~125 images).<br><strong>Step 4:</strong> Paste your key into the <strong>OpenAI API Key</strong> field above and click <strong>Save Key</strong>.' ],
+                    [ 'name' => 'Prompt writer',          'rec' => 'Recommended: ChatGPT', 'html' => 'The prompt writer is the AI that reads your post title and excerpt and writes a detailed DALL-E 3 image description.<br><strong>ChatGPT (GPT-4o mini)</strong> — uses your OpenAI key. Fast, cheap (~$0.001 per prompt), great results. Recommended default.<br><strong>Anthropic Claude / Google Gemini</strong> — uses the key you configured on the Security tab. Use these if you prefer a different model for prompts.<br><strong>None</strong> — skips the prompt writer and sends the post title directly to DALL-E. Quick but produces less tailored images.' ],
+                    [ 'name' => 'Image quality',          'rec' => 'Standard recommended', 'html' => '<strong>Standard</strong> — $0.04 per image (1792×1024 px). Good quality for blog header use cases.<br><strong>HD</strong> — $0.08 per image. More detail and sharpness, better for hero or portfolio images.' ],
+                    [ 'name' => 'Cost estimate',          'rec' => 'Info',                 'html' => 'With ChatGPT as prompt writer + Standard quality: ~<strong>$0.041 per image</strong> ($0.001 prompt + $0.040 image). A $5 top-up covers roughly 120 posts. Costs are billed directly to your OpenAI account — this plugin has no subscription fee.' ],
+                    [ 'name' => 'After generation',       'rec' => 'Info',                 'html' => 'The image is uploaded as a standard WordPress attachment and set as the post featured image. You can replace it from the post editor at any time. The Social Format auto-generator will then create platform-optimised versions for Facebook, Twitter, WhatsApp, and LinkedIn automatically.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'OpenAI API Key:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+                            <div style="position:relative;display:flex;align-items:center;width:100%;max-width:480px">
+                                <input type="password" id="cs-ai-img-openai-key" class="cs-text-input cs-sec-key-input"
+                                       autocomplete="off" placeholder="sk-proj-…"
+                                       style="padding-right:36px;width:100%;box-sizing:border-box"
+                                       value="<?php echo esc_attr( $openai_key ); ?>">
+                                <button type="button" id="cs-ai-img-key-toggle"
+                                        title="Show / hide key"
+                                        style="position:absolute;right:8px;background:none;border:none;cursor:pointer;padding:0;line-height:1;font-size:16px;color:#94a3b8">👁</button>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                <button type="button" class="cs-btn-secondary" id="cs-ai-img-save-key"><?php esc_html_e( 'Save Key', 'cloudscale-devtools' ); ?></button>
+                                <button type="button" id="cs-ai-img-test-key" style="background:#16a34a;color:#fff;border:1px solid #15803d;border-radius:4px;padding:5px 14px;font-size:13px;font-weight:600;cursor:pointer"><?php esc_html_e( 'Test', 'cloudscale-devtools' ); ?></button>
+                                <span id="cs-ai-img-key-status" class="cs-sec-key-status"><?php echo $openai_key ? '<span style="color:#2e7d32">✓ Key saved</span>' : ''; ?></span>
+                            </div>
+                        </div>
+                        <span class="cs-hint"><?php echo wp_kses(
+                            __( 'Sign in at <a href="https://platform.openai.com" target="_blank" rel="noopener">platform.openai.com</a> → profile icon → <strong>API keys</strong> → <strong>Create new secret key</strong>. Add billing credit under <strong>Billing → Add payment method</strong> ($5 minimum). Key starts with <code>sk-proj-…</code>', 'cloudscale-devtools' ),
+                            [ 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ], 'strong' => [], 'code' => [] ]
+                        ); ?></span>
+                    </div>
+                </div>
+
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'Prompt writer:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <select id="cs-ai-img-prompt-writer" class="cs-sec-select">
+                            <option value="chatgpt"><?php esc_html_e( 'ChatGPT (GPT-4o mini)', 'cloudscale-devtools' ); ?></option>
+                            <option value="anthropic"><?php esc_html_e( 'Anthropic Claude', 'cloudscale-devtools' ); ?></option>
+                            <option value="gemini"><?php esc_html_e( 'Google Gemini', 'cloudscale-devtools' ); ?></option>
+                            <option value="none"><?php esc_html_e( 'None — use post title only', 'cloudscale-devtools' ); ?></option>
+                        </select>
+                        <span class="cs-hint"><?php echo wp_kses(
+                            __( '<strong>ChatGPT</strong> uses your OpenAI key above (recommended — same account as DALL-E, ~$0.001/prompt). <strong>Claude / Gemini</strong> use the keys from the Security tab. <strong>None</strong> sends the post title directly to DALL-E without any prompt improvement.', 'cloudscale-devtools' ),
+                            [ 'strong' => [] ]
+                        ); ?></span>
+                    </div>
+                </div>
+
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'Image quality:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <select id="cs-ai-img-quality" class="cs-sec-select">
+                            <option value="standard"><?php esc_html_e( 'Standard ($0.04 / image)', 'cloudscale-devtools' ); ?></option>
+                            <option value="hd"><?php esc_html_e( 'HD ($0.08 / image)', 'cloudscale-devtools' ); ?></option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'Sort by:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <select id="cs-ai-img-sort" class="cs-sec-select">
+                            <option value="newest"><?php esc_html_e( 'Newest first', 'cloudscale-devtools' ); ?></option>
+                            <option value="oldest"><?php esc_html_e( 'Oldest first', 'cloudscale-devtools' ); ?></option>
+                            <option value="popular"><?php esc_html_e( 'Most popular (by views)', 'cloudscale-devtools' ); ?></option>
+                        </select>
+                        <span class="cs-hint"><?php esc_html_e( 'Choose which posts to tackle first — new content or your most-read pages.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+
+                <div class="cs-sec-row">
+                    <span class="cs-sec-label"><?php esc_html_e( 'Options:', 'cloudscale-devtools' ); ?></span>
+                    <div class="cs-sec-control">
+                        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                            <input type="checkbox" id="cs-ai-img-dual" style="width:16px;height:16px">
+                            <?php esc_html_e( 'Generate 2 options per post (costs 2× per click)', 'cloudscale-devtools' ); ?>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="margin:16px 0 12px">
+                    <button type="button" class="cs-btn-primary" id="cs-ai-img-scan-btn">🔍 <?php esc_html_e( 'Find posts without featured image', 'cloudscale-devtools' ); ?></button>
+                </div>
+                <div id="cs-ai-img-results" style="display:none;margin-top:4px"></div>
+            </div>
+        </div>
+        <?php
+    }
+
     /**
      * Validates that a URL does not point to a private/reserved IP address.
      *
@@ -360,6 +465,13 @@ class CSDT_Thumbnails {
         if ( ! self::is_safe_external_url( $url ) ) {
             wp_send_json_error( [ 'message' => 'URL must be a publicly accessible address.' ] );
         }
+        $post_id = url_to_postid( $url );
+        if ( $post_id ) {
+            $chk = get_post( $post_id );
+            if ( $chk && ( $chk->post_status === 'private' || ! empty( $chk->post_password ) ) ) {
+                wp_send_json_error( [ 'message' => 'This post is password-protected or private — social crawlers cannot read it. Please enter a public URL.' ] );
+            }
+        }
         wp_send_json_success( self::social_diagnose_url( $url ) );
     }
 
@@ -376,6 +488,7 @@ class CSDT_Thumbnails {
             'posts_per_page' => 50,
             'orderby'        => 'date',
             'order'          => 'DESC',
+            'has_password'   => false,
             'meta_query'     => [ [ 'key' => '_thumbnail_id', 'compare' => 'EXISTS' ] ],
         ] );
         $results = [];
@@ -1167,6 +1280,13 @@ class CSDT_Thumbnails {
         if ( ! self::is_safe_external_url( $url ) ) {
             wp_send_json_error( [ 'message' => 'URL must be a publicly accessible address.' ] );
         }
+        $post_id = url_to_postid( $url );
+        if ( $post_id ) {
+            $chk = get_post( $post_id );
+            if ( $chk && ( $chk->post_status === 'private' || ! empty( $chk->post_password ) ) ) {
+                wp_send_json_error( [ 'message' => 'This post is password-protected or private — social crawlers cannot read it. Please enter a public URL.' ] );
+            }
+        }
         wp_send_json_success( self::social_test_crawlers( $url ) );
     }
 
@@ -1562,6 +1682,314 @@ class CSDT_Thumbnails {
         ];
     }
 
+    // ─── AJAX: save OpenAI key ───────────────────────────────────────────
+
+    public static function ajax_ai_image_save_key(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $raw = isset( $_POST['openai_key'] ) ? sanitize_text_field( wp_unslash( $_POST['openai_key'] ) ) : '';
+        $key = trim( $raw );
+        if ( $key !== '' ) {
+            update_option( 'csdt_devtools_openai_key', $key, false );
+        }
+        $saved = (string) get_option( 'csdt_devtools_openai_key', '' );
+        wp_send_json_success( [
+            'saved' => ! empty( $saved ),
+            'key'   => $saved,
+        ] );
+    }
+
+    // ─── AJAX: test OpenAI API key ───────────────────────────────────────
+
+    public static function ajax_ai_image_test_key(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $key = (string) get_option( 'csdt_devtools_openai_key', '' );
+        if ( ! $key ) {
+            wp_send_json_error( [ 'message' => 'No API key saved. Enter and save your key first.' ] );
+            return;
+        }
+        try {
+            CSDT_AI_Dispatcher::call_openai_text(
+                'You are a test assistant.',
+                'Reply with the single word OK and nothing else.',
+                5
+            );
+            wp_send_json_success( [ 'message' => '✓ Key is valid and OpenAI is reachable.' ] );
+        } catch ( \RuntimeException $e ) {
+            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+        }
+    }
+
+    // ─── AJAX: find posts without featured images ────────────────────────
+
+    public static function ajax_ai_image_scan(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $sort = isset( $_POST['sort'] ) ? sanitize_key( wp_unslash( $_POST['sort'] ) ) : 'newest';
+
+        // All known view-count meta keys — checked in priority order.
+        $view_meta_keys = [
+            '_cspv_view_count', 'ab_post_views',
+            'post_views_count', 'views', '_post_views', 'wpb_post_views_count',
+            'jetpack-views', '_postviews_counter', 'tally', 'total_views',
+            'views_counter', 'hit_count',
+        ];
+
+        // Fetch ALL published posts that have no thumbnail in one query.
+        $date_order = ( 'oldest' === $sort ) ? 'ASC' : 'DESC';
+        $posts = get_posts( [
+            'post_type'      => 'post',
+            'post_status'    => 'publish',
+            'posts_per_page' => 500,
+            'orderby'        => 'date',
+            'order'          => $date_order,
+            'fields'         => 'ids',
+            'meta_query'     => [ [ 'key' => '_thumbnail_id', 'compare' => 'NOT EXISTS' ] ],
+        ] );
+
+        $results = [];
+
+        foreach ( $posts as $post_id ) {
+            $post_obj = get_post( $post_id );
+
+            $view_count = null;
+            foreach ( $view_meta_keys as $mk ) {
+                $val = get_post_meta( $post_id, $mk, true );
+                if ( $val !== '' && $val !== false ) {
+                    $view_count = (int) $val;
+                    break;
+                }
+            }
+
+            $results[] = [
+                'post_id'       => $post_id,
+                'title'         => get_the_title( $post_id ),
+                'edit_url'      => get_edit_post_link( $post_id, 'raw' ),
+                'post_url'      => get_permalink( $post_id ),
+                'date'          => get_the_date( 'j M Y', $post_id ),
+                'comment_count' => (int) ( $post_obj ? $post_obj->comment_count : 0 ),
+                'view_count'    => $view_count,
+            ];
+        }
+
+        // For popular sort, re-sort in PHP by view_count desc, then comment_count desc.
+        if ( 'popular' === $sort ) {
+            usort( $results, function ( $a, $b ) {
+                $av = $a['view_count'] ?? 0;
+                $bv = $b['view_count'] ?? 0;
+                if ( $bv !== $av ) { return $bv - $av; }
+                return $b['comment_count'] - $a['comment_count'];
+            } );
+        }
+
+        wp_send_json_success( [ 'posts' => $results, 'sort' => $sort ] );
+    }
+
+    // ─── AJAX: generate DALL-E image for a post (returns 2 options) ─────
+
+    public static function ajax_ai_image_generate(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $post_id       = isset( $_POST['post_id'] )       ? (int) $_POST['post_id']                                   : 0;
+        $quality       = ( isset( $_POST['quality'] ) && $_POST['quality'] === 'hd' ) ? 'hd' : 'standard';
+        $prompt_writer = isset( $_POST['prompt_writer'] ) ? sanitize_key( wp_unslash( $_POST['prompt_writer'] ) ) : 'chatgpt';
+        $count         = ( isset( $_POST['dual'] ) && '1' === $_POST['dual'] ) ? 2 : 1;
+
+        if ( ! $post_id ) {
+            wp_send_json_error( [ 'message' => 'Invalid post ID.' ] );
+            return;
+        }
+        $post = get_post( $post_id );
+        if ( ! $post ) {
+            wp_send_json_error( [ 'message' => 'Post not found.' ] );
+            return;
+        }
+
+        $title   = $post->post_title;
+        $content = wp_strip_all_tags( $post->post_content );
+        $excerpt = $post->post_excerpt ?: wp_trim_words( $content, 50 );
+
+        $system_msg = 'You write precise DALL-E 3 image generation prompts for WordPress blog post header images. Output only the prompt, nothing else. No explanations.';
+        $user_msg   = "Post title: \"{$title}\"\nExcerpt: \"{$excerpt}\"\n\nWrite a DALL-E 3 prompt for a 1792x1024 professional blog post header image. No text or typography in the image. Photorealistic or clean editorial illustration style. Under 180 words.";
+
+        try {
+            switch ( $prompt_writer ) {
+                case 'chatgpt':
+                    $prompt = CSDT_AI_Dispatcher::call_openai_text( $system_msg, $user_msg, 300 );
+                    break;
+                case 'anthropic':
+                    $prompt = CSDT_AI_Dispatcher::call( $system_msg, $user_msg, '_auto', 300, 'anthropic' );
+                    break;
+                case 'gemini':
+                    $prompt = CSDT_AI_Dispatcher::call( $system_msg, $user_msg, '_auto', 300, 'gemini' );
+                    break;
+                default:
+                    $prompt = "Professional blog header image for an article titled \"{$title}\". High-quality, photorealistic, wide landscape format, no text or typography.";
+                    break;
+            }
+        } catch ( \RuntimeException $e ) {
+            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            return;
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+
+        $slug    = sanitize_file_name( $post->post_name ?: 'post-' . $post_id );
+        $options = [];
+
+        for ( $i = 1; $i <= $count; $i++ ) {
+            try {
+                $image_url = CSDT_AI_Dispatcher::generate_image( $prompt, '1792x1024', $quality );
+            } catch ( \RuntimeException $e ) {
+                continue;
+            }
+
+            $tmp_png = download_url( $image_url );
+            if ( is_wp_error( $tmp_png ) ) {
+                continue;
+            }
+
+            $tmp_jpg = self::convert_to_jpg_under_400k( $tmp_png );
+            @unlink( $tmp_png ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+
+            if ( ! $tmp_jpg ) {
+                continue;
+            }
+
+            $file = [
+                'name'     => $slug . '-ai-header-' . $i . '.jpg',
+                'tmp_name' => $tmp_jpg,
+            ];
+
+            $attach_id = media_handle_sideload( $file, $post_id, $title . ' (option ' . $i . ')' );
+            @unlink( $tmp_jpg ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+
+            if ( is_wp_error( $attach_id ) ) {
+                continue;
+            }
+
+            $options[] = [
+                'attach_id' => $attach_id,
+                'thumb_url' => wp_get_attachment_image_url( $attach_id, 'medium' ),
+                'full_url'  => wp_get_attachment_image_url( $attach_id, 'large' ),
+            ];
+        }
+
+        if ( empty( $options ) ) {
+            wp_send_json_error( [ 'message' => 'Failed to generate images.' ] );
+            return;
+        }
+
+        wp_send_json_success( [ 'options' => $options, 'prompt' => $prompt ] );
+    }
+
+    // ─── AJAX: pick one of the generated options as thumbnail ────────────
+
+    public static function ajax_ai_image_pick(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $post_id   = isset( $_POST['post_id'] )   ? (int) $_POST['post_id']   : 0;
+        $attach_id = isset( $_POST['attach_id'] ) ? (int) $_POST['attach_id'] : 0;
+        $discard   = isset( $_POST['discard'] ) && '' !== $_POST['discard']
+            ? array_map( 'intval', explode( ',', sanitize_text_field( wp_unslash( $_POST['discard'] ) ) ) )
+            : [];
+
+        if ( ! $post_id || ! $attach_id ) {
+            wp_send_json_error( [ 'message' => 'Invalid IDs.' ] );
+            return;
+        }
+
+        set_post_thumbnail( $post_id, $attach_id );
+
+        foreach ( $discard as $did ) {
+            if ( $did !== $attach_id ) {
+                wp_delete_attachment( $did, true );
+            }
+        }
+
+        wp_send_json_success( [
+            'thumb_url' => wp_get_attachment_image_url( $attach_id, 'medium' ),
+        ] );
+    }
+
+    // ─── Discard temp attachments (Cancel in modal) ──────────────────────
+
+    public static function ajax_ai_image_discard(): void {
+        check_ajax_referer( self::THUMB_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $raw = isset( $_POST['attach_ids'] ) ? sanitize_text_field( wp_unslash( $_POST['attach_ids'] ) ) : '';
+        $ids = array_filter( array_map( 'intval', explode( ',', $raw ) ) );
+
+        foreach ( $ids as $id ) {
+            wp_delete_attachment( $id, true );
+        }
+
+        wp_send_json_success();
+    }
+
+    // ─── Helper: convert any image to JPEG under 400 KB ──────────────────
+
+    private static function convert_to_jpg_under_400k( string $src_path ): ?string {
+        if ( ! function_exists( 'imagecreatefromstring' ) ) {
+            return null;
+        }
+        $data = file_get_contents( $src_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+        if ( ! $data ) {
+            return null;
+        }
+        $src = imagecreatefromstring( $data );
+        if ( ! $src ) {
+            return null;
+        }
+
+        $w   = imagesx( $src );
+        $h   = imagesy( $src );
+        $bg  = imagecreatetruecolor( $w, $h );
+        imagefill( $bg, 0, 0, imagecolorallocate( $bg, 255, 255, 255 ) );
+        imagealphablending( $bg, true );
+        imagecopy( $bg, $src, 0, 0, 0, 0, $w, $h );
+        imagedestroy( $src );
+
+        $jpg_path = $src_path . '.jpg';
+        $limit    = 400 * 1024;
+
+        for ( $q = 85; $q >= 40; $q -= 5 ) {
+            imagejpeg( $bg, $jpg_path, $q );
+            if ( file_exists( $jpg_path ) && filesize( $jpg_path ) < $limit ) {
+                break;
+            }
+        }
+
+        imagedestroy( $bg );
+
+        if ( ! file_exists( $jpg_path ) || filesize( $jpg_path ) >= $limit ) {
+            @unlink( $jpg_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+            return null;
+        }
+
+        return $jpg_path;
+    }
+
+
     // ─── AJAX: scan featured images for missing WordPress thumbnail sizes ────
 
     public static function ajax_regen_thumb_scan(): void {
@@ -1710,6 +2138,14 @@ class CSDT_Thumbnails {
        ================================================================== */
 
     public static function strip_asset_ver( string $src ): string {
+        // Only strip on the public frontend — never on admin pages (breaks cache-busting for plugin assets).
+        if ( is_admin() ) {
+            return $src;
+        }
+        // Never strip from our own plugin assets (ver= is plugin version, not WP version).
+        if ( strpos( $src, plugins_url( '', dirname( __FILE__ ) ) ) !== false ) {
+            return $src;
+        }
         if ( strpos( $src, 'ver=' ) !== false ) {
             $src = remove_query_arg( 'ver', $src );
         }

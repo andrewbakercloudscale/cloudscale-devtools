@@ -279,6 +279,22 @@ class CSDT_CSP {
                 </label>
             </div>
 
+            <!-- ── Violation Log sub-panel ────────────────────────────── -->
+            <div id="cs-csp-violation-wrap" style="<?php echo $csp_on && $reporting_on ? '' : 'display:none;'; ?><?php echo esc_attr( $sec_card ); ?>margin-bottom:14px;">
+                <div style="<?php echo esc_attr( $sec_header ); ?>" id="cs-csp-viol-header">
+                    <span style="<?php echo esc_attr( $sec_title ); ?>">&#x26A0;&#xFE0F; <?php esc_html_e( 'Violation Log', 'cloudscale-devtools' ); ?> <span id="cs-csp-viol-count" style="display:none;font-weight:700;color:#dc2626;"></span></span>
+                    <button type="button" id="cs-csp-viol-refresh" class="cs-btn-secondary cs-btn-sm" style="flex-shrink:0;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" id="cs-csp-viol-clear" class="cs-btn-secondary cs-btn-sm" style="border-color:#f87171;color:#dc2626;flex-shrink:0;"><?php esc_html_e( 'Clear', 'cloudscale-devtools' ); ?></button>
+                    <span id="cs-csp-viol-chevron" class="cs-details-toggle cs-details-toggle--js"></span>
+                </div>
+                <div id="cs-csp-viol-body" style="display:none;<?php echo esc_attr( $sec_body ); ?>padding:10px 14px;">
+                    <div id="cs-csp-viol-table" style="font-size:12px;"></div>
+                    <p style="font-size:11px;color:#94a3b8;margin:6px 0 0;">
+                        <?php esc_html_e( 'The browser sends a report for every blocked (or would-be-blocked) resource. Browse your site normally to populate this log.', 'cloudscale-devtools' ); ?>
+                    </p>
+                </div>
+            </div>
+
             <!-- Service checkboxes -->
             <div style="margin-bottom:14px;">
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:10px;"><?php esc_html_e( 'Third-party services used on this site', 'cloudscale-devtools' ); ?></div>
@@ -321,62 +337,62 @@ class CSDT_CSP {
                 <span id="cs-csp-rolledback" style="display:none;color:#d97706;font-size:13px;font-weight:600;">↩ <?php esc_html_e( 'Rolled back', 'cloudscale-devtools' ); ?></span>
             </div>
 
+            <?php
+            // ── Shared section-card style ────────────────────────────────
+            $sec_card   = 'margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;';
+            $sec_header = 'display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;cursor:pointer;user-select:none;min-height:44px;';
+            $sec_title  = 'font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569;flex:1;min-width:0;';
+            // "Show ▼" pill button — CSS flips to "Hide ▲" when details[open]
+            $sec_toggle = 'cs-details-toggle';  // CSS class, not inline style
+            $sec_body   = 'padding:0;';
+            ?>
+
             <?php if ( ! empty( $csp_history ) ) : ?>
-            <div id="cs-csp-history-wrap" style="margin-top:18px;">
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px;"><?php echo esc_html( sprintf( __( 'Change History (%d saves)', 'cloudscale-devtools' ), count( $csp_history ) ) ); ?></div>
-                <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+            <!-- ── Change History ─────────────────────────────────────── -->
+            <details id="cs-csp-history-wrap" style="<?php echo esc_attr( $sec_card ); ?>">
+                <summary style="<?php echo esc_attr( $sec_header ); ?>list-style:none;">
+                    <span style="<?php echo esc_attr( $sec_title ); ?>">&#x1F4CB; <?php echo esc_html( sprintf( __( 'Change History (%d saves)', 'cloudscale-devtools' ), count( $csp_history ) ) ); ?></span>
+                    <span class="<?php echo esc_attr( $sec_toggle ); ?>"></span>
+                </summary>
+                <div style="<?php echo esc_attr( $sec_body ); ?>">
                 <?php foreach ( $csp_history as $idx => $entry ) :
                     $ts    = $entry['saved_at'] ?? 0;
                     $label = esc_html( $entry['label'] ?? 'Settings saved' );
                     $age   = $ts ? esc_html( human_time_diff( $ts ) . ' ago' ) : '';
                     $bg    = $idx % 2 === 0 ? '#fff' : '#f8fafc';
                 ?>
-                    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:<?php echo esc_attr( $bg ); ?>;<?php echo $idx > 0 ? 'border-top:1px solid #e2e8f0;' : ''; ?>">
-                        <span style="color:#94a3b8;font-size:11px;white-space:nowrap;min-width:95px;"><?php echo $age; ?></span>
+                    <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:<?php echo esc_attr( $bg ); ?>;<?php echo $idx > 0 ? 'border-top:1px solid #e2e8f0;' : ''; ?>">
+                        <span style="color:#94a3b8;font-size:11px;white-space:nowrap;min-width:80px;"><?php echo $age; ?></span>
                         <span style="flex:1;font-size:12px;color:#334155;"><?php echo $label; ?></span>
                         <button type="button" class="cs-csp-restore-btn" data-index="<?php echo (int) $idx; ?>"
                                 style="background:none;border:1px solid #94a3b8;color:#475569;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;">↩ Restore</button>
                     </div>
                 <?php endforeach; ?>
                 </div>
-                <div id="cs-csp-restore-msg" style="display:none;margin-top:6px;font-size:12px;font-weight:600;color:#d97706;"></div>
-            </div>
+                <div id="cs-csp-restore-msg" style="display:none;padding:6px 14px;font-size:12px;font-weight:600;color:#d97706;"></div>
+            </details>
             <?php endif; ?>
 
-            <!-- Violation log — visible whenever reporting is enabled -->
-            <div id="cs-csp-violation-wrap" style="<?php echo $csp_on && $reporting_on ? '' : 'display:none;'; ?>margin-top:20px;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;"><?php esc_html_e( 'Violation Log', 'cloudscale-devtools' ); ?></span>
-                    <span id="cs-csp-viol-count" style="background:#6366f1;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;display:none;">0</span>
-                    <button type="button" id="cs-csp-viol-refresh" class="cs-btn-secondary cs-btn-sm" style="margin-left:auto;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
-                    <button type="button" id="cs-csp-viol-clear" class="cs-btn-secondary cs-btn-sm" style="border-color:#f87171;color:#dc2626;"><?php esc_html_e( 'Clear Log', 'cloudscale-devtools' ); ?></button>
-                </div>
-                <div id="cs-csp-viol-table" style="font-size:12px;"></div>
-                <p style="font-size:11px;color:#94a3b8;margin:6px 0 0;">
-                    <?php esc_html_e( 'The browser sends a report for every blocked (or would-be-blocked) resource. Browse your site normally to populate this log. Turn off "Log violations" when you no longer need to monitor.', 'cloudscale-devtools' ); ?>
-                </p>
-            </div>
-
-            <!-- Fixes log — visible whenever there are logged fixes -->
-            <div id="cs-csp-fixes-wrap" style="<?php echo ! empty( $fixes_log ) ? '' : 'display:none;'; ?>margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">✅ <?php esc_html_e( 'Fixes Applied', 'cloudscale-devtools' ); ?></span>
-                    <span id="cs-csp-fixes-count" style="background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;"><?php echo count( $fixes_log ); ?></span>
-                    <button type="button" id="cs-csp-fixes-clear" class="cs-btn-secondary cs-btn-sm" style="margin-left:auto;border-color:#f87171;color:#dc2626;"><?php esc_html_e( 'Clear Fixes Log', 'cloudscale-devtools' ); ?></button>
-                </div>
-                <div id="cs-csp-fixes-table" style="font-size:12px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+            <!-- ── Fixes Applied ─────────────────────────────────────── -->
+            <details id="cs-csp-fixes-wrap" style="<?php echo esc_attr( $sec_card ); ?><?php echo empty( $fixes_log ) ? 'display:none;' : ''; ?>">
+                <summary style="<?php echo esc_attr( $sec_header ); ?>list-style:none;">
+                    <span style="<?php echo esc_attr( $sec_title ); ?>">&#x2705; <?php echo esc_html( sprintf( __( 'Fixes Applied (%d)', 'cloudscale-devtools' ), count( $fixes_log ) ) ); ?></span>
+                    <button type="button" id="cs-csp-fixes-clear" class="cs-btn-secondary cs-btn-sm" style="border-color:#f87171;color:#dc2626;flex-shrink:0;" onclick="event.stopPropagation()"><?php esc_html_e( 'Clear', 'cloudscale-devtools' ); ?></button>
+                    <span class="<?php echo esc_attr( $sec_toggle ); ?>"></span>
+                </summary>
+                <div id="cs-csp-fixes-table" style="<?php echo esc_attr( $sec_body ); ?>">
                 <?php foreach ( $fixes_log as $i => $fix ) :
                     $ts  = isset( $fix['time'] ) ? human_time_diff( $fix['time'] ) . ' ago' : '';
                     $lbl = esc_html( $fix['label'] ?? 'Settings updated' );
                     $bg  = $i % 2 === 0 ? '#fff' : '#f8fafc';
                 ?>
-                    <div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:<?php echo esc_attr( $bg ); ?>;<?php echo $i > 0 ? 'border-top:1px solid #e2e8f0;' : ''; ?>">
-                        <span style="color:#94a3b8;font-size:11px;white-space:nowrap;min-width:90px;"><?php echo esc_html( $ts ); ?></span>
+                    <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;background:<?php echo esc_attr( $bg ); ?>;<?php echo $i > 0 ? 'border-top:1px solid #e2e8f0;' : ''; ?>">
+                        <span style="color:#94a3b8;font-size:11px;white-space:nowrap;min-width:80px;"><?php echo esc_html( $ts ); ?></span>
                         <span style="flex:1;font-size:12px;color:#15803d;font-weight:600;"><?php echo $lbl; ?></span>
                     </div>
                 <?php endforeach; ?>
                 </div>
-            </div>
+            </details>
 
             <!-- Header security scan -->
             <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0;">

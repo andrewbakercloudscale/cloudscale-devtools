@@ -127,6 +127,15 @@
         html += '</div>';
         html += '</div>';
 
+        // Count total findings for the Details label
+        var totalFindings = ['critical','high','medium','low'].reduce(function(n, k) {
+            return n + ((r[k] && r[k].length) || 0);
+        }, 0);
+        var detailsLabel = totalFindings > 0
+            ? 'Details (' + totalFindings + ' finding' + (totalFindings !== 1 ? 's' : '') + ') &#x25BC;'
+            : 'Details &#x25BC;';
+        html += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:#6366f1;list-style:none;display:list-item;padding:6px 0;user-select:none">' + detailsLabel + '</summary>';
+
         var secs = [
             { key: 'critical', label: 'Critical',       cls: 'cs-audit-sec-critical' },
             { key: 'high',     label: 'High',           cls: 'cs-audit-sec-high'     },
@@ -158,8 +167,12 @@
                     html += '<span>' + escHtml(issue.title) + '</span>';
                     if (qf) html += '<button type="button" class="button button-small cs-audit-qf-btn" data-modal="' + escHtml(qf.modal) + '" style="font-size:11px;padding:1px 8px;height:auto;line-height:1.6">' + escHtml(qf.label) + ' \u2192</button>';
                     html += '</div>';
-                    if (issue.detail) html += '<div class="cs-audit-issue-detail">' + escHtml(issue.detail) + '</div>';
-                    if (issue.fix)    html += '<div class="cs-audit-issue-fix">' + escHtml(issue.fix) + '</div>';
+                    if (issue.detail || issue.fix) {
+                        html += '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:#6366f1;font-weight:600;list-style:none;display:list-item">Details &#x25BC;</summary>';
+                        if (issue.detail) html += '<div class="cs-audit-issue-detail">' + escHtml(issue.detail) + '</div>';
+                        if (issue.fix)    html += '<div class="cs-audit-issue-fix">' + escHtml(issue.fix) + '</div>';
+                        html += '</details>';
+                    }
                     html += '</div>';
                 });
             }
@@ -200,6 +213,8 @@
             html += '<div class="cs-audit-section cs-audit-sec-good"><h4 class="cs-audit-section-title">Code Triage</h4>';
             html += '<div class="cs-audit-good-item"><span class="cs-audit-good-check">✓</span><div>No suspicious patterns found in active plugin code — triage not required.</div></div></div>';
         }
+
+        html += '</details>'; // close Details block
 
         container.innerHTML = html;
 
@@ -1263,8 +1278,12 @@
                     } else {
                         html += '<div style="background:' + sec.bg + ';border:1px solid ' + sec.border + ';border-left:3px solid ' + sec.color + ';border-radius:0 5px 5px 0;padding:10px 12px;margin-bottom:8px;">';
                         html += '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:4px;">' + escHtml(issue.title) + '</div>';
-                        if (issue.detail) html += '<div style="font-size:12px;color:#374151;line-height:1.5;margin-bottom:4px;">' + escHtml(issue.detail) + '</div>';
-                        if (issue.fix)    html += '<div style="font-size:12px;color:#1d4ed8;font-style:italic;">💡 ' + escHtml(issue.fix) + '</div>';
+                        if (issue.detail || issue.fix) {
+                            html += '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:#6366f1;font-weight:600;list-style:none;display:list-item">Details &#x25BC;</summary>';
+                            if (issue.detail) html += '<div style="font-size:12px;color:#374151;line-height:1.5;margin-top:4px;margin-bottom:4px;">' + escHtml(issue.detail) + '</div>';
+                            if (issue.fix)    html += '<div style="font-size:12px;color:#1d4ed8;font-style:italic;">💡 ' + escHtml(issue.fix) + '</div>';
+                            html += '</details>';
+                        }
                         html += '</div>';
                     }
                 });

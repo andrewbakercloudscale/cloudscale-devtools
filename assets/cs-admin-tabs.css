@@ -14,6 +14,7 @@
     margin-top: 10px;
     padding-left: 16px;
     padding-right: 20px;
+    overflow-x: hidden;
 }
 @media (max-width: 782px) {
     #cs-app {
@@ -1383,8 +1384,55 @@
     white-space: nowrap;
 }
 .cs-sec-control { display: flex; flex-direction: column; gap: 4px; }
-.cs-sec-key-input { width: 280px; max-width: 100%; font-family: monospace; font-size: 12px; }
+.cs-sec-key-input { width: 420px; max-width: 100%; font-family: monospace; font-size: 12px; }
 .cs-sec-select { width: 320px; max-width: 100%; font-size: 12px; }
+
+@media (max-width: 600px) {
+    /* Prevent anything inside the app from creating horizontal scroll */
+    #cs-app,
+    #cs-app .cs-panel,
+    #cs-app .cs-panel-body {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    .cs-panel-body {
+        padding: 14px 10px;
+    }
+    /* Stack label above control */
+    .cs-sec-row {
+        grid-template-columns: 1fr;
+        max-width: 100%;
+    }
+    .cs-sec-label {
+        white-space: normal;
+        margin-bottom: 0;
+    }
+    /* Full-width inputs and selects */
+    .cs-sec-control,
+    .cs-sec-control > * {
+        max-width: 100%;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    /* Flex rows inside controls wrap instead of overflowing */
+    .cs-sec-control > div {
+        flex-wrap: wrap;
+    }
+    .cs-sec-key-input,
+    .cs-sec-select {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    /* Hint text and inline code must wrap */
+    .cs-hint,
+    .cs-hint * {
+        word-break: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        max-width: 100%;
+    }
+}
 .cs-sec-prompt-area {
     width: 100%;
     max-width: 680px;
@@ -1514,3 +1562,26 @@
 .cs-scan-col-hint   { display: block; font-size: 11px; color: #64748b; }
 .cs-btn-deep { background: #6d28d9 !important; border-color: #5b21b6 !important; }
 .cs-btn-deep:hover:not(:disabled) { background: #5b21b6 !important; }
+
+/* ── Collapsible section toggle pill ─────────────────────────── */
+.cs-details-toggle {
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #6366f1;
+    background: #ede9fe;
+    border: 1px solid #c4b5fd;
+    border-radius: 20px;
+    padding: 5px 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: 8px;
+    min-height: 34px;
+    cursor: pointer;
+}
+/* CSS-driven text for <details>/<summary> toggles */
+.cs-details-toggle::after       { content: "Show ▼"; }
+details[open] > summary .cs-details-toggle::after { content: "Hide ▲"; }
+/* JS-driven variant (violation log) — text set by JS, no ::after */
+.cs-details-toggle--js::after   { content: none; }

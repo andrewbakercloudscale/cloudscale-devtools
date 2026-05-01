@@ -370,6 +370,12 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_social_cf_test',     [ 'CSDT_Thumbnails', 'ajax_social_cf_test' ] );
         add_action( 'wp_ajax_csdt_devtools_cf_purge',           [ 'CSDT_Thumbnails', 'ajax_cf_purge' ] );
         add_action( 'wp_ajax_csdt_devtools_cf_save',            [ 'CSDT_Thumbnails', 'ajax_cf_save' ] );
+        add_action( 'wp_ajax_csdt_devtools_ai_image_save_key',  [ 'CSDT_Thumbnails', 'ajax_ai_image_save_key' ] );
+        add_action( 'wp_ajax_csdt_devtools_ai_image_test_key', [ 'CSDT_Thumbnails', 'ajax_ai_image_test_key' ] );
+        add_action( 'wp_ajax_csdt_devtools_ai_image_scan',      [ 'CSDT_Thumbnails', 'ajax_ai_image_scan' ] );
+        add_action( 'wp_ajax_csdt_devtools_ai_image_generate',  [ 'CSDT_Thumbnails', 'ajax_ai_image_generate' ] );
+        add_action( 'wp_ajax_csdt_devtools_ai_image_pick',      [ 'CSDT_Thumbnails', 'ajax_ai_image_pick' ] );
+        add_action( 'wp_ajax_csdt_devtools_ai_image_discard',   [ 'CSDT_Thumbnails', 'ajax_ai_image_discard' ] );
 
         // SMTP AJAX
         add_action( 'wp_ajax_csdt_devtools_smtp_save',      [ 'CSDT_SMTP', 'ajax_smtp_save' ] );
@@ -1149,6 +1155,12 @@ class CloudScale_DevTools {
             'sanitize_callback' => 'sanitize_text_field',
             'default'           => '',
         ] );
+
+        register_setting( 'csdt_devtools_thumbs_settings', 'csdt_devtools_openai_key', [
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => '',
+        ] );
     }
 
     /* ==================================================================
@@ -1435,7 +1447,7 @@ class CloudScale_DevTools {
             );
         }
 
-        if ( $active_tab === 'thumbnails' ) {
+        if ( $active_tab === 'thumbnails' || $active_tab === 'ai-images' ) {
             wp_enqueue_media();
             $thumb_js = plugin_dir_path( __FILE__ ) . 'assets/cs-thumbnails.js';
             wp_enqueue_script(
@@ -1600,6 +1612,10 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'security' ? 'active' : ''; ?>">
                     🛡️ <?php esc_html_e( 'AI Security Scan', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=ai-images' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'ai-images' ? 'active' : ''; ?>">
+                    🎨 <?php esc_html_e( 'Featured Images', 'cloudscale-devtools' ); ?>
+                </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=optimizer' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'optimizer' ? 'active' : ''; ?>">
                     ⚡ <?php esc_html_e( 'Performance', 'cloudscale-devtools' ); ?>
@@ -1608,7 +1624,6 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'debug' ? 'active' : ''; ?>">
                     🩺 <?php esc_html_e( 'Diagnostics', 'cloudscale-devtools' ); ?>
                 </a>
-
                 <a href="<?php echo esc_url( $base_url . '&tab=mail' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'mail' ? 'active' : ''; ?>">
                     📧 <?php esc_html_e( 'Mail / SMTP', 'cloudscale-devtools' ); ?>
@@ -1641,6 +1656,10 @@ class CloudScale_DevTools {
             <?php elseif ( $active_tab === 'thumbnails' ) : ?>
                 <div class="cs-tab-content active">
                     <?php CSDT_Thumbnails::render_thumbnails_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'ai-images' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php CSDT_Thumbnails::render_ai_images_panel(); ?>
                 </div>
             <?php elseif ( $active_tab === 'security' ) : ?>
                 <div class="cs-tab-content active">
@@ -4232,6 +4251,38 @@ class CloudScale_DevTools {
             </div>
             <?php endif; ?>
 
+            <!-- Card 7: AI Image Generator -->
+            <?php
+            $openai_key    = get_option( 'csdt_devtools_openai_key', '' );
+            $thumbs_url    = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=thumbnails' );
+            if ( $openai_key ) :
+                $missing_images = (int) ( new WP_Query( [
+                    'post_type'      => 'post',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1,
+                    'fields'         => 'ids',
+                    'meta_query'     => [ [ 'key' => '_thumbnail_id', 'compare' => 'NOT EXISTS' ] ],
+                ] ) )->found_posts;
+            ?>
+            <div style="background:<?php echo $missing_images ? '#fffbeb' : '#f0fdf4'; ?>;border:1px solid <?php echo $missing_images ? '#fcd34d' : '#86efac'; ?>;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'AI Image Generator', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:<?php echo $missing_images ? '#92400e' : '#15803d'; ?>;">
+                    <?php echo $missing_images
+                        ? '&#x26A0;&#xFE0F; ' . sprintf( esc_html__( '%d posts need images', 'cloudscale-devtools' ), $missing_images )
+                        : '&#x2705; ' . esc_html__( 'All posts have images', 'cloudscale-devtools' ); ?>
+                </div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'DALL-E 3 · OpenAI key configured', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $thumbs_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Generate Images', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php else : ?>
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:12px 14px;">
+                <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;"><?php esc_html_e( 'AI Image Generator', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:13px;font-weight:700;color:#dc2626;">&#x274C; <?php esc_html_e( 'Not configured', 'cloudscale-devtools' ); ?></div>
+                <div style="font-size:11px;color:#dc2626;margin-top:2px;line-height:1.4;"><?php esc_html_e( 'Add an OpenAI key to generate featured images with DALL-E 3.', 'cloudscale-devtools' ); ?></div>
+                <a href="<?php echo esc_url( $thumbs_url ); ?>" style="font-size:11px;color:#6366f1;font-weight:600;display:inline-block;margin-top:6px;text-decoration:none;"><?php esc_html_e( 'Set up', 'cloudscale-devtools' ); ?> &rarr;</a>
+            </div>
+            <?php endif; ?>
+
         </div><!-- /status grid -->
 
         <!-- ── DB Prefix Rollback Banner ──────────────────────────────────── -->
@@ -4895,6 +4946,11 @@ class CloudScale_DevTools {
                         <a href="#cs-panel-ai-cyber-audit" onclick="document.getElementById('cs-panel-ai-cyber-audit').scrollIntoView({behavior:'smooth'});return false;" style="display:inline-block;background:#6366f1;color:#fff;font-weight:600;font-size:13px;padding:7px 18px;border-radius:6px;text-decoration:none;">Run First Scan ↑</a>
                     </div>
                 <?php else : ?>
+                    <details id="cs-scan-history-list">
+                    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:4px 2px;margin-bottom:8px;user-select:none;">
+                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;"><?php echo esc_html( sprintf( _n( '%d scan', '%d scans', count( $history ), 'cloudscale-devtools' ), count( $history ) ) ); ?></span>
+                        <span style="font-size:10px;color:#94a3b8;margin-left:auto;">&#x25BC;</span>
+                    </summary>
                     <div style="display:flex;flex-direction:column;gap:6px;">
                     <?php foreach ( $history as $idx => $entry ) :
                         $score       = (int) ( $entry['score'] ?? 0 );
@@ -4941,6 +4997,7 @@ class CloudScale_DevTools {
                         </div>
                     <?php endforeach; ?>
                     </div>
+                    </details>
                 <?php endif; ?>
                 </div><!-- /cs-panel-body scan-history -->
                 </div><!-- /cs-panel-scan-history -->

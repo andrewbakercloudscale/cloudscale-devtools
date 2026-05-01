@@ -23,6 +23,7 @@ $options = [
     'csdt_devtools_code_theme_pair',
     'csdt_devtools_anthropic_key',
     'csdt_devtools_gemini_key',
+    'csdt_devtools_openai_key',
     'csdt_devtools_ai_provider',
     'csdt_devtools_security_model',
     'csdt_devtools_deep_scan_model',

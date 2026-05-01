@@ -86,10 +86,11 @@ class CSDT_AI_Dispatcher {
     /**
      * Make a single synchronous AI call. Returns the model's text response.
      *
+     * @param string $force_provider Optional provider override ('anthropic'|'gemini'). Empty = use configured.
      * @throws \RuntimeException on API or network error.
      */
-    public static function call( string $system, string $user_message, string $model, int $max_tokens ): string {
-        $provider = get_option( 'csdt_devtools_ai_provider', 'anthropic' );
+    public static function call( string $system, string $user_message, string $model, int $max_tokens, string $force_provider = '' ): string {
+        $provider = $force_provider !== '' ? $force_provider : get_option( 'csdt_devtools_ai_provider', 'anthropic' );
         $req      = self::build_request( $provider, $system, $user_message, $model, $max_tokens );
 
         // Convert curl-style "Key: value" headers to WP associative format.
@@ -223,10 +224,89 @@ class CSDT_AI_Dispatcher {
 
     // ── Convenience helpers ───────────────────────────────────────────
 
-    /** Returns true when at least one API key is configured. */
+    /** Returns true when at least one text-AI API key is configured. */
     public static function has_key(): bool {
         return ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) )
             || ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+    }
+
+    /** Returns true when an OpenAI key is configured. */
+    public static function has_openai_key(): bool {
+        return ! empty( get_option( 'csdt_devtools_openai_key', '' ) );
+    }
+
+    /**
+     * Call GPT-4o mini for text generation (uses the OpenAI key).
+     *
+     * @throws \RuntimeException on API or network error.
+     */
+    public static function call_openai_text( string $system, string $user_message, int $max_tokens = 300 ): string {
+        $key = get_option( 'csdt_devtools_openai_key', '' );
+        if ( ! $key ) { throw new \RuntimeException( 'No OpenAI API key configured.' ); }
+
+        $resp = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 60,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $key,
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model'      => 'gpt-4o-mini',
+                'max_tokens' => $max_tokens,
+                'messages'   => [
+                    [ 'role' => 'system', 'content' => $system ],
+                    [ 'role' => 'user',   'content' => $user_message ],
+                ],
+            ] ),
+        ] );
+
+        if ( is_wp_error( $resp ) ) { throw new \RuntimeException( $resp->get_error_message() ); }
+        $code = wp_remote_retrieve_response_code( $resp );
+        $body = wp_remote_retrieve_body( $resp );
+        $data = json_decode( $body, true );
+        if ( $code !== 200 ) {
+            throw new \RuntimeException( $data['error']['message'] ?? "HTTP {$code}" );
+        }
+        return trim( $data['choices'][0]['message']['content'] ?? '' );
+    }
+
+    /**
+     * Generate an image via DALL-E 3. Returns the temporary image URL.
+     *
+     * @param string $prompt  The image description.
+     * @param string $size    DALL-E size string — '1792x1024' (default landscape) or '1024x1024'.
+     * @param string $quality 'standard' or 'hd'.
+     * @throws \RuntimeException on API or network error.
+     */
+    public static function generate_image( string $prompt, string $size = '1792x1024', string $quality = 'standard' ): string {
+        $key = get_option( 'csdt_devtools_openai_key', '' );
+        if ( ! $key ) { throw new \RuntimeException( 'No OpenAI API key configured.' ); }
+
+        $resp = wp_remote_post( 'https://api.openai.com/v1/images/generations', [
+            'timeout' => 90,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $key,
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model'   => 'dall-e-3',
+                'prompt'  => $prompt,
+                'n'       => 1,
+                'size'    => $size,
+                'quality' => $quality,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $resp ) ) { throw new \RuntimeException( $resp->get_error_message() ); }
+        $code = wp_remote_retrieve_response_code( $resp );
+        $body = wp_remote_retrieve_body( $resp );
+        $data = json_decode( $body, true );
+        if ( $code !== 200 ) {
+            throw new \RuntimeException( $data['error']['message'] ?? "HTTP {$code}" );
+        }
+        $url = $data['data'][0]['url'] ?? '';
+        if ( ! $url ) { throw new \RuntimeException( 'DALL-E returned no image URL.' ); }
+        return $url;
     }
 
     /**

@@ -1179,4 +1179,327 @@
     } else {
         init();
     }
+
+} )();
+
+/* ── AI Image Generator ──────────────────────────────────────────────────────
+   DALL-E 3 image generation for posts without a featured image.
+ */
+( function () {
+    'use strict';
+
+    const cfg     = window.csdtDevtoolsThumbs || {};
+    const ajaxUrl = cfg.ajaxUrl || '';
+    const nonce   = cfg.nonce   || '';
+
+    function post( action, data ) {
+        const body = new URLSearchParams( { action, nonce, ...data } );
+        return fetch( ajaxUrl, { method: 'POST', body } )
+            .then( r => r.json() )
+            .then( res => {
+                if ( res === -1 || res === 0 ) {
+                    return { success: false, data: { message: 'Session expired — please reload.' } };
+                }
+                return res;
+            } );
+    }
+
+    function esc( str ) {
+        return String( str )
+            .replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
+            .replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
+    }
+
+    function init() {
+        const saveKeyBtn = document.getElementById( 'cs-ai-img-save-key' );
+        const scanBtn    = document.getElementById( 'cs-ai-img-scan-btn' );
+        const results    = document.getElementById( 'cs-ai-img-results' );
+
+        if ( ! saveKeyBtn ) return;
+
+        // ── Eye toggle for API key ────────────────────────────────────────
+        const keyToggleBtn = document.getElementById( 'cs-ai-img-key-toggle' );
+        if ( keyToggleBtn ) {
+            keyToggleBtn.addEventListener( 'click', () => {
+                const keyInput = document.getElementById( 'cs-ai-img-openai-key' );
+                if ( ! keyInput ) return;
+                keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+                keyToggleBtn.style.opacity = keyInput.type === 'text' ? '1' : '0.4';
+            } );
+        }
+
+        // ── Test OpenAI key ───────────────────────────────────────────────
+        const testKeyBtn = document.getElementById( 'cs-ai-img-test-key' );
+        if ( testKeyBtn ) {
+            testKeyBtn.addEventListener( 'click', () => {
+                const keyStatus = document.getElementById( 'cs-ai-img-key-status' );
+                testKeyBtn.disabled    = true;
+                testKeyBtn.textContent = '⏳ Testing…';
+                post( 'csdt_devtools_ai_image_test_key', {} )
+                    .then( res => {
+                        testKeyBtn.disabled    = false;
+                        testKeyBtn.textContent = 'Test';
+                        if ( keyStatus ) {
+                            keyStatus.innerHTML = res.success
+                                ? '<span style="color:#2e7d32">' + esc( res.data.message ) + '</span>'
+                                : '<span style="color:#c62828">✗ ' + esc( res.data?.message || 'Test failed.' ) + '</span>';
+                        }
+                    } )
+                    .catch( () => {
+                        testKeyBtn.disabled    = false;
+                        testKeyBtn.textContent = 'Test';
+                        if ( keyStatus ) keyStatus.innerHTML = '<span style="color:#c62828">✗ Request failed — try refreshing the page</span>';
+                    } );
+            } );
+        }
+
+        // ── Save OpenAI key ───────────────────────────────────────────────
+        saveKeyBtn.addEventListener( 'click', () => {
+            const keyInput  = document.getElementById( 'cs-ai-img-openai-key' );
+            const keyStatus = document.getElementById( 'cs-ai-img-key-status' );
+            const rawKey    = ( keyInput?.value || '' ).trim();
+            if ( ! rawKey ) { alert( 'Enter an OpenAI API key first.' ); return; }
+
+            saveKeyBtn.disabled    = true;
+            saveKeyBtn.textContent = 'Saving…';
+
+            post( 'csdt_devtools_ai_image_save_key', { openai_key: rawKey } )
+                .then( res => {
+                    saveKeyBtn.disabled    = false;
+                    saveKeyBtn.textContent = 'Save Key';
+                    if ( res.success ) {
+                        if ( keyInput ) keyInput.value = res.data.key || '';
+                        if ( keyStatus ) keyStatus.innerHTML = '<span style="color:#2e7d32">✓ Key saved</span>';
+                    } else {
+                        if ( keyStatus ) keyStatus.innerHTML = '<span style="color:#c62828">✗ ' + esc( res.data?.message || 'Save failed.' ) + '</span>';
+                    }
+                } )
+                .catch( () => {
+                    saveKeyBtn.disabled    = false;
+                    saveKeyBtn.textContent = 'Save Key';
+                    alert( 'Request failed.' );
+                } );
+        } );
+
+        // ── Auto re-scan when sort changes and results are visible ───────
+        const sortEl = document.getElementById( 'cs-ai-img-sort' );
+        if ( sortEl ) {
+            sortEl.addEventListener( 'change', () => {
+                if ( results && results.style.display !== 'none' && results.innerHTML.trim() ) {
+                    scanBtn.click();
+                }
+            } );
+        }
+
+        // ── Scan for posts without featured images ────────────────────────
+        scanBtn.addEventListener( 'click', () => {
+            const sort = document.getElementById( 'cs-ai-img-sort' )?.value || 'newest';
+            scanBtn.disabled    = true;
+            scanBtn.textContent = 'Scanning…';
+            if ( results ) {
+                results.style.display = 'block';
+                results.innerHTML     = '<p style="color:#555;font-size:13px">⏳ Finding posts without featured images…</p>';
+            }
+
+            post( 'csdt_devtools_ai_image_scan', { sort } )
+                .then( res => {
+                    scanBtn.disabled    = false;
+                    scanBtn.textContent = '🔍 Find posts without featured image';
+                    if ( ! res.success ) {
+                        if ( results ) results.innerHTML = '<p style="color:#c62828">Error: ' + esc( res.data?.message || 'Scan failed.' ) + '</p>';
+                        return;
+                    }
+                    const posts  = res.data?.posts || [];
+                    const sortBy = res.data?.sort  || 'newest';
+                    if ( ! posts.length ) {
+                        if ( results ) results.innerHTML = '<p style="color:#2e7d32;font-size:13px">✓ All posts have a featured image.</p>';
+                        return;
+                    }
+                    renderPostList( posts, sortBy );
+                } )
+                .catch( () => {
+                    scanBtn.disabled    = false;
+                    scanBtn.textContent = '🔍 Find posts without featured image';
+                    if ( results ) results.innerHTML = '<p style="color:#c62828">Request failed.</p>';
+                } );
+        } );
+
+        // ── Render post list ──────────────────────────────────────────────
+        function renderPostList( posts, sortBy ) {
+            if ( ! results ) return;
+            const sortLabel = sortBy === 'popular' ? 'by popularity' : sortBy === 'oldest' ? 'oldest first' : 'newest first';
+            let html = `<p style="font-size:13px;color:#555;margin-bottom:10px">Found <strong>${esc(String(posts.length))}</strong> post(s) without a featured image <span style="color:#94a3b8">(${esc(sortLabel)})</span>:</p>`;
+            html += '<div style="display:flex;flex-direction:column;gap:8px">';
+            for ( const p of posts ) {
+                const viewCount = ( p.view_count !== null && p.view_count !== undefined ) ? p.view_count : 0;
+                const viewsBadge = `<span style="font-size:11px;color:#94a3b8;margin-left:8px">👁 ${esc(String(viewCount))}</span>`;
+                const meta = `<span style="font-size:11px;color:#94a3b8">${esc(p.date)}</span>${viewsBadge}`;
+                html += `
+                <div id="cs-ai-row-${esc(String(p.post_id))}" style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;flex-wrap:wrap">
+                    <div style="flex:1;min-width:120px">
+                        <a href="${esc(p.post_url)}" target="_blank" style="font-size:13px;font-weight:600;color:#1565c0;text-decoration:none;display:block;margin-bottom:2px">${esc(p.title)}</a>
+                        ${meta}
+                    </div>
+                    <div id="cs-ai-thumb-${esc(String(p.post_id))}" style="width:80px;flex-shrink:0"></div>
+                    <button type="button" class="cs-btn-primary cs-ai-gen-btn" data-post-id="${esc(String(p.post_id))}"
+                            style="font-size:12px;padding:5px 12px;white-space:nowrap">
+                        ✨ Generate
+                    </button>
+                    <span id="cs-ai-status-${esc(String(p.post_id))}" style="font-size:12px;color:#555;min-width:80px"></span>
+                </div>`;
+            }
+            html += '</div>';
+            results.style.display = 'block';
+            results.innerHTML     = html;
+
+            // Attach click handlers to generate buttons.
+            results.querySelectorAll( '.cs-ai-gen-btn' ).forEach( btn => {
+                btn.addEventListener( 'click', () => triggerGenerate( btn ) );
+            } );
+        }
+
+        // ── Image preview modal ───────────────────────────────────────────
+        const imageModal = ( () => {
+            const overlay = document.createElement( 'div' );
+            overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:99999;overflow-y:auto;padding:32px 16px;box-sizing:border-box';
+            const box = document.createElement( 'div' );
+            box.style.cssText = 'background:#fff;border-radius:10px;max-width:740px;margin:0 auto;box-shadow:0 16px 56px rgba(0,0,0,.5);overflow:hidden';
+            overlay.appendChild( box );
+            document.body.appendChild( overlay );
+            let _cb = {};
+            overlay.addEventListener( 'click', e => { if ( e.target === overlay ) _cancel(); } );
+            document.addEventListener( 'keydown', e => { if ( e.key === 'Escape' && overlay.style.display !== 'none' ) _cancel(); } );
+            function _cancel() { overlay.style.display = 'none'; if ( _cb.onCancel ) _cb.onCancel(); }
+            function open( options, callbacks ) {
+                _cb = callbacks || {};
+                const isMult = options.length > 1;
+                const titleText = isMult
+                    ? `Choose a Featured Image (${options.length} options)`
+                    : 'Generated Featured Image';
+                const imagesHtml = isMult
+                    ? `<div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;padding:24px 20px 12px">` +
+                      options.map( ( opt, i ) =>
+                        `<div style="flex:1;min-width:220px;max-width:320px;text-align:center">
+                            <img src="${esc(opt.thumb_url)}" style="width:100%;max-height:210px;object-fit:cover;border-radius:6px;border:2px solid #e2e8f0;display:block">
+                            <button type="button" class="cs-modal-pick-btn"
+                                data-attach-id="${esc(String(opt.attach_id))}"
+                                style="margin-top:10px;background:#1565c0;color:#fff;border:none;border-radius:5px;padding:8px 0;font-size:13px;font-weight:600;cursor:pointer;width:100%">
+                                ✓ Use Option ${i + 1}
+                            </button>
+                        </div>` ).join( '' ) +
+                      `</div>`
+                    : `<div style="padding:24px 20px 12px;text-align:center">
+                          <img src="${esc(options[0].thumb_url)}" style="max-width:100%;max-height:420px;border-radius:6px;border:1px solid #e2e8f0;object-fit:contain;box-shadow:0 4px 24px rgba(0,0,0,.15)">
+                       </div>`;
+                const footerBtns = isMult
+                    ? `<button type="button" class="cs-modal-regen"  style="background:#6366f1;color:#fff;border:none;border-radius:5px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">↺ Regenerate both</button>
+                       <button type="button" class="cs-modal-cancel" style="background:#fff;color:#64748b;border:1px solid #cbd5e1;border-radius:5px;padding:8px 18px;font-size:13px;cursor:pointer">✕ Cancel</button>`
+                    : `<button type="button" class="cs-modal-accept" style="background:#16a34a;color:#fff;border:none;border-radius:5px;padding:8px 22px;font-size:13px;font-weight:600;cursor:pointer">✓ Accept</button>
+                       <button type="button" class="cs-modal-regen"  style="background:#6366f1;color:#fff;border:none;border-radius:5px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">↺ Regenerate</button>
+                       <button type="button" class="cs-modal-cancel" style="background:#fff;color:#64748b;border:1px solid #cbd5e1;border-radius:5px;padding:8px 18px;font-size:13px;cursor:pointer">✕ Cancel</button>`;
+                box.innerHTML = `
+                    <div style="background:#1d2327;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
+                        <strong style="font-size:14px">🖼 ${esc(titleText)}</strong>
+                        <button class="cs-modal-close-x" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">&times;</button>
+                    </div>
+                    ${imagesHtml}
+                    <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:12px 20px;border-top:1px solid #e2e8f0;background:#f8fafc">
+                        ${footerBtns}
+                    </div>`;
+                overlay.style.display = 'block';
+                box.querySelector( '.cs-modal-close-x' )?.addEventListener( 'click', _cancel );
+                box.querySelector( '.cs-modal-cancel' )?.addEventListener( 'click', _cancel );
+                box.querySelector( '.cs-modal-accept' )?.addEventListener( 'click', () => {
+                    overlay.style.display = 'none';
+                    if ( _cb.onAccept ) _cb.onAccept( options[0].attach_id );
+                } );
+                box.querySelector( '.cs-modal-regen' )?.addEventListener( 'click', () => {
+                    overlay.style.display = 'none';
+                    if ( _cb.onRegenerate ) _cb.onRegenerate();
+                } );
+                box.querySelectorAll( '.cs-modal-pick-btn' ).forEach( btn => {
+                    btn.addEventListener( 'click', () => {
+                        overlay.style.display = 'none';
+                        if ( _cb.onAccept ) _cb.onAccept( btn.dataset.attachId );
+                    } );
+                } );
+            }
+            return { open };
+        } )();
+
+        function triggerGenerate( btn ) {
+            const postId       = btn.dataset.postId;
+            const statusEl     = document.getElementById( 'cs-ai-status-' + postId );
+            const thumbEl      = document.getElementById( 'cs-ai-thumb-'  + postId );
+            const quality      = document.getElementById( 'cs-ai-img-quality' )?.value       || 'standard';
+            const promptWriter = document.getElementById( 'cs-ai-img-prompt-writer' )?.value || 'chatgpt';
+            const dual         = document.getElementById( 'cs-ai-img-dual' )?.checked ? '1' : '0';
+
+            btn.disabled    = true;
+            btn.textContent = dual === '1' ? '⏳ Generating 2 options…' : '⏳ Generating…';
+            if ( statusEl ) statusEl.textContent = '';
+            if ( thumbEl )  { thumbEl.innerHTML = ''; thumbEl.style.width = ''; }
+
+            post( 'csdt_devtools_ai_image_generate', { post_id: postId, quality, prompt_writer: promptWriter, dual } )
+                .then( res => {
+                    btn.disabled = false;
+                    if ( ! res.success ) {
+                        btn.textContent = '✨ Generate';
+                        if ( statusEl ) statusEl.innerHTML = '<span style="color:#c62828;font-size:11px">✗ ' + esc( res.data?.message || 'Failed' ) + '</span>';
+                        return;
+                    }
+                    const options = res.data.options || [];
+                    if ( ! options.length ) {
+                        btn.textContent = '✨ Generate';
+                        if ( statusEl ) statusEl.innerHTML = '<span style="color:#c62828">✗ No images returned</span>';
+                        return;
+                    }
+                    btn.textContent = '↺ Regenerate';
+                    const allIds = options.map( o => String( o.attach_id ) );
+
+                    function doAccept( chosenId ) {
+                        const discard = allIds.filter( id => id !== String( chosenId ) ).join( ',' );
+                        if ( statusEl ) statusEl.innerHTML = '<span style="color:#94a3b8;font-size:11px">⏳ Setting…</span>';
+                        post( 'csdt_devtools_ai_image_pick', { post_id: postId, attach_id: chosenId, discard } )
+                            .then( pickRes => {
+                                if ( pickRes.success ) {
+                                    if ( thumbEl ) {
+                                        thumbEl.style.width = '80px';
+                                        thumbEl.innerHTML = `<img src="${esc(pickRes.data.thumb_url)}" style="width:80px;height:42px;object-fit:cover;border-radius:3px;border:1px solid #ddd;cursor:pointer" title="Click to view larger" class="cs-ai-thumb-preview" data-full-url="${esc(pickRes.data.thumb_url)}">`;
+                                        thumbEl.querySelector( '.cs-ai-thumb-preview' )?.addEventListener( 'click', function () {
+                                            imageModal.open( [ { thumb_url: this.dataset.fullUrl, attach_id: chosenId } ], {
+                                                onAccept: () => {},
+                                                onRegenerate: () => { btn.textContent = '✨ Generate'; triggerGenerate( btn ); },
+                                                onCancel: () => {},
+                                            } );
+                                        } );
+                                    }
+                                    if ( statusEl ) statusEl.innerHTML = '<span style="color:#2e7d32">✓ Set</span>';
+                                }
+                            } );
+                    }
+
+                    function doDiscard() {
+                        post( 'csdt_devtools_ai_image_discard', { attach_ids: allIds.join( ',' ) } ).catch( () => {} );
+                    }
+
+                    imageModal.open( options, {
+                        onAccept:     ( chosenId ) => doAccept( chosenId ),
+                        onRegenerate: () => { doDiscard(); btn.textContent = '✨ Generate'; triggerGenerate( btn ); },
+                        onCancel:     () => { doDiscard(); btn.textContent = '✨ Generate'; if ( statusEl ) statusEl.textContent = ''; },
+                    } );
+                } )
+                .catch( () => {
+                    btn.disabled    = false;
+                    btn.textContent = '✨ Generate';
+                    if ( statusEl ) statusEl.innerHTML = '<span style="color:#c62828">✗ Error</span>';
+                } );
+        }
+    }
+
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', init );
+    } else {
+        init();
+    }
 } )();

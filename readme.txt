@@ -298,6 +298,20 @@ Anthropic Terms of Service: https://www.anthropic.com/terms
 Google Privacy Policy: https://policies.google.com/privacy
 Google Terms of Service: https://policies.google.com/terms
 
+= OpenAI API (optional — AI Image Generator only) =
+
+**Service:** OpenAI, LLC
+**Website:** https://openai.com
+**Endpoints used:**
+- https://api.openai.com/v1/chat/completions (GPT-4o mini — writes the DALL-E prompt)
+- https://api.openai.com/v1/images/generations (DALL-E 3 — generates the image)
+**Data sent:** Your post title and excerpt are sent to GPT-4o mini to write an image prompt. The generated prompt is then sent to DALL-E 3 to produce a 1792×1024 JPEG. No visitor data or sensitive site configuration is transmitted.
+**When data is sent:** Only when you click "Generate" on a post in the AI Image Generator panel on the Thumbnails tab and ChatGPT is selected as the prompt writer. Nothing is sent automatically.
+**API key:** You must supply your own OpenAI API key. The key is stored in your WordPress database (wp_options) and is never transmitted anywhere except directly to api.openai.com.
+
+OpenAI Privacy Policy: https://openai.com/policies/privacy-policy
+OpenAI Terms of Service: https://openai.com/policies/terms-of-use
+
 == Upgrade Notice ==
 
 = 1.9.107 =
