@@ -1405,26 +1405,30 @@
         // ── Auto re-scan when sort changes and results are visible ───────
         const sortEl      = document.getElementById( 'cs-ai-img-sort' );
         const withImgBtn  = document.getElementById( 'cs-ai-img-scan-with-btn' );
-        const styleEl     = document.getElementById( 'cs-ai-img-style' );
-        const qualityEl   = document.getElementById( 'cs-ai-img-quality' );
-        const dualEl      = document.getElementById( 'cs-ai-img-dual' );
-        let   activeMode  = 'missing';
+        const styleEl   = document.getElementById( 'cs-ai-img-style' );
+        const qualityEl = document.getElementById( 'cs-ai-img-quality' );
+        const dualEl    = document.getElementById( 'cs-ai-img-dual' );
+        const noTextEl  = document.getElementById( 'cs-ai-img-no-text' );
+        let   activeMode = 'missing';
 
-        // Initialise style / quality / dual from saved PHP values.
-        if ( styleEl   && window.csdtImgStyle   ) { styleEl.value     = window.csdtImgStyle; }
-        if ( qualityEl && window.csdtImgQuality  ) { qualityEl.value   = window.csdtImgQuality; }
-        if ( dualEl    && window.csdtImgDual     ) { dualEl.checked    = true; }
+        // Initialise style / quality / dual / no_text from saved PHP values.
+        if ( styleEl   && window.csdtImgStyle   ) { styleEl.value    = window.csdtImgStyle; }
+        if ( qualityEl && window.csdtImgQuality ) { qualityEl.value  = window.csdtImgQuality; }
+        if ( dualEl    && window.csdtImgDual    ) { dualEl.checked   = true; }
+        if ( noTextEl  && window.csdtImgNoText  ) { noTextEl.checked = true; }
 
-        // Auto-save style / quality / dual whenever they change.
+        // Auto-save whenever any setting changes.
         function saveSettings() {
-            const style   = styleEl?.value   || 'auto';
-            const quality = qualityEl?.value || 'hd';
-            const dual    = dualEl?.checked  ? '1' : '0';
-            post( 'csdt_devtools_ai_image_save_settings', { style, quality, dual } );
+            const style   = styleEl?.value    || 'auto';
+            const quality = qualityEl?.value  || 'hd';
+            const dual    = dualEl?.checked   ? '1' : '0';
+            const no_text = noTextEl?.checked ? '1' : '0';
+            post( 'csdt_devtools_ai_image_save_settings', { style, quality, dual, no_text } );
         }
         if ( styleEl   ) { styleEl.addEventListener(   'change', saveSettings ); }
         if ( qualityEl ) { qualityEl.addEventListener( 'change', saveSettings ); }
         if ( dualEl    ) { dualEl.addEventListener(    'change', saveSettings ); }
+        if ( noTextEl  ) { noTextEl.addEventListener(  'change', saveSettings ); }
 
         if ( sortEl ) {
             sortEl.addEventListener( 'change', () => {

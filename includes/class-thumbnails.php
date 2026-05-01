@@ -354,6 +354,7 @@ BAD (over-directed, scene description):
         $saved_style   = (string) get_option( 'csdt_devtools_img_style', 'auto' );
         $saved_quality = (string) get_option( 'csdt_devtools_img_quality', 'hd' );
         $saved_dual    = (bool)   get_option( 'csdt_devtools_img_dual', false );
+        $saved_no_text = (bool)   get_option( 'csdt_devtools_img_no_text', false );
         $system_prompt = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
         $keys_json     = wp_json_encode( [
             'openai'    => $openai_key,
@@ -382,6 +383,7 @@ BAD (over-directed, scene description):
                 var csdtImgStyle   = <?php echo wp_json_encode( $saved_style ); ?>;
                 var csdtImgQuality = <?php echo wp_json_encode( $saved_quality ); ?>;
                 var csdtImgDual    = <?php echo wp_json_encode( $saved_dual ); ?>;
+                var csdtImgNoText  = <?php echo wp_json_encode( $saved_no_text ); ?>;
                 var csdtImgDefaultSysprompt = <?php echo wp_json_encode( self::DEFAULT_IMG_SYSTEM_PROMPT ); ?>;
                 </script>
 
@@ -498,7 +500,7 @@ BAD (over-directed, scene description):
                             <?php esc_html_e( 'Generate 2 options per post (costs 2× per click)', 'cloudscale-devtools' ); ?>
                         </label>
                         <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                            <input type="checkbox" id="cs-ai-img-no-text" style="width:16px;height:16px">
+                            <input type="checkbox" id="cs-ai-img-no-text" style="width:16px;height:16px" <?php checked( $saved_no_text ); ?>>
                             <?php esc_html_e( 'No text in image (avoids misspellings — DALL-E draws no labels or titles)', 'cloudscale-devtools' ); ?>
                         </label>
                     </div>
@@ -2008,9 +2010,10 @@ BAD (over-directed, scene description):
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
-        if ( isset( $_POST['style'] ) )   { update_option( 'csdt_devtools_img_style',   sanitize_key( wp_unslash( $_POST['style'] ) ),        false ); }
+        if ( isset( $_POST['style'] ) )   { update_option( 'csdt_devtools_img_style',    sanitize_key( wp_unslash( $_POST['style'] ) ),        false ); }
         if ( isset( $_POST['quality'] ) ) { update_option( 'csdt_devtools_img_quality', sanitize_key( wp_unslash( $_POST['quality'] ) ),       false ); }
         if ( isset( $_POST['dual'] ) )    { update_option( 'csdt_devtools_img_dual',    rest_sanitize_boolean( wp_unslash( $_POST['dual'] ) ), false ); }
+        if ( isset( $_POST['no_text'] ) ) { update_option( 'csdt_devtools_img_no_text', rest_sanitize_boolean( wp_unslash( $_POST['no_text'] ) ), false ); }
         wp_send_json_success();
     }
 
