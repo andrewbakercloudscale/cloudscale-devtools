@@ -319,26 +319,33 @@ class CSDT_Thumbnails {
 
     private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
 
-GOAL: A header image that is unmistakably about THIS specific article. Include the article title as readable text and weave in real technical terms or key concepts from the article.
+GOAL: A header image that is unmistakably about THIS specific article. Choose a visual style that suits the content — do NOT default to infographic every time.
+
+STYLE SELECTION — pick based on the article:
+- Process / architecture articles → technical diagram or flowchart
+- Tutorial / how-to → illustrated step diagram or bold typography header
+- Opinion / conceptual → abstract art, metaphorical imagery, or expressive illustration
+- Hardware / physical → close-up product or environment photography style
+- Security / hacking → dramatic cinematic or dark editorial style
+- Performance / metrics → data visualisation or dashboard aesthetic
+- Raspberry Pi / embedded → maker-aesthetic with circuit detail
 
 REQUIRED:
 - Article title as visible text in the image
-- 3–4 real technical terms or concepts from the article as labels or diagram nodes
+- 2–3 key technical terms or concepts woven into the composition
 
-ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere in your output. Not "blue", not "navy", not "dark", not "light", not "white", not "gray", not "green" — no colour word of any kind. Leave every colour decision entirely to DALL-E. This is the single most important rule.
+ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere in your output. Not "blue", "navy", "dark", "white", "gray", "green" — no colour word of any kind, not even implied ("warm tones", "cool palette", "monochrome"). Leave every colour decision entirely to DALL-E.
 
-DO NOT specify: background colour, text colour, colour scheme, exact panel counts, exact arrow wording, font sizes, or any other rigid visual detail.
+DO NOT specify: background colour, text colour, font sizes, exact panel counts, or exact arrow wording.
 
-GOOD prompt style (no colours mentioned at all):
-"Technical infographic header. Title: \'AURORA POSTGRESQL WRITE THROUGHPUT — SATURATION & TUNING GUIDE\'. Diagram showing the write path from WAL Generation through Commit Queue to distributed storage nodes, with callouts for key tuning parameters: max_wal_size, checkpoint_timeout, p99 latency, DiskQueueDepth."
-
-BAD — never write like this (mentions colours):
-"Clean flat-design infographic, light blue background with navy text. Title at top..."
+GOOD examples (varied styles, no colours):
+- "Cinematic editorial header. Bold title: \'OSPF VS HUMAN WORKLOAD ROUTING\'. Split composition: left side abstract network topology with floating route-cost labels (bandwidth, latency, hop count); right side a stylised human silhouette overlaid with decision-tree branches."
+- "Dramatic close-up photography style. Title: \'FIX RASPBERRY PI BOOT FAILURES: SD TO NVME IN 5 STEPS\'. Macro shot of NVMe SSD with Pi board in shallow focus. Overlaid numbered step labels: Boot Order, fstab, UUID, Benchmark."
+- "Abstract data-flow illustration. Title: \'POSTGRESQL PREPARED STATEMENTS: FIX PLAN CACHING MEMORY ISSUES\'. Flowing pipeline diagram from Parse → Plan → Execute, with branch nodes labelled Custom Plan, Generic Plan, Partition Pruning."
 
 RULES:
-- Start with the visual style or layout idea, never "Create" or "Generate"
-- No physical server rooms or rack hardware
-- No colour words — not even implied (e.g. avoid "warm tones", "cool palette", "monochrome")';
+- Start with the visual style, never "Create" or "Generate"
+- No physical server rooms or rack hardware photos';
 
     public static function render_ai_images_panel(): void {
         $openai_key    = (string) get_option( 'csdt_devtools_openai_key', '' );
@@ -2142,12 +2149,14 @@ RULES:
         require_once ABSPATH . 'wp-admin/includes/media.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
-        $options = [];
+        $options    = [];
+        $last_error = '';
 
         for ( $i = 1; $i <= $count; $i++ ) {
             try {
                 $image_url = CSDT_AI_Dispatcher::generate_image( $prompt, '1792x1024', $quality );
             } catch ( \RuntimeException $e ) {
+                $last_error = $e->getMessage();
                 continue;
             }
 
@@ -2183,7 +2192,7 @@ RULES:
         }
 
         if ( empty( $options ) ) {
-            wp_send_json_error( [ 'message' => 'Failed to generate images.' ] );
+            wp_send_json_error( [ 'message' => $last_error ?: 'Failed to generate images.' ] );
             return;
         }
 
