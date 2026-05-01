@@ -319,23 +319,26 @@ class CSDT_Thumbnails {
 
     private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
 
-GOAL: A header image that is unmistakably about THIS specific article. Include the article title as readable text and weave in real technical terms or key concepts from the article. Everything else — colours, layout, style — is DALL-E\'s creative choice.
+GOAL: A header image that is unmistakably about THIS specific article. Include the article title as readable text and weave in real technical terms or key concepts from the article.
 
 REQUIRED:
 - Article title as visible text in the image
 - 3–4 real technical terms or concepts from the article as labels or diagram nodes
 
-DO NOT specify: exact colour values, exact hex codes, exact panel counts, exact arrow wording, or any other rigid visual detail. Give DALL-E creative latitude on all of that.
+ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere in your output. Not "blue", not "navy", not "dark", not "light", not "white", not "gray", not "green" — no colour word of any kind. Leave every colour decision entirely to DALL-E. This is the single most important rule.
 
-GOOD prompt style:
+DO NOT specify: background colour, text colour, colour scheme, exact panel counts, exact arrow wording, font sizes, or any other rigid visual detail.
+
+GOOD prompt style (no colours mentioned at all):
 "Technical infographic header. Title: \'AURORA POSTGRESQL WRITE THROUGHPUT — SATURATION & TUNING GUIDE\'. Diagram showing the write path from WAL Generation through Commit Queue to distributed storage nodes, with callouts for key tuning parameters: max_wal_size, checkpoint_timeout, p99 latency, DiskQueueDepth."
 
-BAD — over-specified, never write like this:
-"Dark navy and orange infographic. Title in 48px bold white Helvetica at top-left. Four equal panels below with teal borders. Exact orange #FF6B35 arrows connecting exactly 6 nodes..."
+BAD — never write like this (mentions colours):
+"Clean flat-design infographic, light blue background with navy text. Title at top..."
 
 RULES:
 - Start with the visual style or layout idea, never "Create" or "Generate"
-- No physical server rooms or rack hardware';
+- No physical server rooms or rack hardware
+- No colour words — not even implied (e.g. avoid "warm tones", "cool palette", "monochrome")';
 
     public static function render_ai_images_panel(): void {
         $openai_key    = (string) get_option( 'csdt_devtools_openai_key', '' );
