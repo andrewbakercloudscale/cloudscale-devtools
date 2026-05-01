@@ -1217,6 +1217,25 @@
 
         if ( ! saveKeyBtn ) return;
 
+        // ── Copy API key to clipboard ─────────────────────────────────────
+        const copyKeyBtn = document.getElementById( 'cs-ai-img-copy-key' );
+        if ( copyKeyBtn ) {
+            copyKeyBtn.addEventListener( 'click', () => {
+                const keyInput = document.getElementById( 'cs-ai-img-openai-key' );
+                const val = ( keyInput?.value || '' ).trim();
+                if ( ! val ) { return; }
+                navigator.clipboard.writeText( val ).then( () => {
+                    const orig = copyKeyBtn.innerHTML;
+                    copyKeyBtn.textContent = '✔ Copied';
+                    copyKeyBtn.style.color = '#16a34a';
+                    setTimeout( () => { copyKeyBtn.innerHTML = orig; copyKeyBtn.style.color = ''; }, 2000 );
+                } ).catch( () => {
+                    copyKeyBtn.textContent = '✘ Failed';
+                    setTimeout( () => { copyKeyBtn.innerHTML = '📋 Copy'; }, 2000 );
+                } );
+            } );
+        }
+
         // ── Eye toggle for API key ────────────────────────────────────────
         const keyToggleBtn = document.getElementById( 'cs-ai-img-key-toggle' );
         if ( keyToggleBtn ) {
@@ -1327,13 +1346,15 @@
         // ── Render post list ──────────────────────────────────────────────
         function renderPostList( posts, sortBy ) {
             if ( ! results ) return;
-            const sortLabel = sortBy === 'popular' ? 'by popularity' : sortBy === 'oldest' ? 'oldest first' : 'newest first';
+            const sortLabel = sortBy === 'popular' ? 'by popularity' : sortBy === 'oldest' ? 'oldest first' : sortBy === 'longest' ? 'longest first' : 'newest first';
             let html = `<p style="font-size:13px;color:#555;margin-bottom:10px">Found <strong>${esc(String(posts.length))}</strong> post(s) without a featured image <span style="color:#94a3b8">(${esc(sortLabel)})</span>:</p>`;
             html += '<div style="display:flex;flex-direction:column;gap:8px">';
             for ( const p of posts ) {
                 const viewCount = ( p.view_count !== null && p.view_count !== undefined ) ? p.view_count : 0;
+                const wordCount = ( p.word_count !== null && p.word_count !== undefined ) ? p.word_count : 0;
                 const viewsBadge = `<span style="font-size:11px;color:#94a3b8;margin-left:8px">👁 ${esc(String(viewCount))}</span>`;
-                const meta = `<span style="font-size:11px;color:#94a3b8">${esc(p.date)}</span>${viewsBadge}`;
+                const wordsBadge = wordCount > 0 ? `<span style="font-size:11px;color:#94a3b8;margin-left:8px">📝 ${esc(wordCount.toLocaleString())} words</span>` : '';
+                const meta = `<span style="font-size:11px;color:#94a3b8">${esc(p.date)}</span>${viewsBadge}${wordsBadge}`;
                 html += `
                 <div id="cs-ai-row-${esc(String(p.post_id))}" style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;flex-wrap:wrap">
                     <div style="flex:1;min-width:120px">
