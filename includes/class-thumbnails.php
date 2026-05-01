@@ -319,33 +319,31 @@ class CSDT_Thumbnails {
 
     private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
 
-GOAL: A header image that is unmistakably about THIS specific article. Choose a visual style that suits the content — do NOT default to infographic every time.
+YOUR ONLY JOB: Pick a visual style that suits the article, state the title, and give a one-line topic hint. That\'s it. DALL-E will figure out what to draw — do not direct the scene.
 
-STYLE SELECTION — pick based on the article:
-- Process / architecture articles → technical diagram or flowchart
-- Tutorial / how-to → illustrated step diagram or bold typography header
-- Opinion / conceptual → abstract art, metaphorical imagery, or expressive illustration
-- Hardware / physical → close-up product or environment photography style
-- Security / hacking → dramatic cinematic or dark editorial style
-- Performance / metrics → data visualisation or dashboard aesthetic
-- Raspberry Pi / embedded → maker-aesthetic with circuit detail
+OUTPUT FORMAT — exactly 2 sentences, never more:
+1. Visual style sentence: one or two words describing the aesthetic (e.g. "Cinematic editorial.", "Bold technical illustration.", "Abstract geometric art.", "Dramatic macro photography.")
+2. Content sentence: Title in quotes, then a short subject hint (5–10 words max). No scene description.
 
-REQUIRED:
-- Article title as visible text in the image
-- 2–3 key technical terms or concepts woven into the composition
+STYLE — pick based on article type:
+- Process / architecture → technical illustration
+- Opinion / conceptual → abstract or expressive art
+- Hardware / physical → macro photography
+- Security / hacking → dramatic cinematic
+- Performance / metrics → data visualisation aesthetic
+- Tutorial / how-to → bold illustrated graphic
 
-ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere in your output. Not "blue", "navy", "dark", "white", "gray", "green" — no colour word of any kind, not even implied ("warm tones", "cool palette", "monochrome"). Leave every colour decision entirely to DALL-E.
+ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour. Not "blue", "navy", "dark", "white", "gray", "green" — nothing. Leave all colour decisions to DALL-E.
 
-DO NOT specify: background colour, text colour, font sizes, exact panel counts, or exact arrow wording.
+DO NOT: describe what is on the left or right, describe characters or scenes, specify layout, mention composition, describe exactly what to draw.
 
-GOOD examples (varied styles, no colours):
-- "Cinematic editorial header. Bold title: \'OSPF VS HUMAN WORKLOAD ROUTING\'. Split composition: left side abstract network topology with floating route-cost labels (bandwidth, latency, hop count); right side a stylised human silhouette overlaid with decision-tree branches."
-- "Dramatic close-up photography style. Title: \'FIX RASPBERRY PI BOOT FAILURES: SD TO NVME IN 5 STEPS\'. Macro shot of NVMe SSD with Pi board in shallow focus. Overlaid numbered step labels: Boot Order, fstab, UUID, Benchmark."
-- "Abstract data-flow illustration. Title: \'POSTGRESQL PREPARED STATEMENTS: FIX PLAN CACHING MEMORY ISSUES\'. Flowing pipeline diagram from Parse → Plan → Execute, with branch nodes labelled Custom Plan, Generic Plan, Partition Pruning."
+GOOD (short, high-level, lets DALL-E decide):
+"Cinematic editorial. Title: \'CENTRALISED VS FEDERATED TECH TEAMS: HOW TO FIX FLOW\'. Centralised and federated tech organisation."
+"Bold technical illustration. Title: \'POSTGRESQL PREPARED STATEMENTS: FIX PLAN CACHING MEMORY ISSUES\'. Prepared statement lifecycle and plan caching."
+"Dramatic macro photography. Title: \'FIX RASPBERRY PI BOOT FAILURES: SD TO NVME IN 5 STEPS\'. NVMe SSD boot migration on Raspberry Pi."
 
-RULES:
-- Start with the visual style, never "Create" or "Generate"
-- No physical server rooms or rack hardware photos';
+BAD (over-directed, scene description):
+"Cinematic style. Title: \'...\'. Left side: a centralised office with cubicles and a server. Right side: open-plan teams around product boards. Professional lighting highlights the divide."';
 
     public static function render_ai_images_panel(): void {
         $openai_key    = (string) get_option( 'csdt_devtools_openai_key', '' );
@@ -545,6 +543,7 @@ RULES:
                     <select id="cs-ai-img-sort" style="font-size:12px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#334155">
                         <option value="newest"><?php esc_html_e( 'Newest first', 'cloudscale-devtools' ); ?></option>
                         <option value="oldest"><?php esc_html_e( 'Oldest first', 'cloudscale-devtools' ); ?></option>
+                        <option value="img_date"><?php esc_html_e( 'Image date (newest)', 'cloudscale-devtools' ); ?></option>
                         <option value="popular"><?php esc_html_e( 'Most popular', 'cloudscale-devtools' ); ?></option>
                         <option value="longest"><?php esc_html_e( 'Longest first', 'cloudscale-devtools' ); ?></option>
                     </select>
@@ -1938,20 +1937,24 @@ RULES:
                 ? str_word_count( wp_strip_all_tags( $post_obj->post_content ) )
                 : 0;
 
-            $thumb_id  = (int) get_post_thumbnail_id( $post_id );
-            $thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : null;
+            $thumb_id        = (int) get_post_thumbnail_id( $post_id );
+            $thumb_url       = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : null;
+            $thumb_post      = $thumb_id ? get_post( $thumb_id ) : null;
+            $thumb_date_raw  = $thumb_post ? strtotime( $thumb_post->post_date ) : 0;
 
             $results[] = [
-                'post_id'       => $post_id,
-                'title'         => get_the_title( $post_id ),
-                'edit_url'      => get_edit_post_link( $post_id, 'raw' ),
-                'post_url'      => get_permalink( $post_id ),
-                'date'          => get_the_date( 'j M Y', $post_id ),
-                'comment_count' => (int) ( $post_obj ? $post_obj->comment_count : 0 ),
-                'view_count'    => $view_count,
-                'word_count'    => $word_count,
-                'has_thumb'     => (bool) $thumb_id,
-                'thumb_url'     => $thumb_url ?: null,
+                'post_id'        => $post_id,
+                'title'          => get_the_title( $post_id ),
+                'edit_url'       => get_edit_post_link( $post_id, 'raw' ),
+                'post_url'       => get_permalink( $post_id ),
+                'date'           => get_the_date( 'j M Y', $post_id ),
+                'comment_count'  => (int) ( $post_obj ? $post_obj->comment_count : 0 ),
+                'view_count'     => $view_count,
+                'word_count'     => $word_count,
+                'has_thumb'      => (bool) $thumb_id,
+                'thumb_url'      => $thumb_url ?: null,
+                'thumb_date_raw' => $thumb_date_raw,
+                'thumb_date'     => $thumb_date_raw ? date( 'j M Y', $thumb_date_raw ) : null,
             ];
         }
 
@@ -1966,6 +1969,10 @@ RULES:
         } elseif ( 'longest' === $sort ) {
             usort( $results, function ( $a, $b ) {
                 return ( $b['word_count'] ?? 0 ) - ( $a['word_count'] ?? 0 );
+            } );
+        } elseif ( 'img_date' === $sort ) {
+            usort( $results, function ( $a, $b ) {
+                return ( $b['thumb_date_raw'] ?? 0 ) - ( $a['thumb_date_raw'] ?? 0 );
             } );
         }
 
