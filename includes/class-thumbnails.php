@@ -319,31 +319,30 @@ class CSDT_Thumbnails {
 
     private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
 
-YOUR ONLY JOB: Pick a visual style that suits the article, state the title, and give a one-line topic hint. That\'s it. DALL-E will figure out what to draw — do not direct the scene.
+OUTPUT FORMAT — exactly 2 sentences:
+1. Visual style (e.g. "Cinematic editorial." / "Isometric 3D illustration." / "Flat vector illustration." / "Technical diagram.")
+2. The article title in quotes, followed by 3–5 specific technical terms or named concepts from the article. These terms are the subject matter — not a scene description.
 
-OUTPUT FORMAT — exactly 2 sentences, never more:
-1. Visual style sentence: one or two words describing the aesthetic (e.g. "Cinematic editorial.", "Bold technical illustration.", "Abstract geometric art.", "Dramatic macro photography.")
-2. Content sentence: Title in quotes, then a short subject hint (5–10 words max). No scene description.
+STYLE — pick what fits the article:
+- Process / architecture / code → technical illustration or isometric 3D illustration
+- Opinion / leadership / culture → cinematic editorial or flat vector illustration
+- Hardware / physical device → macro photography style
+- Security / hacking / exploits → dramatic cinematic editorial
+- Performance / metrics / tuning → technical diagram or data visualisation
+- Tutorial / step-by-step → flat vector illustration or cartoon illustration
 
-STYLE — pick based on article type:
-- Process / architecture → technical illustration
-- Opinion / conceptual → abstract or expressive art
-- Hardware / physical → macro photography
-- Security / hacking → dramatic cinematic
-- Performance / metrics → data visualisation aesthetic
-- Tutorial / how-to → bold illustrated graphic
+NEVER pick: abstract art, expressive art, surrealist, geometric art, or any non-representational style.
 
-ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour. Not "blue", "navy", "dark", "white", "gray", "green" — nothing. Leave all colour decisions to DALL-E.
+ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere. Not "blue", "navy", "dark", "light", "white", "gray", "green", "warm", "cool" — nothing. Leave all colour to DALL-E.
 
-DO NOT: describe what is on the left or right, describe characters or scenes, specify layout, mention composition, describe exactly what to draw.
+GOOD examples:
+"Isometric 3D illustration. \'POSTGRESQL PREPARED STATEMENTS: FIX PLAN CACHING MEMORY ISSUES\' — Custom Plan, Generic Plan, Partition Pruning, plan_cache_mode, memory per connection."
+"Cinematic editorial. \'CENTRALISED VS FEDERATED TECH TEAMS: HOW TO FIX FLOW\' — delivery autonomy, squad topology, risk concentration, backlogs, Conway\'s Law."
+"Dramatic macro photography. \'FIX RASPBERRY PI BOOT FAILURES: SD TO NVME IN 5 STEPS\' — NVMe SSD, boot order, fstab UUID, Pi 5, storage benchmark."
+"Flat vector illustration. \'7 CORPORATE CULTURE SINS DESTROYING YOUR ORGANISATION\' — psychological safety, silo thinking, blame culture, trust deficit, org dysfunction."
 
-GOOD (short, high-level, lets DALL-E decide):
-"Cinematic editorial. Title: \'CENTRALISED VS FEDERATED TECH TEAMS: HOW TO FIX FLOW\'. Centralised and federated tech organisation."
-"Bold technical illustration. Title: \'POSTGRESQL PREPARED STATEMENTS: FIX PLAN CACHING MEMORY ISSUES\'. Prepared statement lifecycle and plan caching."
-"Dramatic macro photography. Title: \'FIX RASPBERRY PI BOOT FAILURES: SD TO NVME IN 5 STEPS\'. NVMe SSD boot migration on Raspberry Pi."
-
-BAD (over-directed, scene description):
-"Cinematic style. Title: \'...\'. Left side: a centralised office with cubicles and a server. Right side: open-plan teams around product boards. Professional lighting highlights the divide."';
+BAD (vague topic hint — never do this):
+"Cinematic editorial. \'CENTRALISED VS FEDERATED TECH TEAMS\' — centralised and federated tech organisation."';
 
     public static function render_ai_images_panel(): void {
         $openai_key    = (string) get_option( 'csdt_devtools_openai_key', '' );
@@ -517,7 +516,7 @@ BAD (over-directed, scene description):
                             <option value="editorial" <?php selected( $saved_style, 'editorial' ); ?>><?php esc_html_e( 'Editorial photography', 'cloudscale-devtools' ); ?></option>
                             <option value="isometric" <?php selected( $saved_style, 'isometric' ); ?>><?php esc_html_e( 'Isometric 3D illustration', 'cloudscale-devtools' ); ?></option>
                             <option value="cartoon" <?php selected( $saved_style, 'cartoon' ); ?>><?php esc_html_e( 'Cartoon / illustration', 'cloudscale-devtools' ); ?></option>
-                            <option value="dali" <?php selected( $saved_style, 'dali' ); ?>><?php esc_html_e( 'Surrealist (Salvador Dali)', 'cloudscale-devtools' ); ?></option>
+                            <option value="flat_vector" <?php selected( $saved_style, 'flat_vector' ); ?>><?php esc_html_e( 'Flat vector illustration', 'cloudscale-devtools' ); ?></option>
                             <option value="minimalist" <?php selected( $saved_style, 'minimalist' ); ?>><?php esc_html_e( 'Minimalist', 'cloudscale-devtools' ); ?></option>
                         </select>
                         <span class="cs-hint"><?php esc_html_e( 'Override the visual style. "Auto" defers to your system prompt instructions below.', 'cloudscale-devtools' ); ?></span>
@@ -2062,12 +2061,12 @@ BAD (over-directed, scene description):
             'editorial'             => 'professional editorial photography',
             'isometric'             => 'clean isometric 3D illustration, flat vector art style',
             'cartoon'               => 'bold cartoon illustration',
-            'dali'                  => 'surrealist dreamlike art',
+            'flat_vector'           => 'flat vector illustration, bold shapes, clean lines, modern graphic design',
             'minimalist'            => 'minimalist design with bold typography',
         ];
 
         // Styles that make sense as blog headers — used when auto-varying on Regenerate.
-        $vary_pool = [ 'photorealistic', 'editorial', 'technical_infographic', 'minimalist', 'isometric', 'cartoon' ];
+        $vary_pool = [ 'photorealistic', 'editorial', 'technical_infographic', 'minimalist', 'isometric', 'cartoon', 'flat_vector' ];
 
         // On force_vary, cycle through sensible blog-header styles only.
         if ( $force_vary ) {
