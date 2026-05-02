@@ -10,6 +10,41 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class CSDT_Security_Headers {
 
+    public static function render_headers_tab(): void {
+        self::render_scan_panel();
+        self::render_security_headers_panel();
+        CSDT_CSP::render_csp_panel();
+    }
+
+    public static function render_scan_panel(): void {
+        $scan_history = json_decode( get_option( 'csdt_scan_header_history', '[]' ), true );
+        if ( ! is_array( $scan_history ) ) { $scan_history = []; }
+        ?>
+        <hr class="cs-sec-divider">
+        <div class="cs-section-header" style="background:linear-gradient(90deg,#1e3a5f 0%,#1d4ed8 100%);border-left:3px solid #60a5fa;margin-bottom:0;border-radius:6px 6px 0 0;">
+            <span>🔒 <?php esc_html_e( 'HEADER SECURITY SCAN', 'cloudscale-devtools' ); ?></span>
+            <span class="cs-header-hint"><?php esc_html_e( 'Live scan of your homepage response headers', 'cloudscale-devtools' ); ?></span>
+        </div>
+        <div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;margin-bottom:0;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <button type="button" id="csdt-scan-headers-btn" class="cs-btn-primary">
+                    <?php esc_html_e( 'Scan Headers Now', 'cloudscale-devtools' ); ?>
+                </button>
+                <span style="font-size:12px;color:#64748b;"><?php esc_html_e( 'Scans via Cloudflare-bypass request. Checks homepage for missing and duplicate security headers.', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div id="csdt-scan-results" style="display:none;margin-top:16px;"></div>
+            <div id="csdt-scan-history-wrap" style="margin-top:18px;<?php echo empty( $scan_history ) ? 'display:none;' : ''; ?>">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px;">
+                    <?php echo esc_html( sprintf( __( 'Scan History (%d scans)', 'cloudscale-devtools' ), count( $scan_history ) ) ); ?>
+                </div>
+                <canvas id="csdt-scan-history-chart" width="600" height="100" style="width:100%;max-width:600px;height:100px;display:block;border:1px solid #e2e8f0;border-radius:6px;"></canvas>
+                <div id="csdt-scan-history-list" style="margin-top:8px;max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;"></div>
+            </div>
+        </div>
+        <script>window.csdtScanHeaderHistory = <?php echo wp_json_encode( $scan_history ); ?>;</script>
+        <?php
+    }
+
     public static function render_security_headers_panel(): void {
         $enabled = get_option( 'csdt_devtools_safe_headers_enabled', '0' ) === '1';
         $ext_ack = get_option( 'csdt_devtools_sec_headers_ack', '0' ) === '1';
@@ -18,7 +53,7 @@ class CSDT_Security_Headers {
             'X-Content-Type-Options: nosniff'                  => 'Prevents browsers from MIME-sniffing a response away from the declared content type. Stops certain XSS attacks via content confusion.',
             'X-Frame-Options: SAMEORIGIN'                      => 'Blocks your site from being embedded in an iframe on another domain. Prevents clickjacking attacks.',
             'Referrer-Policy: strict-origin-when-cross-origin' => 'Sends the full URL as Referer on same-origin requests; sends only the origin on cross-origin requests; sends nothing on downgrade (HTTPS→HTTP).',
-            'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()' => 'Disables access to camera, microphone, geolocation, and payment APIs for this origin and all embedded iframes.',
+            'Permissions-Policy: camera=(), microphone=(), geolocation=()' => 'Disables access to camera, microphone, and geolocation APIs for this origin and all embedded iframes.',
         ];
         ?>
         <hr class="cs-sec-divider">
@@ -189,15 +224,18 @@ class CSDT_Security_Headers {
             'referrer-policy',
             'permissions-policy',
         ];
-        $mandatory = [ 'content-security-policy', 'strict-transport-security', 'x-frame-options', 'x-content-type-options' ];
+        // Grading is based on the 4 plugin-managed headers only.
+        // CSP and HSTS are informational and can adjust the grade but do not determine F.
+        $plugin_headers = [ 'x-frame-options', 'x-content-type-options', 'referrer-policy', 'permissions-policy' ];
 
         // ── Helper: analyse one URL ──────────────────────────────────────────
-        $analyse = static function ( string $url ) use ( $sec_keys, $mandatory ): array {
+        $analyse = static function ( string $url ) use ( $sec_keys ): array {
             $resp = wp_remote_get( $url, [
                 'timeout'     => 10,
                 'sslverify'   => false,
                 'redirection' => 3,
                 'user-agent'  => 'CloudScale-Header-Scanner/1.0',
+                'headers'     => [ 'Cache-Control' => 'no-cache, no-store, must-revalidate', 'Pragma' => 'no-cache' ],
             ] );
             if ( is_wp_error( $resp ) ) {
                 return [ 'url' => $url, 'error' => $resp->get_error_message() ];
@@ -237,22 +275,23 @@ class CSDT_Security_Headers {
 
         // ── Homepage — full analysis ─────────────────────────────────────────
         $home_url  = home_url( '/' );
-        $home_data = $analyse( $home_url );
+        $scan_url  = add_query_arg( '_csdt', time(), $home_url );
+        $home_data = $analyse( $scan_url );
 
         // Grade + warnings from homepage
         $grade    = 'A+';
         $warnings = [];
         if ( ! isset( $home_data['error'] ) ) {
-            $sec          = $home_data['sec'];
-            $missing_mand = 0;
-            foreach ( $mandatory as $hk ) {
-                if ( ( $sec[ $hk ]['status'] ?? 'missing' ) === 'missing' ) { $missing_mand++; }
+            $sec            = $home_data['sec'];
+            $plugin_missing = 0;
+            foreach ( $plugin_headers as $hk ) {
+                if ( ( $sec[ $hk ]['status'] ?? 'missing' ) === 'missing' ) { $plugin_missing++; }
             }
-            // Grade by missing mandatory headers
-            if ( $missing_mand >= 3 )     { $grade = 'F'; }
-            elseif ( $missing_mand === 2 ) { $grade = 'D'; }
-            elseif ( $missing_mand === 1 ) { $grade = 'C'; }
-            else                           { $grade = 'A+'; }
+            // Grade based on the 4 plugin-managed headers
+            if ( $plugin_missing >= 3 )      { $grade = 'F'; }
+            elseif ( $plugin_missing === 2 )  { $grade = 'D'; }
+            elseif ( $plugin_missing === 1 )  { $grade = 'C'; }
+            else                              { $grade = 'A+'; }
 
             // CSP quality warnings
             $csp_val = $sec['content-security-policy']['values'][0] ?? '';
@@ -305,13 +344,7 @@ class CSDT_Security_Headers {
                     }
                 }
             }
-            // Optional headers missing
-            foreach ( [ 'referrer-policy', 'permissions-policy' ] as $opt ) {
-                if ( ( $sec[ $opt ]['status'] ?? 'missing' ) === 'missing' && in_array( $grade, [ 'A+', 'A' ], true ) ) {
-                    $grade = 'B';
-                }
-            }
-            // HSTS quality
+            // HSTS quality (informational — can upgrade from A to A-)
             $hsts = $sec['strict-transport-security']['values'][0] ?? '';
             if ( $hsts && preg_match( '/max-age=(\d+)/', $hsts, $m ) && (int) $m[1] < 31536000 ) {
                 $warnings[] = [ 'header' => 'Strict-Transport-Security', 'msg' => 'max-age is less than 31536000 (1 year). Increase to at least 31536000.' ];
@@ -319,9 +352,24 @@ class CSDT_Security_Headers {
             }
             $home_data['grade']    = $grade;
             $home_data['warnings'] = $warnings;
+            // Use the canonical home URL for display, not the cache-busted scan URL.
+            $home_data['url'] = $home_url;
             // Server IP
             $host = parse_url( $home_url, PHP_URL_HOST );
             $home_data['ip'] = $host ? gethostbyname( $host ) : '';
+
+            // Persist scan to history (last 50 entries).
+            $scan_hist = json_decode( get_option( 'csdt_scan_header_history', '[]' ), true );
+            if ( ! is_array( $scan_hist ) ) { $scan_hist = []; }
+            $entry = [
+                'ts'    => time(),
+                'grade' => $grade,
+                'sec'   => array_map( static fn( $h ) => $h['status'], $home_data['sec'] ),
+            ];
+            array_unshift( $scan_hist, $entry );
+            $scan_hist = array_slice( $scan_hist, 0, 50 );
+            update_option( 'csdt_scan_header_history', wp_json_encode( $scan_hist ) );
+            $home_data['scan_history'] = $scan_hist;
         }
 
         // ── Last 10 posts/pages — security headers only ──────────────────────

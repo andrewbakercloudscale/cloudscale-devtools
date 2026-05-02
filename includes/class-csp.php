@@ -17,7 +17,7 @@ class CSDT_CSP {
             header( 'X-Content-Type-Options: nosniff' );
             header( 'X-Frame-Options: SAMEORIGIN' );
             header( 'Referrer-Policy: strict-origin-when-cross-origin' );
-            header( 'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()' );
+            header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
         }
         if ( get_option( 'csdt_devtools_csp_enabled', '0' ) === '1' ) {
             $csp = self::build_csp_header();

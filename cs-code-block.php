@@ -1394,7 +1394,7 @@ class CloudScale_DevTools {
             ] );
         }
 
-        if ( in_array( $active_tab, [ 'security', 'home' ], true ) ) {
+        if ( in_array( $active_tab, [ 'security', 'home', 'headers' ], true ) ) {
             wp_enqueue_script(
                 'csdt-vuln-scan',
                 plugins_url( 'assets/cs-vuln-scan.js', __FILE__ ),
@@ -1635,6 +1635,10 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'thumbnails' ? 'active' : ''; ?>">
                     🖼️ <?php esc_html_e( 'Thumbnails', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=headers' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'headers' ? 'active' : ''; ?>">
+                    🔒 <?php esc_html_e( 'Headers', 'cloudscale-devtools' ); ?>
+                </a>
             </div>
             <!-- Copy All action bar -->
             <div id="cs-tab-actions">
@@ -1663,6 +1667,10 @@ class CloudScale_DevTools {
             <?php elseif ( $active_tab === 'ai-images' ) : ?>
                 <div class="cs-tab-content active">
                     <?php CSDT_Thumbnails::render_ai_images_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'headers' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php CSDT_Security_Headers::render_headers_tab(); ?>
                 </div>
             <?php elseif ( $active_tab === 'security' ) : ?>
                 <div class="cs-tab-content active">
@@ -4652,9 +4660,6 @@ class CloudScale_DevTools {
                     </div>
                 </div>
 
-                <?php CSDT_Security_Headers::render_security_headers_panel(); ?>
-
-                <?php CSDT_CSP::render_csp_panel(); ?>
 
                 <!-- ── AI Settings ────────────────────────────────────────────── -->
                 <div class="cs-panel" id="cs-panel-ai-settings">

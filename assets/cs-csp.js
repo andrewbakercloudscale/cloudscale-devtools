@@ -669,6 +669,6 @@
         csdtCspInit();
     }
     document.addEventListener('csdt:tab-shown', function(e) {
-        if (e.detail && e.detail.tab === 'security') csdtCspInit();
+        if (e.detail && e.detail.tab === 'headers') csdtCspInit();
     });
 })();
