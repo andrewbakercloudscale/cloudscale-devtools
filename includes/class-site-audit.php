@@ -531,6 +531,51 @@ class CSDT_Site_Audit {
                         : null,
                 ];
             } )(),
+            ( function () {
+                // Detect orphaned cron hooks — events registered in the schedule but with no
+                // PHP handler. These are left behind by deleted/deactivated plugins and fire
+                // periodically doing nothing, wasting a cron slot and slowing WP-Cron runs.
+                $core_hooks = [
+                    'wp_scheduled_delete', 'delete_expired_transients', 'wp_version_check',
+                    'wp_update_plugins', 'wp_update_themes', 'wp_scheduled_auto_draft_delete',
+                    'recovery_mode_clean_expired_keys', 'wp_privacy_delete_old_export_files',
+                    'wp_site_health_scheduled_check', 'wp_update_user_counts',
+                    'wp_https_detection', 'wp_privacy_delete_old_export_files',
+                ];
+                $orphaned = [];
+                $crons    = _get_cron_array();
+                if ( is_array( $crons ) ) {
+                    foreach ( $crons as $hooks ) {
+                        foreach ( array_keys( $hooks ) as $hook ) {
+                            if ( in_array( $hook, $core_hooks, true ) ) { continue; }
+                            if ( ! has_action( $hook ) ) {
+                                $orphaned[] = $hook;
+                            }
+                        }
+                    }
+                }
+                $orphaned = array_values( array_unique( $orphaned ) );
+                $count    = count( $orphaned );
+                $preview  = implode( ', ', array_slice( $orphaned, 0, 4 ) );
+                if ( $count > 4 ) { $preview .= ' and ' . ( $count - 4 ) . ' more'; }
+                return [
+                    'id'        => 'orphaned_cron_hooks',
+                    'title'     => $count > 0
+                        ? sprintf( '%d orphaned cron hook%s from deleted plugins', $count, $count === 1 ? '' : 's' )
+                        : 'No orphaned cron hooks — schedule is clean',
+                    'detail'    => $count > 0
+                        ? sprintf(
+                            '%d scheduled cron hook%s %s a registered PHP handler. These were added by plugins that have since been deleted or deactivated but whose scheduled events were never cleaned up. They fire on schedule, do nothing, and accumulate latency on every WP-Cron run. Hooks: %s.',
+                            $count, $count === 1 ? '' : 's',
+                            $count === 1 ? 'has no' : 'have no',
+                            $preview
+                          )
+                        : 'All scheduled cron events have registered PHP handlers. No leftover events from deleted plugins.',
+                    'fixed'     => $count === 0,
+                    'fix_label' => $count > 0 ? 'Remove Orphaned Hooks' : 'Nothing to remove',
+                    'risk'      => $count > 0 ? 'low' : null,
+                ];
+            } )(),
         ];
     }
     // ── Editor Debug Panel ────────────────────────────────────────────────────
@@ -1117,6 +1162,34 @@ bantime  = 86400</pre>
                 wp_send_json_success( [
                     'fixes'   => self::get_quick_fixes(),
                     'message' => sprintf( 'Deleted %d inactive plugin%s from disk.', $count, $count === 1 ? '' : 's' ),
+                ] );
+                return;
+            case 'orphaned_cron_hooks':
+                $core_hooks = [
+                    'wp_scheduled_delete', 'delete_expired_transients', 'wp_version_check',
+                    'wp_update_plugins', 'wp_update_themes', 'wp_scheduled_auto_draft_delete',
+                    'recovery_mode_clean_expired_keys', 'wp_privacy_delete_old_export_files',
+                    'wp_site_health_scheduled_check', 'wp_update_user_counts',
+                    'wp_https_detection', 'wp_privacy_delete_old_export_files',
+                ];
+                $removed = 0;
+                $crons   = _get_cron_array();
+                if ( is_array( $crons ) ) {
+                    foreach ( $crons as $hooks ) {
+                        foreach ( array_keys( $hooks ) as $hook ) {
+                            if ( in_array( $hook, $core_hooks, true ) ) { continue; }
+                            if ( ! has_action( $hook ) ) {
+                                wp_clear_scheduled_hook( $hook );
+                                $removed++;
+                            }
+                        }
+                    }
+                }
+                wp_send_json_success( [
+                    'fixes'   => self::get_quick_fixes(),
+                    'message' => $removed > 0
+                        ? sprintf( 'Removed %d orphaned cron hook%s.', $removed, $removed === 1 ? '' : 's' )
+                        : 'No orphaned hooks found.',
                 ] );
                 return;
             default:

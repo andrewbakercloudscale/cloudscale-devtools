@@ -319,30 +319,60 @@ class CSDT_Thumbnails {
 
     private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
 
-OUTPUT FORMAT — exactly 2 sentences:
-1. Visual style (e.g. "Cinematic editorial." / "Isometric 3D illustration." / "Flat vector illustration." / "Technical diagram.")
-2. The article title in quotes, followed by 3–5 specific technical terms or named concepts from the article. These terms are the subject matter — not a scene description.
+CRITICAL — NO TEXT IN IMAGES: Never quote the article title. Never list technical terms as text. Never include any words, labels, captions, or writing that would cause DALL-E to render text. DALL-E cannot produce readable text — any text instruction creates scrambled garbage that ruins the image.
+
+DALL-E SAFETY RULE: Never use words like hack, hacker, exploit, breach, attack, malware, intrude, or any language implying illegal or harmful acts. Describe the defensive or structural side instead: a fortified vault, a reinforced door, an engineer inspecting a system.
+
+RELEVANCE RULE: The image must be immediately recognisable as being about the article topic. A reader who has not read the article must be able to guess the topic from the image alone. Generic "glowing city" or "abstract digital landscape" images are forbidden — they tell the reader nothing. Ground every image in the specific tool, product, technology, or action the article describes.
+
+OUTPUT FORMAT — 2–3 sentences:
+1. Visual style.
+2. A concrete, specific scene that directly depicts the article topic — name the actual technology or action, not a metaphor for it.
+3. (Optional) Atmosphere, lighting, or composition detail.
 
 STYLE — pick what fits the article:
-- Process / architecture / code → technical illustration or isometric 3D illustration
+- Script / tool / code → cinematic editorial or isometric 3D illustration
+- Process / architecture → isometric 3D illustration or cinematic editorial
 - Opinion / leadership / culture → cinematic editorial or flat vector illustration
 - Hardware / physical device → macro photography style
-- Security / hacking / exploits → dramatic cinematic editorial
-- Performance / metrics / tuning → technical diagram or data visualisation
-- Tutorial / step-by-step → flat vector illustration or cartoon illustration
+- Security / reliability → cinematic editorial, infrastructure aesthetic
+- Performance / metrics → cinematic editorial, data-centre aesthetic
+- Tutorial / step-by-step → flat vector illustration or isometric 3D illustration
 
-NEVER pick: abstract art, expressive art, surrealist, geometric art, or any non-representational style.
+NEVER pick: technical diagram, infographic, schematic, blueprint, any style that implies labels or text.
 
 ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere. Not "blue", "navy", "dark", "light", "white", "gray", "green", "warm", "cool" — nothing. Leave all colour to DALL-E.
 
-GOOD examples:
-"Isometric 3D illustration. \'POSTGRESQL PREPARED STATEMENTS: FIX PLAN CACHING MEMORY ISSUES\' — Custom Plan, Generic Plan, Partition Pruning, plan_cache_mode, memory per connection."
-"Cinematic editorial. \'CENTRALISED VS FEDERATED TECH TEAMS: HOW TO FIX FLOW\' — delivery autonomy, squad topology, risk concentration, backlogs, Conway\'s Law."
-"Dramatic macro photography. \'FIX RASPBERRY PI BOOT FAILURES: SD TO NVME IN 5 STEPS\' — NVMe SSD, boot order, fstab UUID, Pi 5, storage benchmark."
-"Flat vector illustration. \'7 CORPORATE CULTURE SINS DESTROYING YOUR ORGANISATION\' — psychological safety, silo thinking, blame culture, trust deficit, org dysfunction."
+BRAND ICONS WELCOME: Reference recognisable brand mascots/icons as large foreground props — the PostgreSQL elephant statue, the AWS smile-arrow, the Docker whale, the Redis cube, the Kubernetes helm wheel, the GitHub octocat, the Google "G" monolith, the Apple logo. Use them as physical objects in the scene, not flat 2D logos.
 
-BAD (vague topic hint — never do this):
-"Cinematic editorial. \'CENTRALISED VS FEDERATED TECH TEAMS\' — centralised and federated tech organisation."';
+TOPIC → SPECIFIC SCENE GUIDE (always use the most specific match):
+- Linux / server diagnostics → surgeon operating on a glowing server rack on an operating table
+- Database / SQL / PostgreSQL → a giant stone PostgreSQL elephant statue presiding over a vast underground vault, lone technician below
+- Database health check → master watchmaker\'s workshop, enormous clockwork mechanism on the bench
+- SEO / search / Google ranking → a lone explorer with a torch and a giant magnifying glass examining a vast illuminated map of interconnected web pages spread across the floor of a cathedral-sized library, Google "G" monolith visible in the background
+- Page audit / technical audit / script → a quality-control inspector on a factory floor, clipboard in hand, examining web pages rolling off a conveyor belt like printed sheets
+- AEO / AI search / answer engine → a figure standing before a vast oracle machine made of crystalline panels, presenting a question scroll
+- Security / firewall / certificates → a fortified vault door, a sealed blast door, an engineer sealing a pressure hatch
+- Network protocol / connectivity → a suspension bridge between two data-centre towers, or a control room operator monitoring signal feeds
+- Protocol failure / outage → a suspension bridge with a broken mid-span collapsing into a stormy sea
+- Cloud / AWS / infrastructure → the AWS smile-arrow logo as a giant neon sign atop an aerial city of data-centre towers
+- Team culture / organisation → birds-eye city with connected neighbourhoods vs isolated fortress districts
+- Raspberry Pi / hardware → macro shot of a Raspberry Pi circuit board with bokeh data-centre lights
+- Backup / recovery → fireproof vault door in a storm, or a lifeboat launching from a ship
+- Performance / speed → rocket engine ignition, or racing car engine bay close-up
+- AI / machine learning → crystalline neural lattice filling a vast cavern, figures dwarfed beneath it
+- WordPress / CMS → master craftsman\'s workshop with glowing tools on the bench
+
+GOOD examples:
+"Cinematic editorial. A lone inspector in a hard hat walks a vast factory floor examining web-page sheets rolling off a conveyor belt — each sheet shows a structured web page layout — with the Google G monolith glowing in the background. Epic scale, sharp foreground."
+"Cinematic editorial. A surgeon in a sterile theatre performs delicate work on a glowing server rack on the operating table, surrounded by monitors showing vital signs. Dramatic overhead lighting, photorealistic depth of field."
+"Isometric 3D illustration. A giant stone PostgreSQL elephant statue presides over a vast underground data vault, glowing pipelines connecting crystalline towers, a lone technician at the central console far below."
+"Dramatic macro photography. A Raspberry Pi 5 circuit board fills the frame, ultra-sharp GPIO pins, bokeh data-centre lights in the background."
+
+BAD examples — generic, unrelated to topic, or cause safety rejections:
+"Cinematic editorial. Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing about SEO)"
+"Technical illustration. \'DIAGNOSE YOUR LINUX SERVER\' — uptime, vmstat. (text = scrambled garbage)"
+"A shadowy hacker exploiting a vulnerable server. (safety rejection)"';
 
     public static function render_ai_images_panel(): void {
         $openai_key    = (string) get_option( 'csdt_devtools_openai_key', '' );
@@ -352,7 +382,6 @@ BAD (vague topic hint — never do this):
         $saved_model   = (string) get_option( 'csdt_devtools_prompt_model', 'gpt-4o-mini' );
         $saved_style   = (string) get_option( 'csdt_devtools_img_style', 'auto' );
         $saved_quality = (string) get_option( 'csdt_devtools_img_quality', 'hd' );
-        $saved_dual    = (bool)   get_option( 'csdt_devtools_img_dual', false );
         $saved_no_text = (bool)   get_option( 'csdt_devtools_img_no_text', false );
         $system_prompt = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
         $keys_json     = wp_json_encode( [
@@ -381,7 +410,6 @@ BAD (vague topic hint — never do this):
                 var csdtImgModel  = <?php echo wp_json_encode( $saved_model ); ?>;
                 var csdtImgStyle   = <?php echo wp_json_encode( $saved_style ); ?>;
                 var csdtImgQuality = <?php echo wp_json_encode( $saved_quality ); ?>;
-                var csdtImgDual    = <?php echo wp_json_encode( $saved_dual ); ?>;
                 var csdtImgNoText  = <?php echo wp_json_encode( $saved_no_text ); ?>;
                 var csdtImgDefaultSysprompt = <?php echo wp_json_encode( self::DEFAULT_IMG_SYSTEM_PROMPT ); ?>;
                 </script>
@@ -494,10 +522,6 @@ BAD (vague topic hint — never do this):
                 <div class="cs-sec-row">
                     <span class="cs-sec-label"><?php esc_html_e( 'Options:', 'cloudscale-devtools' ); ?></span>
                     <div class="cs-sec-control" style="display:flex;flex-direction:column;gap:8px">
-                        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                            <input type="checkbox" id="cs-ai-img-dual" style="width:16px;height:16px" <?php checked( $saved_dual ); ?>>
-                            <?php esc_html_e( 'Generate 2 options per post (costs 2× per click)', 'cloudscale-devtools' ); ?>
-                        </label>
                         <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                             <input type="checkbox" id="cs-ai-img-no-text" style="width:16px;height:16px" <?php checked( $saved_no_text ); ?>>
                             <?php esc_html_e( 'No text in image (avoids misspellings — DALL-E draws no labels or titles)', 'cloudscale-devtools' ); ?>
@@ -2011,7 +2035,6 @@ BAD (vague topic hint — never do this):
         }
         if ( isset( $_POST['style'] ) )   { update_option( 'csdt_devtools_img_style',    sanitize_key( wp_unslash( $_POST['style'] ) ),        false ); }
         if ( isset( $_POST['quality'] ) ) { update_option( 'csdt_devtools_img_quality', sanitize_key( wp_unslash( $_POST['quality'] ) ),       false ); }
-        if ( isset( $_POST['dual'] ) )    { update_option( 'csdt_devtools_img_dual',    rest_sanitize_boolean( wp_unslash( $_POST['dual'] ) ), false ); }
         if ( isset( $_POST['no_text'] ) ) { update_option( 'csdt_devtools_img_no_text', rest_sanitize_boolean( wp_unslash( $_POST['no_text'] ) ), false ); }
         wp_send_json_success();
     }
@@ -2023,6 +2046,7 @@ BAD (vague topic hint — never do this):
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
+        set_time_limit( 120 );
 
         $post_id       = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
         $prompt_vendor = isset( $_POST['prompt_vendor'] ) ? sanitize_key( wp_unslash( $_POST['prompt_vendor'] ) ) : 'openai';
@@ -2056,13 +2080,13 @@ BAD (vague topic hint — never do this):
         $context_str = implode( "\n\n", $context_parts );
 
         $style_map = [
-            'technical_infographic' => 'technical illustration or diagram aesthetic',
+            'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes, no text or labels anywhere',
             'photorealistic'        => 'cinematic photorealistic photography',
             'editorial'             => 'professional editorial photography',
             'isometric'             => 'clean isometric 3D illustration, flat vector art style',
             'cartoon'               => 'bold cartoon illustration',
             'flat_vector'           => 'flat vector illustration, bold shapes, clean lines, modern graphic design',
-            'minimalist'            => 'minimalist design with bold typography',
+            'minimalist'            => 'minimalist design, bold shapes, clean negative space, no text',
         ];
 
         // Styles that make sense as blog headers — used when auto-varying on Regenerate.
@@ -2075,10 +2099,17 @@ BAD (vague topic hint — never do this):
         }
 
         $style_instruction = isset( $style_map[ $style ] ) ? " Required visual style: {$style_map[$style]}." : '';
-        $no_text_suffix    = $no_text ? ' No text, labels, or typography anywhere in the image.' : '';
+        $no_text_suffix    = $no_text
+            ? ' CRITICAL: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles, no watermarks, no signage, no UI chrome. Pure visual imagery only. Do NOT quote the article title or any phrase inside the prompt itself.'
+            : '';
 
-        $system_msg = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
-        $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$no_text_suffix}";
+        $vary_instruction = $force_vary
+            ? ' IMPORTANT: The user just regenerated because they did not like the previous image. You MUST choose a completely different visual metaphor: different setting, different subject, different mood. If the previous prompt used a data centre or city, use a workshop, natural landscape, or organic environment instead. If it used an isometric style, use photorealistic. Never repeat the same type of scene.'
+            : '';
+
+        $system_msg   = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
+        $brand_instruction = ' Scan the article for specific technology brands (e.g. PostgreSQL, MySQL, Redis, AWS, Docker, Kubernetes, Python, macOS, GitHub, Cloudflare). If any are found, make their recognisable mascot or icon a prominent visual element in the scene — e.g. the PostgreSQL elephant statue, the Docker whale, the AWS smile-arrow logo — as a large foreground prop, not as flat text.';
+        $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
 
         try {
             switch ( $prompt_vendor ) {
@@ -2110,11 +2141,13 @@ BAD (vague topic hint — never do this):
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
+        set_time_limit( 180 );
 
-        $post_id = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
-        $quality = ( isset( $_POST['quality'] ) && $_POST['quality'] === 'hd' ) ? 'hd' : 'standard';
-        $count   = ( isset( $_POST['dual'] ) && '1' === $_POST['dual'] ) ? 2 : 1;
-        $prompt  = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+        $post_id  = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
+        $quality  = ( isset( $_POST['quality'] ) && $_POST['quality'] === 'hd' ) ? 'hd' : 'standard';
+        $count    = 1;
+        $prompt   = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+        $no_text  = isset( $_POST['no_text'] ) && '1' === $_POST['no_text'];
 
         // Legacy fallback: if no pre-written prompt, write one inline.
         $prompt_vendor = isset( $_POST['prompt_vendor'] ) ? sanitize_key( wp_unslash( $_POST['prompt_vendor'] ) ) : 'openai';
@@ -2178,6 +2211,13 @@ BAD (vague topic hint — never do this):
         $options    = [];
         $last_error = '';
 
+        // Enforce no-text at the DALL-E call level — DALL-E cannot reliably render
+        // text and any attempt produces garbled glyphs. Append when the user has
+        // checked "no text", or always (blog headers should never carry text).
+        if ( $no_text ) {
+            $prompt .= ' Important: NO text, words, letters, numbers, labels, captions, or typography of any kind anywhere in the image.';
+        }
+
         for ( $i = 1; $i <= $count; $i++ ) {
             try {
                 $image_url = CSDT_AI_Dispatcher::generate_image( $prompt, '1792x1024', $quality );
@@ -2198,17 +2238,21 @@ BAD (vague topic hint — never do this):
                 continue;
             }
 
+            self::overlay_title( $tmp_jpg, $title );
+
             $file = [
                 'name'     => $slug . '-ai-header-' . $i . '.jpg',
                 'tmp_name' => $tmp_jpg,
             ];
 
-            $attach_id = media_handle_sideload( $file, $post_id, $title . ' (option ' . $i . ')' );
+            $attach_id = media_handle_sideload( $file, $post_id, $title );
             @unlink( $tmp_jpg ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 
             if ( is_wp_error( $attach_id ) ) {
                 continue;
             }
+
+            update_post_meta( $attach_id, '_wp_attachment_image_alt', sanitize_text_field( $title ) );
 
             $options[] = [
                 'attach_id' => $attach_id,
@@ -2330,6 +2374,118 @@ BAD (vague topic hint — never do this):
         }
 
         return $jpg_path;
+    }
+
+    // ─── Overlay post title onto generated image ──────────────────────────────
+
+    private static function overlay_title( string $jpg_path, string $title ): void {
+        if ( ! function_exists( 'imagecreatefromjpeg' ) || ! function_exists( 'imagecopymerge' ) ) {
+            return;
+        }
+
+        $img = @imagecreatefromjpeg( $jpg_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        if ( ! $img ) {
+            return;
+        }
+
+        $w       = imagesx( $img );
+        $h       = imagesy( $img );
+        $pad     = (int) ( $w * 0.022 );
+        $strip_h = (int) ( $h * 0.155 );
+        $strip_y = $h - $strip_h;
+
+        // Semi-transparent dark strip
+        $overlay = imagecreatetruecolor( $w, $strip_h );
+        $black   = imagecolorallocate( $overlay, 0, 0, 0 );
+        imagefilledrectangle( $overlay, 0, 0, $w - 1, $strip_h - 1, $black );
+        imagecopymerge( $img, $overlay, 0, $strip_y, 0, 0, $w, $strip_h, 68 );
+        imagedestroy( $overlay );
+
+        $display = $title;
+        $white   = imagecolorallocate( $img, 255, 255, 255 );
+        $font    = self::find_ttf_font();
+
+        if ( $font && function_exists( 'imagettftext' ) && function_exists( 'imagettfbbox' ) ) {
+            $max_w     = $w - ( 2 * $pad );
+            $font_size = (int) ( $strip_h * 0.31 );
+            $line2     = '';
+
+            // Shrink font until single line fits
+            while ( $font_size >= 22 ) {
+                $bbox = imagettfbbox( $font_size, 0, $font, $display );
+                if ( $bbox && ( $bbox[2] - $bbox[0] ) <= $max_w ) {
+                    break;
+                }
+                $font_size -= 2;
+            }
+
+            // Still doesn't fit — wrap to 2 lines at a smaller size
+            if ( $font_size < 22 ) {
+                $font_size = (int) ( $strip_h * 0.22 );
+                $words     = explode( ' ', $display );
+                $total     = count( $words );
+                for ( $split = (int) ( $total / 2 ); $split > 0; $split-- ) {
+                    $l1   = implode( ' ', array_slice( $words, 0, $split ) );
+                    $l2   = implode( ' ', array_slice( $words, $split ) );
+                    $box1 = imagettfbbox( $font_size, 0, $font, $l1 );
+                    $box2 = imagettfbbox( $font_size, 0, $font, $l2 );
+                    if ( $box1 && $box2
+                        && ( $box1[2] - $box1[0] ) <= $max_w
+                        && ( $box2[2] - $box2[0] ) <= $max_w ) {
+                        $display = $l1;
+                        $line2   = $l2;
+                        break;
+                    }
+                }
+            }
+
+            if ( '' === $line2 ) {
+                // Single line — vertically centred in strip
+                $text_y = $strip_y + (int) ( $strip_h * 0.68 );
+                imagettftext( $img, $font_size, 0, $pad, $text_y, $white, $font, $display );
+            } else {
+                // Two lines — stacked with a small gap
+                $line_h = (int) ( $font_size * 1.25 );
+                $block  = 2 * $line_h;
+                $top_y  = $strip_y + (int) ( ( $strip_h - $block ) / 2 ) + $line_h;
+                imagettftext( $img, $font_size, 0, $pad, $top_y, $white, $font, $display );
+                imagettftext( $img, $font_size, 0, $pad, $top_y + $line_h, $white, $font, $line2 );
+            }
+        } else {
+            // Built-in GD bitmap font fallback
+            $short  = mb_strlen( $display ) > 60 ? mb_substr( $display, 0, 59 ) . '…' : $display;
+            $text_y = $strip_y + (int) ( ( $strip_h - 16 ) / 2 );
+            imagestring( $img, 5, $pad, $text_y, $short, $white );
+        }
+
+        imagejpeg( $img, $jpg_path, 88 );
+        imagedestroy( $img );
+    }
+
+    private static function find_ttf_font(): ?string {
+        static $cached = false;
+        if ( false !== $cached ) {
+            return '' !== $cached ? $cached : null;
+        }
+        $candidates = [
+            // Bundled in plugin — always available regardless of host OS
+            plugin_dir_path( __FILE__ ) . '../assets/fonts/DejaVuSans-Bold.ttf',
+            // System fallbacks
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+            '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
+            '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
+            '/System/Library/Fonts/Helvetica.ttc',
+        ];
+        foreach ( $candidates as $f ) {
+            if ( file_exists( $f ) ) {
+                $cached = $f;
+                return $f;
+            }
+        }
+        $cached = '';
+        return null;
     }
 
 

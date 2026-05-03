@@ -13,11 +13,44 @@ class CSDT_CSP {
 
     public static function output_security_headers(): void {
         if ( is_admin() ) { return; }
-        if ( get_option( 'csdt_devtools_safe_headers_enabled', '0' ) === '1' ) {
-            header( 'X-Content-Type-Options: nosniff' );
-            header( 'X-Frame-Options: SAMEORIGIN' );
-            header( 'Referrer-Policy: strict-origin-when-cross-origin' );
-            header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
+
+        // Master switch — when off, suppress all headers regardless of per-header enabled flags.
+        if ( get_option( 'csdt_devtools_safe_headers_enabled', '0' ) !== '1' ) { return; }
+
+        $config = json_decode( (string) get_option( 'csdt_sec_headers_config', 'null' ), true );
+
+        if ( ! is_array( $config ) ) {
+            // Legacy: no per-header config saved yet. Master is on (checked above), so use hardcoded defaults.
+            $config = [
+                'x-content-type-options'    => [ 'enabled' => true, 'value' => 'nosniff' ],
+                'x-frame-options'           => [ 'enabled' => true, 'value' => 'SAMEORIGIN' ],
+                'referrer-policy'           => [ 'enabled' => true, 'value' => 'strict-origin-when-cross-origin' ],
+                'permissions-policy'        => [ 'enabled' => true, 'value' => 'camera=(), microphone=(), geolocation=(), payment=()' ],
+                'strict-transport-security' => [ 'enabled' => true, 'value' => 'max-age=31536000; includeSubDomains' ],
+            ];
+        }
+
+        if ( ! empty( $config ) ) {
+            $is_https = is_ssl()
+                || ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https' )
+                || ( isset( $_SERVER['HTTP_CF_VISITOR'] ) && strpos( $_SERVER['HTTP_CF_VISITOR'], '"https"' ) !== false );
+
+            $header_names = [
+                'x-content-type-options'    => 'X-Content-Type-Options',
+                'x-frame-options'           => 'X-Frame-Options',
+                'referrer-policy'           => 'Referrer-Policy',
+                'permissions-policy'        => 'Permissions-Policy',
+                'strict-transport-security' => 'Strict-Transport-Security',
+            ];
+            $fixed = [ 'x-content-type-options' => 'nosniff' ];
+
+            foreach ( $header_names as $key => $name ) {
+                if ( empty( $config[ $key ]['enabled'] ) ) { continue; }
+                if ( 'strict-transport-security' === $key && ! $is_https ) { continue; }
+                $value = $fixed[ $key ] ?? ( $config[ $key ]['value'] ?? '' );
+                if ( ! $value ) { continue; }
+                header( $name . ': ' . $value );
+            }
         }
         if ( get_option( 'csdt_devtools_csp_enabled', '0' ) === '1' ) {
             $csp = self::build_csp_header();
@@ -310,31 +343,34 @@ class CSDT_CSP {
 
             <!-- Custom directives -->
             <div style="margin-bottom:14px;">
-                <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;"><?php esc_html_e( 'Additional directives (appended verbatim)', 'cloudscale-devtools' ); ?></label>
-                <input type="text" id="cs-csp-custom" class="cs-text-input" style="width:100%;font-family:monospace;font-size:12px;"
-                       placeholder="upgrade-insecure-requests; block-all-mixed-content"
-                       value="<?php echo esc_attr( $csp_custom ); ?>">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:13px;font-weight:700;color:#334155;"><?php esc_html_e( 'Custom directives', 'cloudscale-devtools' ); ?></span>
+                    <span style="font-size:11px;color:#94a3b8;"><?php esc_html_e( 'appended verbatim to the generated CSP', 'cloudscale-devtools' ); ?></span>
+                </div>
+                <textarea id="cs-csp-custom" class="cs-text-input" rows="3"
+                          style="width:100%;font-family:monospace;font-size:12px;line-height:1.6;resize:vertical;box-sizing:border-box;"
+                          placeholder="e.g. upgrade-insecure-requests"><?php echo esc_textarea( $csp_custom ); ?></textarea>
             </div>
 
             <!-- Live preview -->
             <div style="margin-bottom:14px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;"><?php esc_html_e( 'Preview', 'cloudscale-devtools' ); ?></div>
-                    <button type="button" id="cs-csp-copy-btn" style="background:none;border:1px solid #334155;color:#94a3b8;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;">📋 Copy</button>
+                    <span style="font-size:13px;font-weight:700;color:#334155;"><?php esc_html_e( 'Preview', 'cloudscale-devtools' ); ?></span>
+                    <button type="button" id="cs-csp-copy-btn" style="background:none;border:1px solid #cbd5e1;color:#64748b;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;">📋 Copy</button>
                 </div>
-                <pre id="cs-csp-preview" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0;max-height:140px;overflow-y:auto;"></pre>
+                <pre id="cs-csp-preview" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0;max-height:160px;overflow-y:auto;"></pre>
             </div>
 
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <button type="button" id="cs-csp-save-btn" class="cs-btn-primary cs-btn-sm"><?php esc_html_e( 'Save Settings', 'cloudscale-devtools' ); ?></button>
+                <span id="cs-csp-saved" style="display:none;color:#16a34a;font-size:13px;font-weight:600;">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 <?php if ( $backup_time ) : ?>
                 <button type="button" id="cs-csp-rollback-btn" class="cs-btn-secondary cs-btn-sm" style="border-color:#f87171;color:#dc2626;">
                     ↩ <?php esc_html_e( 'Rollback to previous settings', 'cloudscale-devtools' ); ?>
                     <span style="font-weight:400;font-size:11px;opacity:.8;">(<?php echo esc_html( human_time_diff( $backup_time ) . ' ' . __( 'ago', 'cloudscale-devtools' ) ); ?>)</span>
                 </button>
-                <?php endif; ?>
-                <span id="cs-csp-saved"    style="display:none;color:#16a34a;font-size:13px;font-weight:600;">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 <span id="cs-csp-rolledback" style="display:none;color:#d97706;font-size:13px;font-weight:600;">↩ <?php esc_html_e( 'Rolled back', 'cloudscale-devtools' ); ?></span>
+                <?php endif; ?>
             </div>
 
             <?php
@@ -376,7 +412,7 @@ class CSDT_CSP {
             <!-- ── Fixes Applied ─────────────────────────────────────── -->
             <details id="cs-csp-fixes-wrap" style="<?php echo esc_attr( $sec_card ); ?><?php echo empty( $fixes_log ) ? 'display:none;' : ''; ?>">
                 <summary style="<?php echo esc_attr( $sec_header ); ?>list-style:none;">
-                    <span style="<?php echo esc_attr( $sec_title ); ?>">&#x2705; <?php echo esc_html( sprintf( __( 'Fixes Applied (%d)', 'cloudscale-devtools' ), count( $fixes_log ) ) ); ?></span>
+                    <span style="<?php echo esc_attr( $sec_title ); ?>">&#x2705; <?php echo esc_html( sprintf( __( 'CSP Fixes Applied (%d)', 'cloudscale-devtools' ), count( $fixes_log ) ) ); ?></span>
                     <button type="button" id="cs-csp-fixes-clear" class="cs-btn-secondary cs-btn-sm" style="border-color:#f87171;color:#dc2626;flex-shrink:0;" onclick="event.stopPropagation()"><?php esc_html_e( 'Clear', 'cloudscale-devtools' ); ?></button>
                     <span class="<?php echo esc_attr( $sec_toggle ); ?>"></span>
                 </summary>
@@ -394,16 +430,6 @@ class CSDT_CSP {
                 </div>
             </details>
 
-            <!-- Header security scan -->
-            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0;">
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">🔍 <?php esc_html_e( 'Header Security Scan', 'cloudscale-devtools' ); ?></span>
-                    <button type="button" id="cs-csp-scan-btn" class="cs-btn-secondary cs-btn-sm"><?php esc_html_e( 'Scan Headers Now', 'cloudscale-devtools' ); ?></button>
-                    <span id="cs-csp-scan-spinner" style="display:none;font-size:12px;color:#64748b;"><?php esc_html_e( 'Scanning…', 'cloudscale-devtools' ); ?></span>
-                </div>
-                <p style="font-size:11px;color:#94a3b8;margin:0 0 8px;"><?php esc_html_e( 'Checks the homepage and last 10 published posts/pages for duplicate CSP headers, missing security headers, and plugin conflicts.', 'cloudscale-devtools' ); ?></p>
-                <div id="cs-csp-scan-results" style="font-size:12px;"></div>
-            </div>
         </div>
 
         <?php
@@ -482,7 +508,14 @@ class CSDT_CSP {
             update_option( 'csdt_csp_fixes_log', wp_json_encode( array_slice( $fixes, 0, 50 ) ) );
         }
 
-        wp_send_json_success( [ 'has_backup' => true ] );
+        $new_entry = $history[0];
+        wp_send_json_success( [
+            'has_backup'    => true,
+            'history_entry' => [
+                'label'    => $new_entry['label'],
+                'saved_at' => $new_entry['saved_at'],
+            ],
+        ] );
     }
 
     private static function csp_history_label( array $old, array $new ): string {
@@ -644,6 +677,93 @@ class CSDT_CSP {
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
         delete_option( 'csdt_csp_fixes_log' );
         wp_send_json_success();
+    }
+
+    public static function ajax_csp_apply_fix(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+
+        $type      = isset( $_POST['type'] )      ? sanitize_key( wp_unslash( $_POST['type'] ) )         : '';
+        $value     = isset( $_POST['value'] )     ? sanitize_text_field( wp_unslash( $_POST['value'] ) ) : '';
+        $directive = isset( $_POST['directive'] ) ? sanitize_key( wp_unslash( $_POST['directive'] ) )    : 'script-src';
+
+        if ( ! in_array( $type, [ 'custom', 'service' ], true ) || ! $value ) {
+            wp_send_json_error( 'Invalid parameters.' );
+        }
+
+        // Snapshot current state for history before any changes.
+        $old_enabled   = get_option( 'csdt_devtools_csp_enabled', '0' );
+        $old_mode      = get_option( 'csdt_devtools_csp_mode', 'enforce' );
+        $old_services  = json_decode( get_option( 'csdt_devtools_csp_services', '[]' ), true );
+        if ( ! is_array( $old_services ) ) { $old_services = []; }
+        $old_custom    = get_option( 'csdt_devtools_csp_custom', '' );
+        $old_reporting = get_option( 'csdt_csp_reporting_enabled', '0' );
+
+        $names = [
+            'google_analytics' => 'Google Analytics', 'google_adsense' => 'Google AdSense',
+            'google_tag_manager' => 'Google Tag Manager', 'google_fonts' => 'Google Fonts',
+            'cloudflare_insights' => 'Cloudflare Insights', 'facebook_pixel' => 'Facebook Pixel',
+            'recaptcha' => 'reCAPTCHA', 'youtube' => 'YouTube', 'vimeo' => 'Vimeo',
+            'stripe' => 'Stripe', 'hotjar' => 'Hotjar', 'intercom' => 'Intercom',
+            'twitter_embeds' => 'Twitter/X embeds', 'disqus' => 'Disqus',
+            'woocommerce_payments' => 'WooCommerce Payments',
+        ];
+
+        $new_services = $old_services;
+        $new_custom   = $old_custom;
+
+        if ( $type === 'service' ) {
+            $allowed_services = array_keys( $names );
+            if ( ! in_array( $value, $allowed_services, true ) ) {
+                wp_send_json_error( 'Unknown service.' );
+            }
+            if ( in_array( $value, $old_services, true ) ) {
+                wp_send_json_success( [ 'already_applied' => true, 'custom' => $old_custom, 'services' => $old_services ] );
+            }
+            $new_services = array_values( array_unique( array_merge( $old_services, [ $value ] ) ) );
+            $fix_label    = 'Fix applied: Added ' . ( $names[ $value ] ?? $value ) . ' to CSP allow-list';
+            update_option( 'csdt_devtools_csp_services', wp_json_encode( $new_services ) );
+        } else {
+            // Validate origin — must start with https://, http://, or //
+            if ( ! preg_match( '/^(https?:)?\/\//', $value ) ) {
+                wp_send_json_error( 'Invalid origin URL.' );
+            }
+            $origin     = esc_url_raw( $value );
+            $new_custom = trim( $old_custom );
+            $entry      = $directive . ' ' . $origin;
+            // Only append if not already present.
+            if ( strpos( $new_custom, $origin ) === false ) {
+                $new_custom = $new_custom ? $new_custom . "\n" . $entry : $entry;
+            }
+            $fix_label = 'Fix applied: Added ' . $origin . ' to custom CSP (' . $directive . ')';
+            update_option( 'csdt_devtools_csp_custom', $new_custom );
+        }
+
+        // Push old state to rolling 10-entry change history.
+        $history = json_decode( get_option( 'csdt_csp_history', '[]' ), true );
+        if ( ! is_array( $history ) ) { $history = []; }
+        array_unshift( $history, [
+            'enabled'           => $old_enabled,
+            'mode'              => $old_mode,
+            'services'          => wp_json_encode( $old_services ),
+            'custom'            => $old_custom,
+            'reporting_enabled' => $old_reporting,
+            'saved_at'          => time(),
+            'label'             => $fix_label,
+        ] );
+        update_option( 'csdt_csp_history', wp_json_encode( array_slice( $history, 0, 10 ) ) );
+
+        // Append to fixes log (up to 50 entries).
+        $fixes = json_decode( get_option( 'csdt_csp_fixes_log', '[]' ), true );
+        if ( ! is_array( $fixes ) ) { $fixes = []; }
+        array_unshift( $fixes, [ 'time' => time(), 'label' => $fix_label ] );
+        update_option( 'csdt_csp_fixes_log', wp_json_encode( array_slice( $fixes, 0, 50 ) ) );
+
+        wp_send_json_success( [
+            'custom'   => $new_custom,
+            'services' => $new_services,
+            'label'    => $fix_label,
+        ] );
     }
 
 }

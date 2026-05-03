@@ -434,16 +434,18 @@
         const bars = days.map( d => {
             const truncated = d.count > displayMax;
             const pct = truncated ? 92 : Math.round( ( d.count / displayMax ) * 100 );
-            let cls = d.count === 0 ? '' : d.count >= displayMax * 0.75 ? ' cs-bf-bar-high' : d.count >= displayMax * 0.4 ? ' cs-bf-bar-mid' : '';
+            let cls = d.count === 0 ? ' cs-bf-bar-zero' : d.count >= displayMax * 0.75 ? ' cs-bf-bar-high' : d.count >= displayMax * 0.4 ? ' cs-bf-bar-mid' : '';
             const extraStyle = isAttack && d.count > 0
                 ? `background:#dc2626!important;${ d.isToday ? 'box-shadow:0 0 8px rgba(220,38,38,.6);' : 'opacity:.7;' }`
                 : '';
-            const truncLabel = truncated
+            const topLabel = truncated
                 ? `<span style="position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#dc2626;white-space:nowrap;">${d.count}</span>`
+                : d.count === 0
+                ? `<span style="position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#16a34a;white-space:nowrap;">0</span>`
                 : '';
             return `<div class="cs-bf-day" style="width:${barW}px;flex-shrink:0;flex-grow:0;">
                 <div class="cs-bf-bar-track" style="position:relative;">
-                    ${truncLabel}<div class="cs-bf-bar${cls}" style="height:${pct}%;${extraStyle}" title="${d.count} failed attempt${d.count !== 1 ? 's' : ''}"></div>
+                    ${topLabel}<div class="cs-bf-bar${cls}" style="height:${pct}%;${extraStyle}" title="${d.count} failed attempt${d.count !== 1 ? 's' : ''}"></div>
                 </div>
                 <div class="cs-bf-day-label" style="${isAttack && d.isToday ? 'color:#dc2626;font-weight:700;' : ''}">${d.label}</div>
             </div>`;

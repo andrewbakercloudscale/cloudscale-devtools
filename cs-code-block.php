@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.621
+ * Version: 1.9.673
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.621';
+    const VERSION      = '1.9.673';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -330,8 +330,13 @@ class CloudScale_DevTools {
         // Login security AJAX
         add_action( 'wp_ajax_csdt_devtools_login_save',          [ 'CSDT_Login', 'ajax_login_save' ] );
         add_action( 'wp_ajax_csdt_devtools_bf_log_fetch',        [ 'CSDT_Login', 'ajax_bf_log_fetch' ] );
+        add_action( 'wp_ajax_csdt_ip_block',                     [ 'CSDT_Login', 'ajax_ip_block' ] );
+        add_action( 'wp_ajax_csdt_ip_unblock',                   [ 'CSDT_Login', 'ajax_ip_unblock' ] );
+        add_action( 'parse_request',                             [ 'CSDT_Login', 'enforce_ip_blocklist' ], 1 );
         add_action( 'wp_ajax_csdt_ssh_monitor_save',             [ 'CSDT_Monitor', 'ajax_ssh_monitor_save' ] );
         add_action( 'wp_ajax_csdt_ssh_log_clear',               [ 'CSDT_Monitor', 'ajax_ssh_log_clear' ] );
+        add_action( 'wp_ajax_csdt_ssh_fix_permissions',         [ 'CSDT_Monitor', 'ajax_ssh_fix_permissions' ] );
+        add_action( 'wp_ajax_csdt_csp_domain_hunt',              [ __CLASS__, 'ajax_csp_domain_hunt' ] );
         add_action( 'wp_ajax_csdt_bf_self_test',                [ 'CSDT_Threat_Monitor', 'ajax_bf_self_test' ] );
         add_action( 'wp_ajax_csdt_devtools_totp_setup_start',    [ 'CSDT_Login', 'ajax_totp_setup_start' ] );
         add_action( 'wp_ajax_csdt_devtools_totp_setup_verify',   [ 'CSDT_Login', 'ajax_totp_setup_verify' ] );
@@ -422,6 +427,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_csp_violations_clear', [ 'CSDT_CSP', 'ajax_csp_violations_clear' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_fixes_get',        [ 'CSDT_CSP', 'ajax_csp_fixes_get' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_fixes_clear',      [ 'CSDT_CSP', 'ajax_csp_fixes_clear' ] );
+        add_action( 'wp_ajax_csdt_devtools_csp_apply_fix',        [ 'CSDT_CSP', 'ajax_csp_apply_fix' ] );
         add_action( 'send_headers',                             [ 'CSDT_CSP', 'output_security_headers' ] );
         add_action( 'wp_ajax_csdt_test_account_create',          [ 'CSDT_Test_Accounts', 'ajax_create_test_account' ] );
         add_action( 'wp_ajax_csdt_test_account_revoke',          [ 'CSDT_Test_Accounts', 'ajax_revoke_test_account' ] );
@@ -1394,7 +1400,7 @@ class CloudScale_DevTools {
             ] );
         }
 
-        if ( in_array( $active_tab, [ 'security', 'home', 'headers' ], true ) ) {
+        if ( in_array( $active_tab, [ 'security', 'headers', 'home' ], true ) ) {
             wp_enqueue_script(
                 'csdt-vuln-scan',
                 plugins_url( 'assets/cs-vuln-scan.js', __FILE__ ),
@@ -1615,6 +1621,10 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'security' ? 'active' : ''; ?>">
                     🛡️ <?php esc_html_e( 'AI Security Scan', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=headers' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'headers' ? 'active' : ''; ?>">
+                    🔒 <?php esc_html_e( 'Headers', 'cloudscale-devtools' ); ?>
+                </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=ai-images' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'ai-images' ? 'active' : ''; ?>">
                     🎨 <?php esc_html_e( 'Featured Images', 'cloudscale-devtools' ); ?>
@@ -1634,10 +1644,6 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $base_url . '&tab=thumbnails' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'thumbnails' ? 'active' : ''; ?>">
                     🖼️ <?php esc_html_e( 'Thumbnails', 'cloudscale-devtools' ); ?>
-                </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=headers' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'headers' ? 'active' : ''; ?>">
-                    🔒 <?php esc_html_e( 'Headers', 'cloudscale-devtools' ); ?>
                 </a>
             </div>
             <!-- Copy All action bar -->
@@ -1668,13 +1674,15 @@ class CloudScale_DevTools {
                 <div class="cs-tab-content active">
                     <?php CSDT_Thumbnails::render_ai_images_panel(); ?>
                 </div>
-            <?php elseif ( $active_tab === 'headers' ) : ?>
-                <div class="cs-tab-content active">
-                    <?php CSDT_Security_Headers::render_headers_tab(); ?>
-                </div>
             <?php elseif ( $active_tab === 'security' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_security_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'headers' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php CSDT_Security_Headers::render_header_scan_panel(); ?>
+                    <?php CSDT_Security_Headers::render_security_headers_panel( false ); ?>
+                    <?php CSDT_CSP::render_csp_panel(); ?>
                 </div>
             <?php elseif ( $active_tab === 'optimizer' ) : ?>
                 <div class="cs-tab-content active">
@@ -1751,7 +1759,7 @@ class CloudScale_DevTools {
         ?>
         <button type="button" id="<?php echo esc_attr( $btn_id ); ?>"
             data-cs-modal-open="<?php echo esc_attr( $modal_id ); ?>"
-            style="background:#2563eb!important;border:1px solid rgba(255,255,255,0.35)!important;border-radius:5px!important;color:#fff!important;font-size:12px!important;font-weight:700!important;padding:5px 14px!important;cursor:pointer!important;margin-left:auto!important;flex-shrink:0!important;display:block!important;box-shadow:none!important;text-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;line-height:1.4!important">
+            style="background:#fff!important;border:1px solid rgba(255,255,255,0.6)!important;border-radius:5px!important;color:#1e40af!important;font-size:12px!important;font-weight:700!important;padding:5px 14px!important;cursor:pointer!important;margin-left:auto!important;flex-shrink:0!important;display:block!important;box-shadow:none!important;text-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;line-height:1.4!important">
             Explain&hellip;
         </button>
         <div id="<?php echo esc_attr( $modal_id ); ?>"
@@ -3187,6 +3195,8 @@ class CloudScale_DevTools {
 
                 <?php
                 // ── wp-login.php blocked hits — chart + probe IP table ────────
+                $ip_blocklist = get_option( 'csdt_ip_blocklist', [] );
+                if ( ! is_array( $ip_blocklist ) ) { $ip_blocklist = []; }
                 $daily_hits   = isset( $wplogin_stats['daily'] ) && is_array( $wplogin_stats['daily'] ) ? $wplogin_stats['daily'] : [];
                 $today        = gmdate( 'Y-m-d' );
                 $days         = [];
@@ -3201,7 +3211,7 @@ class CloudScale_DevTools {
                 $day_mid      = (int) round( $day_max / 2 );
                 $ip_stats_raw = isset( $wplogin_stats['ip_stats'] ) && is_array( $wplogin_stats['ip_stats'] ) ? $wplogin_stats['ip_stats'] : [];
                 uasort( $ip_stats_raw, fn( $a, $b ) => $b['last_ts'] - $a['last_ts'] );
-                $probe_recent = array_slice( $ip_stats_raw, 0, 20, true );
+                $probe_recent = array_slice( $ip_stats_raw, 0, 50, true );
                 ?>
                 <div style="margin-top:22px;border-top:1px solid #e8edf5;padding-top:20px;">
                     <div class="cs-bf-log-header">
@@ -3216,16 +3226,15 @@ class CloudScale_DevTools {
                                 <span class="cs-bf-ytick">0</span>
                             </div>
                             <?php foreach ( $days as $d => $cnt ) :
-                                $pct = $cnt > 0 ? max( 2, (int) round( $cnt / $day_max * 100 ) ) : 0;
-                                $cls = $cnt === 0 ? '' : ( $cnt >= $day_max * 0.75 ? ' cs-bf-bar-high' : ( $cnt >= $day_max * 0.4 ? ' cs-bf-bar-mid' : '' ) );
+                                $pct      = $cnt > 0 ? max( 2, (int) round( $cnt / $day_max * 100 ) ) : 0;
+                                $cls      = $cnt === 0 ? ' cs-bf-bar-zero' : ( $cnt >= $day_max * 0.75 ? ' cs-bf-bar-high' : ( $cnt >= $day_max * 0.4 ? ' cs-bf-bar-mid' : '' ) );
+                                $lbl_clr  = $cnt === 0 ? '#16a34a' : '#64748b';
                             ?>
                             <div class="cs-bf-day" style="flex:1;min-width:28px;">
                                 <div class="cs-bf-bar-track" style="position:relative;">
-                                    <?php if ( $cnt > 0 ) : ?>
-                                    <span style="position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#64748b;white-space:nowrap;"><?php echo esc_html( number_format( $cnt ) ); ?></span>
-                                    <?php endif; ?>
+                                    <span style="position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:<?php echo esc_attr( $lbl_clr ); ?>;white-space:nowrap;"><?php echo esc_html( number_format( $cnt ) ); ?></span>
                                     <div class="cs-bf-bar<?php echo esc_attr( $cls ); ?>"
-                                         style="height:<?php echo $pct; ?>%;<?php echo $cnt === 0 ? 'background:#e2e8f0;' : ''; ?>"
+                                         style="height:<?php echo $pct; ?>%;"
                                          title="<?php echo esc_attr( number_format( $cnt ) . ' blocked on ' . gmdate( 'M j', strtotime( $d ) ) ); ?>"></div>
                                 </div>
                                 <div class="cs-bf-day-label"><?php echo esc_html( gmdate( 'M j', strtotime( $d ) ) ); ?></div>
@@ -3234,22 +3243,86 @@ class CloudScale_DevTools {
                         </div>
                         <div class="cs-bf-table-wrap">
                             <?php if ( ! empty( $probe_recent ) ) : ?>
-                            <table class="cs-bf-table">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px;">
+                                <span style="font-size:11px;color:#64748b;"><?php echo esc_html( sprintf( _n( '%d IP', '%d IPs', count( $probe_recent ), 'cloudscale-devtools' ), count( $probe_recent ) ) ); ?></span>
+                                <div style="display:flex;gap:4px;">
+                                    <button type="button" id="cs-probe-sort-ts"
+                                            style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #3b82f6;background:#3b82f6;color:#fff;cursor:pointer;font-weight:600;">
+                                        Last attempt ↓
+                                    </button>
+                                    <button type="button" id="cs-probe-sort-cnt"
+                                            style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #cbd5e1;background:#f8fafc;color:#475569;cursor:pointer;">
+                                        Count ↓
+                                    </button>
+                                </div>
+                            </div>
+                            <table class="cs-bf-table" id="cs-probe-table">
                                 <thead>
                                     <tr>
-                                        <th class="cs-bf-th"><?php esc_html_e( 'When', 'cloudscale-devtools' ); ?></th>
+                                        <th class="cs-bf-th"><?php esc_html_e( 'Last attempt', 'cloudscale-devtools' ); ?></th>
                                         <th class="cs-bf-th"><?php esc_html_e( 'IP address', 'cloudscale-devtools' ); ?></th>
+                                        <th class="cs-bf-th" style="text-align:right;"><?php esc_html_e( 'Attempts', 'cloudscale-devtools' ); ?></th>
+                                        <th class="cs-bf-th"></th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                <?php foreach ( $probe_recent as $probe_ip => $probe_data ) : ?>
-                                    <tr>
+                                <tbody id="cs-probe-tbody">
+                                <?php foreach ( $probe_recent as $probe_ip => $probe_data ) :
+                                    $probe_count  = array_sum( $probe_data['days'] ?? [] );
+                                    $is_blocked   = isset( $ip_blocklist[ $probe_ip ] );
+                                ?>
+                                    <tr data-ts="<?php echo (int) $probe_data['last_ts']; ?>" data-cnt="<?php echo (int) $probe_count; ?>" data-ip="<?php echo esc_attr( $probe_ip ); ?>">
                                         <td class="cs-bf-td cs-bf-td-time"><?php echo esc_html( human_time_diff( $probe_data['last_ts'] ) . ' ago' ); ?></td>
                                         <td class="cs-bf-td cs-bf-td-ip"><?php echo esc_html( $probe_ip ); ?></td>
+                                        <td class="cs-bf-td" style="text-align:right;font-weight:700;color:#dc2626;"><?php echo number_format( (int) $probe_count ); ?></td>
+                                        <td class="cs-bf-td" style="white-space:nowrap;text-align:right;">
+                                            <a href="https://ipinfo.io/<?php echo esc_attr( $probe_ip ); ?>" target="_blank" rel="noopener"
+                                               style="font-size:10px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:4px;background:#f8fafc;color:#475569;text-decoration:none;margin-right:4px;">Whois</a>
+                                            <?php if ( $is_blocked ) : ?>
+                                            <span style="font-size:10px;padding:2px 6px;border:1px solid #86efac;border-radius:4px;background:#dcfce7;color:#15803d;font-weight:600;">🚫 Blocked</span>
+                                            <?php else : ?>
+                                            <button type="button" class="cs-ip-block-btn"
+                                                    data-ip="<?php echo esc_attr( $probe_ip ); ?>"
+                                                    style="font-size:10px;padding:2px 6px;border:1px solid #fca5a5;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer;font-weight:600;">Block</button>
+                                            <?php endif; ?>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            <script>
+                            (function(){
+                                var btnTs  = document.getElementById('cs-probe-sort-ts');
+                                var btnCnt = document.getElementById('cs-probe-sort-cnt');
+                                var tbody  = document.getElementById('cs-probe-tbody');
+                                if (!btnTs || !btnCnt || !tbody) return;
+
+                                function styleActive(active, inactive) {
+                                    active.style.background   = '#3b82f6';
+                                    active.style.color        = '#fff';
+                                    active.style.borderColor  = '#3b82f6';
+                                    inactive.style.background = '#f8fafc';
+                                    inactive.style.color      = '#475569';
+                                    inactive.style.borderColor = '#cbd5e1';
+                                }
+
+                                function sortBy(attr) {
+                                    var rows = Array.from(tbody.querySelectorAll('tr'));
+                                    rows.sort(function(a, b) {
+                                        return parseInt(b.getAttribute(attr), 10) - parseInt(a.getAttribute(attr), 10);
+                                    });
+                                    rows.forEach(function(r) { tbody.appendChild(r); });
+                                }
+
+                                btnTs.addEventListener('click', function() {
+                                    sortBy('data-ts');
+                                    styleActive(btnTs, btnCnt);
+                                });
+                                btnCnt.addEventListener('click', function() {
+                                    sortBy('data-cnt');
+                                    styleActive(btnCnt, btnTs);
+                                });
+                            })();
+                            </script>
                             <?php else : ?>
                             <div class="cs-bf-empty"><?php echo $total_hits > 0 ? esc_html__( 'Per-IP log populates as new probes arrive.', 'cloudscale-devtools' ) : esc_html__( 'No wp-login.php hits recorded yet.', 'cloudscale-devtools' ); ?></div>
                             <?php endif; ?>
@@ -3264,6 +3337,146 @@ class CloudScale_DevTools {
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>
+
+                    <div id="cs-ip-blocklist-wrap" class="cs-bf-log-wrap" style="margin-top:22px;<?php echo empty( $ip_blocklist ) ? 'display:none;' : ''; ?>">
+                        <div class="cs-bf-log-header">
+                            <span class="cs-bf-log-title">🚫 <?php esc_html_e( 'Blocked IPs', 'cloudscale-devtools' ); ?></span>
+                            <span class="cs-bf-log-total" id="cs-blocklist-count"><?php echo count( $ip_blocklist ); ?> blocked</span>
+                        </div>
+                        <div class="cs-bf-table-wrap">
+                            <table class="cs-bf-table">
+                                <thead>
+                                    <tr>
+                                        <th class="cs-bf-th"><?php esc_html_e( 'IP address', 'cloudscale-devtools' ); ?></th>
+                                        <th class="cs-bf-th"><?php esc_html_e( 'Reason', 'cloudscale-devtools' ); ?></th>
+                                        <th class="cs-bf-th"><?php esc_html_e( 'Blocked', 'cloudscale-devtools' ); ?></th>
+                                        <th class="cs-bf-th"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cs-blocklist-tbody">
+                                <?php foreach ( $ip_blocklist as $bl_ip => $bl_data ) : ?>
+                                    <tr id="cs-bl-row-<?php echo esc_attr( str_replace( '.', '-', $bl_ip ) ); ?>">
+                                        <td class="cs-bf-td cs-bf-td-ip"><?php echo esc_html( $bl_ip ); ?></td>
+                                        <td class="cs-bf-td cs-bf-td-time"><?php echo esc_html( $bl_data['reason'] ?? 'Manual block' ); ?></td>
+                                        <td class="cs-bf-td cs-bf-td-time"><?php echo esc_html( isset( $bl_data['blocked_at'] ) ? human_time_diff( $bl_data['blocked_at'] ) . ' ago' : '—' ); ?></td>
+                                        <td class="cs-bf-td" style="text-align:right;white-space:nowrap;">
+                                            <a href="https://ipinfo.io/<?php echo esc_attr( $bl_ip ); ?>" target="_blank" rel="noopener"
+                                               style="font-size:10px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:4px;background:#f8fafc;color:#475569;text-decoration:none;margin-right:4px;">Whois</a>
+                                            <button type="button" class="cs-ip-unblock-btn" data-ip="<?php echo esc_attr( $bl_ip ); ?>"
+                                                    style="font-size:10px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:4px;background:#f8fafc;color:#475569;cursor:pointer;">Unblock</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <script>
+                    (function(){
+                        var nonce = <?php echo wp_json_encode( wp_create_nonce( CloudScale_DevTools::SECURITY_NONCE ) ); ?>;
+
+                        function doAjax(action, ip, reason, cb) {
+                            var fd = new FormData();
+                            fd.append('action', action);
+                            fd.append('nonce', nonce);
+                            fd.append('ip', ip);
+                            if (reason) fd.append('reason', reason);
+                            fetch(ajaxurl, {method:'POST', body:fd})
+                                .then(function(r){ return r.json(); })
+                                .then(cb)
+                                .catch(function(){ alert('Request failed.'); });
+                        }
+
+                        function addBlocklistRow(ip) {
+                            var wrap  = document.getElementById('cs-ip-blocklist-wrap');
+                            var tbody = document.getElementById('cs-blocklist-tbody');
+                            var count = document.getElementById('cs-blocklist-count');
+                            if (!wrap || !tbody) return;
+                            wrap.style.display = '';
+                            var rowId = 'cs-bl-row-' + ip.replace(/\./g,'-');
+                            if (document.getElementById(rowId)) return;
+                            var n = tbody.rows.length + 1;
+                            if (count) count.textContent = n + ' blocked';
+                            var tr = document.createElement('tr');
+                            tr.id = rowId;
+                            tr.innerHTML =
+                                '<td class="cs-bf-td cs-bf-td-ip">' + ip + '</td>' +
+                                '<td class="cs-bf-td cs-bf-td-time">wp-login probe</td>' +
+                                '<td class="cs-bf-td cs-bf-td-time">just now</td>' +
+                                '<td class="cs-bf-td" style="text-align:right;white-space:nowrap;">' +
+                                '<a href="https://ipinfo.io/' + encodeURIComponent(ip) + '" target="_blank" rel="noopener" style="font-size:10px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:4px;background:#f8fafc;color:#475569;text-decoration:none;margin-right:4px;">Whois</a>' +
+                                '<button type="button" class="cs-ip-unblock-btn" data-ip="' + ip + '" style="font-size:10px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:4px;background:#f8fafc;color:#475569;cursor:pointer;">Unblock</button>' +
+                                '</td>';
+                            tbody.prepend(tr);
+                            wireUnblock(tr.querySelector('.cs-ip-unblock-btn'));
+                        }
+
+                        function wireUnblock(btn) {
+                            if (!btn) return;
+                            btn.addEventListener('click', function(){
+                                var ip = btn.getAttribute('data-ip');
+                                btn.disabled = true; btn.textContent = '⏳';
+                                doAjax('csdt_ip_unblock', ip, null, function(resp){
+                                    if (resp.success) {
+                                        var row = document.getElementById('cs-bl-row-' + ip.replace(/\./g,'-'));
+                                        if (row) row.remove();
+                                        // Restore Block button on probe table row
+                                        var probeRow = document.querySelector('#cs-probe-tbody tr[data-ip="' + ip + '"]');
+                                        if (probeRow) {
+                                            var cell = probeRow.querySelector('td:last-child');
+                                            if (cell) {
+                                                var blocked = cell.querySelector('span');
+                                                if (blocked) {
+                                                    var nb = document.createElement('button');
+                                                    nb.type = 'button'; nb.className = 'cs-ip-block-btn';
+                                                    nb.setAttribute('data-ip', ip);
+                                                    nb.style.cssText = 'font-size:10px;padding:2px 6px;border:1px solid #fca5a5;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer;font-weight:600;';
+                                                    nb.textContent = 'Block';
+                                                    blocked.replaceWith(nb);
+                                                    wireBlock(nb);
+                                                }
+                                            }
+                                        }
+                                        var tbody = document.getElementById('cs-blocklist-tbody');
+                                        var wrap  = document.getElementById('cs-ip-blocklist-wrap');
+                                        var count = document.getElementById('cs-blocklist-count');
+                                        if (tbody && tbody.rows.length === 0 && wrap) { wrap.style.display = 'none'; }
+                                        if (count) count.textContent = (tbody ? tbody.rows.length : 0) + ' blocked';
+                                    } else {
+                                        btn.disabled = false; btn.textContent = 'Unblock';
+                                        alert(resp.data || 'Unblock failed.');
+                                    }
+                                });
+                            });
+                        }
+
+                        function wireBlock(btn) {
+                            if (!btn) return;
+                            btn.addEventListener('click', function(){
+                                var ip = btn.getAttribute('data-ip');
+                                btn.disabled = true; btn.textContent = '⏳';
+                                doAjax('csdt_ip_block', ip, 'wp-login probe', function(resp){
+                                    if (resp.success) {
+                                        btn.replaceWith((function(){
+                                            var s = document.createElement('span');
+                                            s.style.cssText = 'font-size:10px;padding:2px 6px;border:1px solid #86efac;border-radius:4px;background:#dcfce7;color:#15803d;font-weight:600;';
+                                            s.textContent = '🚫 Blocked';
+                                            return s;
+                                        })());
+                                        addBlocklistRow(ip);
+                                    } else {
+                                        btn.disabled = false; btn.textContent = 'Block';
+                                        alert(resp.data || 'Block failed.');
+                                    }
+                                });
+                            });
+                        }
+
+                        document.querySelectorAll('.cs-ip-block-btn').forEach(wireBlock);
+                        document.querySelectorAll('.cs-ip-unblock-btn').forEach(wireUnblock);
+                    })();
+                    </script>
                 </div>
             </div>
         </div>
@@ -3293,11 +3506,70 @@ class CloudScale_DevTools {
             </div>
             <div class="cs-panel-body">
                 <?php if ( ! $auth_log_readable ) : ?>
-                <div class="cs-notice cs-notice-warn" style="margin-bottom:16px;">
-                    ⚠️ <strong><?php esc_html_e( 'Auth log not readable.', 'cloudscale-devtools' ); ?></strong>
-                    <?php esc_html_e( 'To enable SSH monitoring, add the web server user to the adm group:', 'cloudscale-devtools' ); ?>
-                    <code style="display:block;margin:8px 0;padding:6px 10px;background:#f6f7f7;border-radius:4px;">sudo usermod -a -G adm www-data &amp;&amp; sudo systemctl restart php-fpm</code>
+                <div class="cs-notice cs-notice-warn" style="margin-bottom:16px;" id="cs-ssh-perm-notice">
+                    <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:0;">
+                            ⚠️ <strong><?php esc_html_e( 'Auth log not readable.', 'cloudscale-devtools' ); ?></strong>
+                            <?php esc_html_e( 'The web server user needs read access to the auth log.', 'cloudscale-devtools' ); ?>
+                        </div>
+                        <button type="button" id="cs-ssh-fix-btn"
+                                style="flex-shrink:0;background:#2563eb;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                            🔧 <?php esc_html_e( 'Fix it automatically', 'cloudscale-devtools' ); ?>
+                        </button>
+                    </div>
+                    <div id="cs-ssh-fix-result" style="margin-top:8px;display:none;font-size:12px;padding:6px 10px;border-radius:4px;"></div>
+                    <details style="margin-top:8px;">
+                        <summary style="font-size:11px;color:rgba(255,255,255,.7);cursor:pointer;">Manual command</summary>
+                        <div style="position:relative;margin-top:6px;">
+                            <code id="cs-ssh-adm-cmd" style="display:block;padding:8px 44px 8px 10px;background:#f6f7f7;border-radius:4px;color:#1a1a1a;font-size:12px;line-height:1.5;word-break:break-all;">sudo usermod -a -G adm www-data &amp;&amp; sudo systemctl restart php-fpm</code>
+                            <button type="button" onclick="(function(b){var t=document.getElementById('cs-ssh-adm-cmd');navigator.clipboard.writeText(t.textContent).then(function(){var o=b.textContent;b.textContent='✓';setTimeout(function(){b.textContent=o;},1500);});})(this)"
+                                    style="position:absolute;top:50%;right:6px;transform:translateY(-50%);background:#e2e8f0;border:none;border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer;color:#334155;white-space:nowrap;">Copy</button>
+                        </div>
+                    </details>
                 </div>
+                <script>
+                (function(){
+                    var btn = document.getElementById('cs-ssh-fix-btn');
+                    if (!btn) return;
+                    btn.addEventListener('click', function(){
+                        btn.disabled = true;
+                        btn.textContent = '⏳ Running…';
+                        var fd = new FormData();
+                        fd.append('action', 'csdt_ssh_fix_permissions');
+                        fd.append('nonce', csdtVulnScan.nonce);
+                        fetch(ajaxurl, {method:'POST', body:fd})
+                            .then(function(r){ return r.json(); })
+                            .then(function(resp){
+                                var el = document.getElementById('cs-ssh-fix-result');
+                                el.style.display = 'block';
+                                if (resp.success) {
+                                    el.style.background = '#dcfce7';
+                                    el.style.color = '#15803d';
+                                    el.textContent = '✅ ' + (resp.data.note || 'Done.');
+                                    btn.textContent = '✅ Fixed';
+                                    if (resp.data.readable) {
+                                        setTimeout(function(){ location.reload(); }, 2000);
+                                    }
+                                } else {
+                                    el.style.background = '#fff7ed';
+                                    el.style.color = '#c2410c';
+                                    el.textContent = '❌ ' + (resp.data || 'Failed — use the manual command below.');
+                                    btn.disabled = false;
+                                    btn.textContent = '🔧 Retry';
+                                }
+                            })
+                            .catch(function(){
+                                var el = document.getElementById('cs-ssh-fix-result');
+                                el.style.display = 'block';
+                                el.style.background = '#fff7ed';
+                                el.style.color = '#c2410c';
+                                el.textContent = '❌ Request failed — use the manual command below.';
+                                btn.disabled = false;
+                                btn.textContent = '🔧 Retry';
+                            });
+                    });
+                })();
+                </script>
                 <?php endif; ?>
 
                 <div class="cs-field-row">
@@ -4660,6 +4932,9 @@ class CloudScale_DevTools {
                     </div>
                 </div>
 
+                <?php CSDT_Security_Headers::render_security_headers_panel(); ?>
+
+                <?php CSDT_CSP::render_csp_panel(); ?>
 
                 <!-- ── AI Settings ────────────────────────────────────────────── -->
                 <div class="cs-panel" id="cs-panel-ai-settings">
@@ -5010,6 +5285,107 @@ class CloudScale_DevTools {
                 </div><!-- /cs-panel-body scan-history -->
                 </div><!-- /cs-panel-scan-history -->
         <?php
+    }
+
+    /**
+     * Hunt for a domain across cron events, options values, and active plugin headers.
+     * Called from the CSP violation log "Where is this from?" button.
+     */
+    public static function ajax_csp_domain_hunt(): void {
+        check_ajax_referer( self::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $domain = isset( $_POST['domain'] ) ? sanitize_text_field( wp_unslash( $_POST['domain'] ) ) : '';
+        if ( ! $domain ) {
+            wp_send_json_error( 'No domain provided.' );
+        }
+
+        global $wpdb;
+        $results = [];
+
+        // ── 1. Cron events ──────────────────────────────────────────────────
+        $cron = _get_cron_array();
+        $cron_hits = [];
+        if ( is_array( $cron ) ) {
+            foreach ( $cron as $timestamp => $hooks ) {
+                foreach ( $hooks as $hook => $events ) {
+                    if ( stripos( $hook, $domain ) !== false ) {
+                        $cron_hits[] = $hook . ' (next: ' . gmdate( 'Y-m-d H:i', (int) $timestamp ) . ' UTC)';
+                    }
+                    foreach ( $events as $event ) {
+                        $serialized = maybe_serialize( $event['args'] ?? [] );
+                        if ( stripos( (string) $serialized, $domain ) !== false ) {
+                            $cron_hits[] = $hook . ' args contain domain (next: ' . gmdate( 'Y-m-d H:i', (int) $timestamp ) . ' UTC)';
+                        }
+                    }
+                }
+            }
+        }
+        if ( $cron_hits ) {
+            $results['cron'] = array_unique( $cron_hits );
+        }
+
+        // ── 2. wp_options values ─────────────────────────────────────────────
+        $like        = '%' . $wpdb->esc_like( $domain ) . '%';
+        $option_hits = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT option_name FROM {$wpdb->options} WHERE option_value LIKE %s AND autoload = 'yes' LIMIT 20",
+                $like
+            ),
+            ARRAY_A
+        );
+        if ( $option_hits ) {
+            $results['options'] = array_column( $option_hits, 'option_name' );
+        }
+
+        // ── 3. Non-autoloaded options (slower — limit tightly) ────────────────
+        $slow_hits = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT option_name FROM {$wpdb->options} WHERE option_value LIKE %s AND autoload != 'yes' LIMIT 10",
+                $like
+            ),
+            ARRAY_A
+        );
+        if ( $slow_hits ) {
+            $results['options_noautoload'] = array_column( $slow_hits, 'option_name' );
+        }
+
+        // ── 4. Active plugin file headers ────────────────────────────────────
+        $active  = get_option( 'active_plugins', [] );
+        $plugin_hits = [];
+        foreach ( $active as $plugin_file ) {
+            $path = WP_PLUGIN_DIR . '/' . $plugin_file;
+            if ( ! file_exists( $path ) ) { continue; }
+            $header = file_get_contents( $path, false, null, 0, 4000 );
+            if ( $header && stripos( $header, $domain ) !== false ) {
+                $plugin_hits[] = $plugin_file;
+            }
+        }
+        if ( $plugin_hits ) {
+            $results['active_plugins'] = $plugin_hits;
+        }
+
+        // ── 5. Inactive plugin directories (name match only) ─────────────────
+        $all_plugins = get_plugins();
+        $inactive_hits = [];
+        foreach ( $all_plugins as $file => $data ) {
+            if ( in_array( $file, $active, true ) ) { continue; }
+            $slug = dirname( $file );
+            if ( stripos( $slug, $domain ) !== false || stripos( $data['Name'] ?? '', $domain ) !== false ) {
+                $inactive_hits[] = ( $data['Name'] ?? $file ) . ' (inactive)';
+            }
+        }
+        if ( $inactive_hits ) {
+            $results['inactive_plugins'] = $inactive_hits;
+        }
+
+        wp_send_json_success( [
+            'domain'  => $domain,
+            'results' => $results,
+            'found'   => ! empty( $results ),
+        ] );
     }
 
 

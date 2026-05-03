@@ -9,6 +9,56 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class CSDT_Monitor {
 
+    public static function ajax_ssh_fix_permissions(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+
+        if ( ! function_exists( 'exec' ) ) {
+            wp_send_json_error( 'exec() is disabled on this server — run the command manually.' );
+        }
+
+        // Add www-data to adm group (try with sudo first, then direct for root-in-container).
+        $out = []; $rc = 1;
+        exec( 'sudo usermod -a -G adm www-data 2>&1', $out, $rc );
+        if ( $rc !== 0 ) {
+            $out = []; $rc = 1;
+            exec( 'usermod -a -G adm www-data 2>&1', $out, $rc );
+        }
+        if ( $rc !== 0 ) {
+            wp_send_json_error( 'usermod failed: ' . implode( ' ', $out ) );
+        }
+
+        // Reload php-fpm so the new group membership takes effect.
+        // Try several service names used across distros / Docker setups.
+        foreach ( [ 'php-fpm', 'php8.2-fpm', 'php8.1-fpm', 'php8.3-fpm' ] as $svc ) {
+            $tmp = []; $src = 0;
+            exec( 'sudo systemctl restart ' . $svc . ' 2>&1', $tmp, $src );
+            if ( $src === 0 ) { break; }
+        }
+        if ( $src !== 0 ) {
+            // Inside Docker, systemctl won't work — send SIGUSR2 to php-fpm master.
+            $pid_files = glob( '/var/run/php/php*-fpm.pid' );
+            if ( $pid_files ) {
+                $pid = (int) file_get_contents( $pid_files[0] );
+                if ( $pid > 0 ) { posix_kill( $pid, SIGUSR2 ); }
+            }
+        }
+
+        // Re-check readability after attempting restart.
+        clearstatcache( true );
+        $readable = false;
+        foreach ( [ '/var/log/auth.log', '/var/log/secure', '/var/log/messages' ] as $p ) {
+            if ( is_readable( $p ) ) { $readable = true; break; }
+        }
+
+        wp_send_json_success( [
+            'readable' => $readable,
+            'note'     => $readable
+                ? 'Auth log is now readable — refresh the page to activate monitoring.'
+                : 'Group updated. If the log is still unreadable, PHP-FPM may need a full restart to pick up the new group membership.',
+        ] );
+    }
+
     public static function ajax_ssh_log_clear(): void {
         check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {

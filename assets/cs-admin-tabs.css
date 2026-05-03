@@ -1323,6 +1323,7 @@
     transition: height .3s;
     cursor: default;
 }
+.cs-bf-bar-zero { background: #22c55e; }
 .cs-bf-bar-mid  { background: #f59e0b; }
 .cs-bf-bar-high { background: #e53e3e; }
 .cs-bf-day-label {

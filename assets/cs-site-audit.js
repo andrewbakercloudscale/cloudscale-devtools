@@ -215,15 +215,35 @@
             html += '</div>';
         }
 
-        // Finding cards
-        html += '<div id="csdt-audit-cards">';
+        // Finding cards — wrapped in a single collapsible section
+        var total = findings.length;
+        html += '<details id="csdt-audit-cards-details">' +
+            '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;' +
+            'padding:8px 14px;margin-bottom:12px;border-radius:6px;background:#f1f5f9;border:1px solid #e2e8f0;' +
+            'font-size:.85em;font-weight:600;color:#374151;user-select:none;" id="csdt-audit-cards-toggle">' +
+            '<span id="csdt-audit-cards-arrow" style="font-size:.8em;transition:transform .15s;transform:rotate(-90deg);">▼</span>' +
+            '<span id="csdt-audit-cards-label">Show ' + total + ' findings</span>' +
+            '</summary>' +
+            '<div id="csdt-audit-cards">';
         findings.forEach(function (f) { html += renderFindingCard(f); });
-        html += '</div>';
+        html += '</div></details>';
 
         resultsDiv.innerHTML = html;
         resultsDiv.style.display = '';
         var emptyDiv = document.getElementById('csdt-site-audit-empty');
         if (emptyDiv) { emptyDiv.style.display = 'none'; }
+
+        // Wire the single show/hide toggle for all findings
+        var detWrap = document.getElementById('csdt-audit-cards-details');
+        if (detWrap) {
+            var togArrow = document.getElementById('csdt-audit-cards-arrow');
+            var togLabel = document.getElementById('csdt-audit-cards-label');
+            detWrap.addEventListener('toggle', function () {
+                var open = detWrap.open;
+                if (togArrow) togArrow.style.transform = open ? '' : 'rotate(-90deg)';
+                if (togLabel) togLabel.textContent = (open ? 'Hide ' : 'Show ') + findings.length + ' findings';
+            });
+        }
 
         // Combined severity + category filter logic
         var filterState = { sev: 'all', cat: 'all' };

@@ -344,7 +344,17 @@ class CSDT_Login {
         if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return;
         }
-        if ( ! is_admin() || defined( 'DOING_AJAX' ) || defined( 'DOING_CRON' ) ) {
+        if ( defined( 'DOING_AJAX' ) || defined( 'DOING_CRON' ) ) {
+            return;
+        }
+
+        // Also intercept /wp-login and /wp-login/ (without .php — WordPress routes
+        // these through index.php as a 404 rather than firing login_init).
+        $req_path    = rtrim( (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH ), '/' );
+        $home_path   = rtrim( (string) wp_parse_url( home_url(), PHP_URL_PATH ), '/' );
+        $is_wp_login = ( $req_path === $home_path . '/wp-login' );
+
+        if ( ! is_admin() && ! $is_wp_login ) {
             return;
         }
         if ( is_user_logged_in() ) {
@@ -1646,6 +1656,51 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
                 WP_Session_Tokens::get_instance( $user_id )->destroy_all();
             }
         }
+    }
+
+    // ── IP Blocklist ─────────────────────────────────────────────────────────
+
+    /** Enforce the blocklist early — fires on `parse_request` priority 1. */
+    public static function enforce_ip_blocklist(): void {
+        if ( is_admin() ) { return; }
+        $list = get_option( 'csdt_ip_blocklist', [] );
+        if ( empty( $list ) || ! is_array( $list ) ) { return; }
+        $ip = self::get_client_ip();
+        if ( isset( $list[ $ip ] ) ) {
+            status_header( 403 );
+            nocache_headers();
+            exit( 'Access denied.' );
+        }
+    }
+
+    public static function ajax_ip_block(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+        $ip     = sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) );
+        $reason = sanitize_text_field( wp_unslash( $_POST['reason'] ?? 'Manual block' ) );
+        if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) { wp_send_json_error( 'Invalid IP address.' ); }
+        $list         = get_option( 'csdt_ip_blocklist', [] );
+        if ( ! is_array( $list ) ) { $list = []; }
+        $list[ $ip ]  = [ 'reason' => $reason, 'blocked_at' => time() ];
+        update_option( 'csdt_ip_blocklist', $list, false );
+        wp_send_json_success( [ 'ip' => $ip ] );
+    }
+
+    public static function ajax_ip_unblock(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+        $ip   = sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) );
+        $list = get_option( 'csdt_ip_blocklist', [] );
+        if ( is_array( $list ) ) { unset( $list[ $ip ] ); update_option( 'csdt_ip_blocklist', $list, false ); }
+        wp_send_json_success( [ 'ip' => $ip ] );
+    }
+
+    /** Returns the real client IP, honouring Cloudflare's CF-Connecting-IP header. */
+    private static function get_client_ip(): string {
+        if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+            return sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+        }
+        return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
     }
 
 }

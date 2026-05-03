@@ -1407,27 +1407,23 @@
         const withImgBtn  = document.getElementById( 'cs-ai-img-scan-with-btn' );
         const styleEl   = document.getElementById( 'cs-ai-img-style' );
         const qualityEl = document.getElementById( 'cs-ai-img-quality' );
-        const dualEl    = document.getElementById( 'cs-ai-img-dual' );
         const noTextEl  = document.getElementById( 'cs-ai-img-no-text' );
         let   activeMode = 'missing';
 
-        // Initialise style / quality / dual / no_text from saved PHP values.
+        // Initialise style / quality / no_text from saved PHP values.
         if ( styleEl   && window.csdtImgStyle   ) { styleEl.value    = window.csdtImgStyle; }
         if ( qualityEl && window.csdtImgQuality ) { qualityEl.value  = window.csdtImgQuality; }
-        if ( dualEl    && window.csdtImgDual    ) { dualEl.checked   = true; }
         if ( noTextEl  && window.csdtImgNoText  ) { noTextEl.checked = true; }
 
         // Auto-save whenever any setting changes.
         function saveSettings() {
             const style   = styleEl?.value    || 'auto';
             const quality = qualityEl?.value  || 'hd';
-            const dual    = dualEl?.checked   ? '1' : '0';
             const no_text = noTextEl?.checked ? '1' : '0';
-            post( 'csdt_devtools_ai_image_save_settings', { style, quality, dual, no_text } );
+            post( 'csdt_devtools_ai_image_save_settings', { style, quality, no_text } );
         }
         if ( styleEl   ) { styleEl.addEventListener(   'change', saveSettings ); }
         if ( qualityEl ) { qualityEl.addEventListener( 'change', saveSettings ); }
-        if ( dualEl    ) { dualEl.addEventListener(    'change', saveSettings ); }
         if ( noTextEl  ) { noTextEl.addEventListener(  'change', saveSettings ); }
 
         if ( sortEl ) {
@@ -1599,7 +1595,7 @@
                       `</div>`
                     : `<div style="padding:24px 20px 12px;text-align:center">
                           <a href="${esc(options[0].full_url || options[0].thumb_url)}" target="_blank" rel="noopener" title="Tap to view full size (1792×1024)">
-                              <img src="${esc(options[0].thumb_url)}" style="max-width:100%;border-radius:6px;border:1px solid #e2e8f0;object-fit:contain;box-shadow:0 4px 24px rgba(0,0,0,.15);cursor:zoom-in;display:block">
+                              <img src="${esc(options[0].thumb_url)}?v=${Date.now()}" style="max-width:100%;border-radius:6px;border:1px solid #e2e8f0;object-fit:contain;box-shadow:0 4px 24px rgba(0,0,0,.15);cursor:zoom-in;display:block">
                           </a>
                           <p style="margin:6px 0 0;font-size:11px;color:#94a3b8">Tap image to view full size (1792×1024)</p>
                        </div>`;
@@ -1694,7 +1690,6 @@
             const promptVendor = curVendor  || 'openai';
             const promptModel  = ( modelEl?.value || curModel || 'gpt-4o-mini' );
             const promptStyle  = styleEl?.value || 'auto';
-            const dual         = document.getElementById( 'cs-ai-img-dual' )?.checked ? '1' : '0';
             const noText       = document.getElementById( 'cs-ai-img-no-text' )?.checked ? '1' : '0';
 
             btn.disabled    = true;
@@ -1716,10 +1711,10 @@
                     // Step 2 — send directly to DALL-E (no review modal).
                     ( ( editedPrompt ) => {
                             btn.disabled    = true;
-                            btn.textContent = dual === '1' ? '⏳ Generating 2 options…' : '⏳ Generating…';
+                            btn.textContent = '⏳ Generating…';
                             if ( statusEl ) statusEl.innerHTML = '<span style="color:#94a3b8;font-size:11px">⏳ Generating…</span>';
 
-                            post( 'csdt_devtools_ai_image_generate', { post_id: postId, quality, prompt_vendor: promptVendor, prompt_model: promptModel, dual, prompt: editedPrompt } )
+                            post( 'csdt_devtools_ai_image_generate', { post_id: postId, quality, prompt_vendor: promptVendor, prompt_model: promptModel, prompt: editedPrompt, no_text: noText } )
                                 .then( genRes => {
                                     btn.disabled = false;
                                     if ( ! genRes.success ) {
@@ -1772,14 +1767,20 @@
                                 .catch( e => {
                                     btn.disabled    = false;
                                     btn.textContent = '✨ Generate';
-                                    if ( statusEl ) statusEl.innerHTML = '<span style="color:#c62828;font-size:11px" title="' + esc( e?.message || '' ) + '">✗ ' + esc( e?.message || 'Request failed' ) + '</span>';
+                                    const netMsg = ( e?.message || '' ).toLowerCase().includes( 'load' ) || ( e?.message || '' ).toLowerCase().includes( 'network' ) || ( e?.message || '' ).toLowerCase().includes( 'fetch' )
+                                        ? 'Timed out — try again on WiFi'
+                                        : ( e?.message || 'Request failed' );
+                                    if ( statusEl ) statusEl.innerHTML = '<span style="color:#c62828;font-size:11px" title="' + esc( e?.message || '' ) + '">✗ ' + esc( netMsg ) + '</span>';
                                 } );
                     } )( writtenPrompt );
                 } )
                 .catch( e => {
                     btn.disabled    = false;
                     btn.textContent = '✨ Generate';
-                    if ( statusEl ) statusEl.innerHTML = '<span style="color:#c62828;font-size:11px" title="' + esc( e?.message || '' ) + '">✗ ' + esc( e?.message || 'Request failed' ) + '</span>';
+                    const netMsg = ( e?.message || '' ).toLowerCase().includes( 'load' ) || ( e?.message || '' ).toLowerCase().includes( 'network' ) || ( e?.message || '' ).toLowerCase().includes( 'fetch' )
+                        ? 'Timed out — try again on WiFi'
+                        : ( e?.message || 'Request failed' );
+                    if ( statusEl ) statusEl.innerHTML = '<span style="color:#c62828;font-size:11px" title="' + esc( e?.message || '' ) + '">✗ ' + esc( netMsg ) + '</span>';
                 } );
         }
     }
