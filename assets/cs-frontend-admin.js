@@ -52,6 +52,9 @@
         '.csdt-gen-style-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}',
         '.csdt-gen-style-row label{font-size:12px;font-weight:600;color:#374151;}',
         '.csdt-gen-style-row select{font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:3px 8px;background:#fff;}',
+        '.csdt-gen-prompt-row{margin-top:10px;}',
+        '.csdt-gen-prompt-toggle{font-size:11px;color:#6b7280;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;}',
+        '.csdt-gen-prompt-text{display:none;margin-top:6px;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;color:#374151;line-height:1.5;white-space:pre-wrap;word-break:break-word;}',
     ].join( '' );
 
     var style = document.createElement( 'style' );
@@ -82,6 +85,10 @@
         '      <option value="hd">HD</option>',
         '    </select>',
         '  </div>',
+        '  <div class="csdt-gen-prompt-row" id="csdt-gen-prompt-row" style="display:none;">',
+        '    <button type="button" class="csdt-gen-prompt-toggle" id="csdt-gen-prompt-toggle">▶ View prompt</button>',
+        '    <div class="csdt-gen-prompt-text" id="csdt-gen-prompt-text"></div>',
+        '  </div>',
         '  <div class="csdt-gen-modal-msg" id="csdt-gen-msg">Click Generate to create an image for this post.</div>',
         '  <div class="csdt-gen-modal-imgs" id="csdt-gen-imgs"></div>',
         '  <div class="csdt-gen-modal-actions">',
@@ -93,13 +100,24 @@
     ].join( '' );
     document.body.appendChild( bg );
 
-    var msgEl    = document.getElementById( 'csdt-gen-msg' );
-    var imgsEl   = document.getElementById( 'csdt-gen-imgs' );
-    var saveBtn  = document.getElementById( 'csdt-gen-save' );
-    var regenBtn = document.getElementById( 'csdt-gen-regen' );
-    var cancelBtn= document.getElementById( 'csdt-gen-cancel' );
-    var styleEl  = document.getElementById( 'csdt-gen-style' );
-    var qualEl   = document.getElementById( 'csdt-gen-quality' );
+    var msgEl         = document.getElementById( 'csdt-gen-msg' );
+    var imgsEl        = document.getElementById( 'csdt-gen-imgs' );
+    var saveBtn       = document.getElementById( 'csdt-gen-save' );
+    var regenBtn      = document.getElementById( 'csdt-gen-regen' );
+    var cancelBtn     = document.getElementById( 'csdt-gen-cancel' );
+    var styleEl       = document.getElementById( 'csdt-gen-style' );
+    var qualEl        = document.getElementById( 'csdt-gen-quality' );
+    var promptRow     = document.getElementById( 'csdt-gen-prompt-row' );
+    var promptToggle  = document.getElementById( 'csdt-gen-prompt-toggle' );
+    var promptText    = document.getElementById( 'csdt-gen-prompt-text' );
+
+    if ( promptToggle ) {
+        promptToggle.addEventListener( 'click', function () {
+            var open = promptText.style.display !== 'none';
+            promptText.style.display = open ? 'none' : 'block';
+            promptToggle.textContent = ( open ? '▶' : '▼' ) + ' View prompt';
+        } );
+    }
 
     // Pre-fill style from saved settings; quality always defaults to standard
     if ( cfg.imgStyle && styleEl ) { styleEl.value = cfg.imgStyle; }
@@ -152,6 +170,12 @@
             if ( ! resp.success || ! resp.data || ! resp.data.options || ! resp.data.options.length ) {
                 setMsg( '✕ ' + ( ( resp.data && resp.data.message ) || 'Generation failed.' ) );
                 return;
+            }
+            if ( resp.data.prompt && promptRow && promptText ) {
+                promptText.textContent = resp.data.prompt;
+                promptRow.style.display = 'block';
+                promptText.style.display = 'none';
+                if ( promptToggle ) { promptToggle.textContent = '▶ View prompt'; }
             }
             var options = resp.data.options;
             pendingIds = options.map( function ( o ) { return o.attach_id; } );
@@ -221,6 +245,8 @@
         setMsg( 'Click Generate to create an image for this post.' );
         setBusy( false );
         saveBtn.disabled = true;
+        if ( promptRow )  { promptRow.style.display = 'none'; }
+        if ( promptText ) { promptText.style.display = 'none'; promptText.textContent = ''; }
     }
 
     /* ── Wire up buttons ─────────────────────────────────────────────────── */

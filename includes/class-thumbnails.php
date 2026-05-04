@@ -2497,11 +2497,13 @@ BAD examples — produce identical images across all tech articles, are too abst
             $min_font  = (int) ( $strip_h * 0.22 );
             $line2     = '';
 
-            // Shrink font until single line fits, but never below the two-line size —
-            // using a smaller font on one line than on two lines gains nothing.
+            // Shrink font until single line fits, but never below the two-line size.
+            // Use 88% of max_w as the threshold — imagettfbbox underestimates rendered
+            // width for long strings and the extra margin prevents clipping at the edge.
+            $fit_w = (int) ( $max_w * 0.88 );
             while ( $font_size >= $min_font ) {
                 $bbox = imagettfbbox( $font_size, 0, $font, $display );
-                if ( $bbox && ( $bbox[2] - $bbox[0] ) <= $max_w ) {
+                if ( $bbox && ( $bbox[2] - $bbox[0] ) <= $fit_w ) {
                     break;
                 }
                 $font_size -= 2;
