@@ -319,67 +319,82 @@ class CSDT_Thumbnails {
 
     private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
 
-CRITICAL — NO TEXT IN IMAGES: Never quote the article title. Never list technical terms as text. Never include any words, labels, captions, or writing that would cause DALL-E to render text. DALL-E cannot produce readable text — any text instruction creates scrambled garbage that ruins the image.
+━━ NO TEXT IN IMAGES ━━
+Never quote the article title. Never list technical terms as text. Never include any words, labels, captions, or writing that would cause DALL-E to render text. DALL-E cannot produce readable text — any text instruction creates scrambled garbage that ruins the image.
 
-DALL-E SAFETY RULE: Never use words like hack, hacker, exploit, breach, attack, malware, intrude, or any language implying illegal or harmful acts. Describe the defensive or structural side instead: a fortified vault, a reinforced door, an engineer inspecting a system.
+━━ SAFETY RULE ━━
+Never use words like hack, hacker, exploit, breach, attack, malware, intrude, or any language implying illegal or harmful acts. Describe the defensive or structural side: a fortified vault, a reinforced door, an engineer inspecting a system.
 
-RELEVANCE RULE: The image must be immediately recognisable as being about the article topic. A reader who has not read the article must be able to guess the topic from the image alone. Generic "glowing city" or "abstract digital landscape" images are forbidden — they tell the reader nothing. Ground every image in the specific tool, product, technology, or action the article describes.
+━━ RELEVANCE RULE ━━
+The image must be immediately recognisable as being about the article topic. A reader who has not read the article must be able to guess the topic from the image alone. Generic "glowing city" or "abstract digital landscape" images are forbidden — they tell the reader nothing. Ground every image in the specific tool, product, technology, or action the article describes.
 
-BANNED SCENES — DALL-E\'s default output for every tech article; all produce identical images and are strictly forbidden: aerial shots of backlit data-centre city skylines, glowing server-tower cityscapes, neon city-at-night compositions, abstract streams of light representing networks. If you produce any of these you have failed.
+━━ BANNED SCENES ━━
+DALL-E\'s default output for every tech article — all produce identical images and are strictly forbidden: aerial shots of backlit data-centre city skylines, glowing server-tower cityscapes, neon city-at-night compositions, abstract streams of light representing networks. If you produce any of these you have failed.
 
-BRAND ICONS MANDATORY: When the article mentions a recognisable technology brand, its mascot or icon MUST be the DOMINANT foreground subject — large, detailed, filling significant visual space, and immediately identifiable. Physical objects to use: ARM → a giant silicon processor die as a polished stone monolith on a plinth; Cloudflare → an enormous Cloudflare shield/globe beacon on a hilltop radiating signal rings; Docker → a colossal Docker whale surfacing from calm water; PostgreSQL → a towering stone elephant statue; Redis → a massive cube monument; Kubernetes → a giant spinning ship\'s helm wheel; GitHub → a large Octocat sculpture; AWS → a colossal smile-arrow arch. Brand elements must never be small, subtle, or background decoration.
+━━ BRAND ICONS — MANDATORY ━━
+When the article mentions a recognisable technology brand, its mascot or logo-derived icon MUST be the DOMINANT foreground subject — occupying at least 30% of the frame width, large, detailed, and immediately identifiable. Never let a brand icon be small, subtle, or background decoration. Treat it as a monumental physical sculpture or landmark.
 
-OUTPUT FORMAT — 2–3 sentences:
-1. Visual style.
-2. A concrete, specific scene — lead with any brand icon if present, then the surrounding environment.
-3. (Optional) Atmosphere, lighting, or composition detail.
+Brand → physical object mapping (use these exactly):
+- ARM → a giant silicon processor die as a polished stone monolith on a plinth
+- Cloudflare → an enormous Cloudflare shield/globe beacon on a hilltop radiating signal rings
+- Docker → a colossal Docker whale surfacing from calm water with cargo containers on its back
+- PostgreSQL → a towering stone elephant statue
+- Redis → a massive cube monument carved from red stone
+- Kubernetes → a giant spinning ship\'s helm wheel on a clifftop
+- GitHub → a large Octocat sculpture on a museum plinth
+- AWS → a colossal smile-arrow arch over a craftsman\'s workshop entrance
+- Google → a giant illuminated "G" monolith in a cathedral-sized library
+- Linux / Tux → an oversized penguin figurehead on the prow of a ship or atop a server rack
+- Raspberry Pi → a circuit board filling the macro frame, ultra-sharp GPIO pin detail
+- WordPress → a master craftsman\'s workbench with glowing chisel tools
 
-STYLE — pick what fits the article:
+━━ VISUAL METAPHOR CORE PRINCIPLE ━━
+Every abstract concept must be translated into a CONCRETE PHYSICAL METAPHOR. Never describe floating data, glowing nodes, or abstract networks. Map concepts to tangible objects:
+
+- Diagnosis / inspection → a surgeon, quality inspector, or watchmaker at their workbench
+- Security / protection → a vault door, blast hatch, armoured gate, or fortified wall filling the frame
+- Speed / performance → a rocket engine ignition close-up or racing-car engine bay
+- Failure / outage → a suspension bridge with a broken mid-span collapsing into a stormy sea
+- Connectivity / networking → a control room operator at a console, or a dense fibre-optic cable cross-section
+- Comparison / vs → two champion artefacts on side-by-side pedestals in a grand hall with a judge figure
+- Data / storage → a vast underground archive vault, stone pillars, lone archivist dwarfed below
+- AI / machine learning → a crystalline neural lattice filling a vast cavern, figures dwarfed beneath it
+- Search / discovery → a lone explorer with a torch examining an illuminated map spread across a cathedral floor
+- Process / workflow → a factory floor with items moving along a conveyor belt, inspector watching
+- Recovery / backup → a fireproof vault door in a storm, or a lifeboat launching from a ship
+- Cloud / serverless → a grand craftsman\'s workshop with glowing tool-racks and worktops
+
+━━ STYLE SELECTION ━━
+Pick the single best-fit style for the article:
 - Script / tool / code → cinematic editorial or isometric 3D illustration
 - Process / architecture → isometric 3D illustration or cinematic editorial
 - Opinion / leadership / culture → cinematic editorial or flat vector illustration
 - Hardware / physical device / chip → dramatic macro photography — fill the frame with the device
-- Security / reliability → a vault door, blast hatch, or armoured gate filling the frame — never a generic server room
-- Performance / comparison / vs → macro close-up of two competing devices side-by-side on a workbench, OR a racing-vehicle engine bay
+- Security / reliability → vault door or armoured gate filling the frame — never a generic server room
+- Performance / comparison → macro close-up of two competing devices on a workbench, or a racing engine bay
 - Tutorial / step-by-step → flat vector illustration or isometric 3D illustration
 
-NEVER pick: technical diagram, infographic, schematic, blueprint, any style that implies labels or text.
+NEVER pick: technical diagram, infographic, schematic, blueprint, or any style that implies labels or text.
 
-ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere. Not "blue", "navy", "dark", "light", "white", "gray", "green", "warm", "cool" — nothing. Leave all colour to DALL-E.
+━━ COLOUR BAN ━━
+Do NOT name any colour anywhere in the prompt. Not "blue", "navy", "dark", "light", "white", "gray", "green", "warm", "cool" — nothing. Leave all colour decisions to DALL-E.
 
-TOPIC → SPECIFIC SCENE GUIDE (always use the most specific match):
-- Linux / server diagnostics → surgeon operating on a glowing server rack on an operating table
-- Database / SQL / PostgreSQL → a giant stone PostgreSQL elephant statue presiding over a vast underground vault, lone technician below
-- Database health check → master watchmaker\'s workshop, enormous clockwork mechanism on the bench
-- SEO / search / Google ranking → a lone explorer with a torch and a giant magnifying glass examining a vast illuminated map of interconnected web pages spread across the floor of a cathedral-sized library, Google "G" monolith visible in the background
-- Page audit / technical audit / script → a quality-control inspector on a factory floor, clipboard in hand, examining web pages rolling off a conveyor belt like printed sheets
-- AEO / AI search / answer engine → a figure standing before a vast oracle machine made of crystalline panels, presenting a question scroll
-- Security / firewall / certificates → a fortified vault door, a sealed blast door, an engineer sealing a pressure hatch
-- Network protocol / connectivity → a control room operator at a console monitoring signal feeds, OR a close-up of dense fibre-optic cables
-- Protocol failure / outage → a suspension bridge with a broken mid-span collapsing into a stormy sea
-- ARM / processor / chip / silicon / SoC → a giant ARM processor die as a polished stone monolith on a plinth in a grand exhibition hall, engineers dwarfed below examining it
-- Cloudflare / CDN / edge network / DDoS → an enormous Cloudflare shield/globe as a physical beacon on a hilltop, signal rings radiating outward, engineers in hard hats below
-- Technology comparison / vs / versus / benchmark / disruption → two champion artefacts on side-by-side pedestals — e.g. two oversized processor chips on museum plinths facing each other in a grand hall, a judge figure inspecting both
-- Cloud / AWS / serverless → a grand craftsman\'s workshop with glowing tool-racks and worktops, AWS smile-arrow arch above the entrance, engineers at benches
-- Raspberry Pi / hardware → macro shot of a Raspberry Pi circuit board filling the frame, ultra-sharp component and GPIO pin detail
-- Backup / recovery → fireproof vault door in a storm, or a lifeboat launching from a ship
-- Performance / speed → rocket engine ignition close-up, or racing car engine bay
-- AI / machine learning → crystalline neural lattice filling a vast cavern, figures dwarfed beneath it
-- WordPress / CMS → master craftsman\'s workshop with glowing tools on the bench
-- Team culture / organisation → birds-eye view of connected neighbourhood districts vs isolated fortress districts
+━━ OUTPUT FORMAT ━━
+2–3 sentences:
+1. Visual style.
+2. A concrete, specific scene — lead with any brand icon if present, then the surrounding environment.
+3. (Optional) Atmosphere, lighting, or composition detail.
 
 GOOD examples:
-"Cinematic editorial. A lone inspector in a hard hat walks a vast factory floor examining web-page sheets rolling off a conveyor belt — each sheet shows a structured web page layout — with the Google G monolith glowing in the background. Epic scale, sharp foreground detail."
+"Cinematic editorial. A lone inspector in a hard hat walks a vast factory floor examining web-page sheets rolling off a conveyor belt, with a giant illuminated G monolith glowing in the background. Epic scale, sharp foreground detail."
 "Cinematic editorial. A surgeon in a sterile theatre performs delicate work on a glowing server rack on the operating table, surrounded by monitors showing vital signs. Dramatic overhead lighting, photorealistic depth of field."
 "Isometric 3D illustration. A giant stone PostgreSQL elephant statue presides over a vast underground data vault, glowing pipelines connecting crystalline towers, a lone technician at the central console far below."
-"Dramatic macro photography. A Raspberry Pi 5 circuit board fills the frame, ultra-sharp GPIO pins and component detail in the foreground."
 "Cinematic editorial. A colossal ARM processor die as a polished stone monolith dominates the centre of a grand exhibition hall, two engineers in hard hats studying it from below, a Cloudflare shield/globe beacon glowing on a second plinth behind them."
 
-BAD examples — produce identical images across all tech articles, are too abstract, or cause safety rejections:
-"Cinematic editorial. A futuristic city of glowing data-centre towers stretches to the horizon. (BANNED — generic backlit city skyline)"
-"Cinematic editorial. Streams of light flow between towering server structures in a hazy digital city. (BANNED — abstract light-stream cityscape)"
-"Cinematic editorial. Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing)"
-"Technical illustration. \'DIAGNOSE YOUR LINUX SERVER\' — uptime, vmstat. (text = scrambled garbage)"
+BAD examples — produce identical images, are too abstract, or cause safety rejections:
+"A futuristic city of glowing data-centre towers stretches to the horizon. (BANNED — generic backlit city skyline)"
+"Streams of light flow between towering server structures in a hazy digital city. (BANNED — abstract light-stream)"
+"Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing)"
 "A shadowy hacker exploiting a vulnerable server. (safety rejection)"';
 
     public static function render_ai_images_panel(): void {
@@ -387,7 +402,7 @@ BAD examples — produce identical images across all tech articles, are too abst
         $anthropic_key = (string) get_option( 'csdt_devtools_anthropic_key', '' );
         $gemini_key    = (string) get_option( 'csdt_devtools_gemini_key', '' );
         $saved_vendor  = (string) get_option( 'csdt_devtools_prompt_vendor', 'openai' );
-        $saved_model   = (string) get_option( 'csdt_devtools_prompt_model', 'gpt-4o-mini' );
+        $saved_model   = (string) get_option( 'csdt_devtools_prompt_model', 'gpt-4o' );
         $saved_style   = (string) get_option( 'csdt_devtools_img_style', 'auto' );
         $saved_quality = (string) get_option( 'csdt_devtools_img_quality', 'hd' );
         $saved_no_text = (bool)   get_option( 'csdt_devtools_img_no_text', false );
@@ -1581,7 +1596,7 @@ BAD examples — produce identical images across all tech articles, are too abst
             'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'csdt_devtools_thumbnails' ),
             'promptVendor'  => (string) get_option( 'csdt_devtools_prompt_vendor', 'openai' ),
-            'promptModel'   => (string) get_option( 'csdt_devtools_prompt_model', 'gpt-4o-mini' ),
+            'promptModel'   => (string) get_option( 'csdt_devtools_prompt_model', 'gpt-4o' ),
             'imgStyle'      => (string) get_option( 'csdt_devtools_img_style', 'auto' ),
             'imgQuality'    => (string) get_option( 'csdt_devtools_img_quality', 'hd' ),
             'imgDual'       => get_option( 'csdt_devtools_img_dual', false ) ? '1' : '0',
@@ -2091,7 +2106,7 @@ BAD examples — produce identical images across all tech articles, are too abst
 
         $post_id       = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
         $prompt_vendor = isset( $_POST['prompt_vendor'] ) ? sanitize_key( wp_unslash( $_POST['prompt_vendor'] ) ) : 'openai';
-        $prompt_model  = isset( $_POST['prompt_model'] )  ? sanitize_text_field( wp_unslash( $_POST['prompt_model'] ) ) : 'gpt-4o-mini';
+        $prompt_model  = isset( $_POST['prompt_model'] )  ? sanitize_text_field( wp_unslash( $_POST['prompt_model'] ) ) : 'gpt-4o';
         $style         = isset( $_POST['prompt_style'] )  ? sanitize_key( wp_unslash( $_POST['prompt_style'] ) ) : 'auto';
         $no_text       = ! empty( $_POST['no_text'] ) && '1' === $_POST['no_text'];
         $force_vary    = ! empty( $_POST['force_vary'] ) && '1' === $_POST['force_vary'];
@@ -2190,7 +2205,7 @@ BAD examples — produce identical images across all tech articles, are too abst
         $prompt        = isset( $_POST['prompt'] )        ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
         $no_text       = isset( $_POST['no_text'] )       && '1' === $_POST['no_text'];
         $prompt_vendor = isset( $_POST['prompt_vendor'] ) ? sanitize_key( wp_unslash( $_POST['prompt_vendor'] ) )      : 'openai';
-        $prompt_model  = isset( $_POST['prompt_model'] )  ? sanitize_text_field( wp_unslash( $_POST['prompt_model'] ) ) : 'gpt-4o-mini';
+        $prompt_model  = isset( $_POST['prompt_model'] )  ? sanitize_text_field( wp_unslash( $_POST['prompt_model'] ) ) : 'gpt-4o';
         $prompt_style  = isset( $_POST['prompt_style'] )  ? sanitize_key( wp_unslash( $_POST['prompt_style'] ) )       : 'auto';
 
         if ( ! $post_id ) {
@@ -2497,20 +2512,26 @@ BAD examples — produce identical images across all tech articles, are too abst
             $min_font  = (int) ( $strip_h * 0.22 );
             $line2     = '';
 
-            // Shrink font until single line fits, but never below the two-line size.
-            // Use 88% of max_w as the threshold — imagettfbbox underestimates rendered
-            // width for long strings and the extra margin prevents clipping at the edge.
-            $fit_w = (int) ( $max_w * 0.88 );
-            while ( $font_size >= $min_font ) {
-                $bbox = imagettfbbox( $font_size, 0, $font, $display );
-                if ( $bbox && ( $bbox[2] - $bbox[0] ) <= $fit_w ) {
-                    break;
+            // imagettfbbox() consistently underestimates rendered string width in GD,
+            // so any margin-based fix still clips. Instead decide wrap vs single-line
+            // purely by character count: DejaVuSans-Bold average advance ≈ 0.60× em.
+            $chars_per_line = (int) ( $max_w / ( $min_font * 0.60 ) );
+            $force_wrap     = mb_strlen( $display ) > $chars_per_line;
+
+            if ( ! $force_wrap ) {
+                // Short title — try single line, shrinking font until it fits.
+                $fit_w = (int) ( $max_w * 0.90 );
+                while ( $font_size >= $min_font ) {
+                    $bbox = imagettfbbox( $font_size, 0, $font, $display );
+                    if ( $bbox && ( $bbox[2] - $bbox[0] ) <= $fit_w ) {
+                        break;
+                    }
+                    $font_size -= 2;
                 }
-                $font_size -= 2;
             }
 
-            // Still doesn't fit — wrap to 2 lines
-            if ( $font_size < $min_font ) {
+            // Long title or imagettfbbox loop exhausted — wrap to 2 lines
+            if ( $force_wrap || $font_size < $min_font ) {
                 $font_size = $min_font;
                 $words     = explode( ' ', $display );
                 $total     = count( $words );

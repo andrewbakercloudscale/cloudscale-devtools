@@ -1753,6 +1753,8 @@ PROMPT;
                         if ( strpos( $t, 'login url' ) !== false )                                          return false;
                         if ( strpos( $t, 'inactive theme' ) !== false || strpos( $t, 'unused theme' ) !== false ) return false;
                         if ( strpos( $t, 'auto update' ) !== false || strpos( $t, 'auto-update' ) !== false || strpos( $t, 'automatic update' ) !== false || strpos( $t, 'background update' ) !== false ) return false;
+                        if ( strpos( $t, 'title tag' ) !== false || strpos( $t, 'title tags' ) !== false )         return false;
+                        if ( strpos( $t, 'meta description' ) !== false || strpos( $t, 'meta desc' ) !== false )   return false;
                         return true;
                     } ) );
                     // Always append cross-sell and all rule-based findings even with AI

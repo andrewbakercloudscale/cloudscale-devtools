@@ -1376,6 +1376,7 @@
     grid-template-columns: 120px 1fr;
     gap: 8px 14px;
     align-items: center;
+    margin-bottom: 14px;
 }
 .cs-sec-row-prompt { align-items: start; }
 .cs-sec-label {
