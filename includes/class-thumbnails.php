@@ -332,11 +332,13 @@ The image must be immediately recognisable as being about the article topic. A r
 DALL-E\'s default output for every tech article — all produce identical images and are strictly forbidden: aerial shots of backlit data-centre city skylines, glowing server-tower cityscapes, neon city-at-night compositions, abstract streams of light representing networks. If you produce any of these you have failed.
 
 ━━ BRAND ICONS — MANDATORY ━━
-When the article mentions a recognisable technology brand, its mascot or logo-derived icon MUST be the DOMINANT foreground subject — occupying at least 30% of the frame width, large, detailed, and immediately identifiable. Never let a brand icon be small, subtle, or background decoration. Treat it as a monumental physical sculpture or landmark.
+When the article mentions recognisable technology brands, ALL of their icons MUST appear as large foreground objects — each occupying significant visual space. NEVER place a brand icon in the background, distance, or backdrop. NEVER use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element. Treat every icon as a monumental physical sculpture that demands attention.
 
 Brand → physical object mapping (use these exactly):
 - ARM → a giant silicon processor die as a polished stone monolith on a plinth
-- Cloudflare → an enormous Cloudflare shield/globe beacon on a hilltop radiating signal rings
+- x86 / Intel → a colossal Intel chip wafer on a glass pedestal (for ARM vs x86: both chips on side-by-side plinths as equal rivals)
+- AMD → a massive Ryzen chip sculpture
+- Cloudflare → an enormous Cloudflare shield/globe beacon on a hilltop IN THE MID-FOREGROUND radiating visible signal rings
 - Docker → a colossal Docker whale surfacing from calm water with cargo containers on its back
 - PostgreSQL → a towering stone elephant statue
 - Redis → a massive cube monument carved from red stone
@@ -347,6 +349,7 @@ Brand → physical object mapping (use these exactly):
 - Linux / Tux → an oversized penguin figurehead on the prow of a ship or atop a server rack
 - Raspberry Pi → a circuit board filling the macro frame, ultra-sharp GPIO pin detail
 - WordPress → a master craftsman\'s workbench with glowing chisel tools
+- Cloud / cloud computing → dramatic cumulus cloud formations rising from the ground like mountains, server equipment integrated into them
 
 ━━ VISUAL METAPHOR CORE PRINCIPLE ━━
 Every abstract concept must be translated into a CONCRETE PHYSICAL METAPHOR. Never describe floating data, glowing nodes, or abstract networks. Map concepts to tangible objects:
@@ -399,10 +402,12 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
 
     private static function get_img_system_prompt(): string {
         $saved = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
-        // Auto-migrate: if the saved prompt is an old known version, reset to current default.
-        // Fingerprint: old prompts contained the site-specific "TOPIC → SPECIFIC SCENE GUIDE" section.
+        // Auto-migrate: reset saved prompt if it matches any known old version.
+        // Old v1: site-specific topic guide. Old v2: single-brand mandate without "ALL brands" rule.
         if ( strpos( $saved, 'TOPIC → SPECIFIC SCENE GUIDE' ) !== false
-            || strpos( $saved, 'Linux / server diagnostics → surgeon' ) !== false ) {
+            || strpos( $saved, 'Linux / server diagnostics → surgeon' ) !== false
+            || strpos( $saved, 'Identify the single most prominent technology brand' ) !== false
+            || ( strpos( $saved, 'BRAND ICONS' ) !== false && strpos( $saved, 'ALL of their icons' ) === false ) ) {
             $saved = self::DEFAULT_IMG_SYSTEM_PROMPT;
             update_option( 'csdt_devtools_img_system_prompt', $saved, false );
         }
@@ -2176,7 +2181,7 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
             : '';
 
         $system_msg   = self::get_img_system_prompt();
-        $brand_instruction = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = a colossal Intel chip wafer on a glass pedestal OR two oversized processor chips on museum plinths facing each other for vs/comparison articles. AMD = a massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering stone elephant statue. Redis = massive red cube monument. Kubernetes = giant ship helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/serverless = towering cumulus cloud formation with server racks emerging from it. Do NOT relegate brand elements to the background or render them subtly.';
+        $brand_instruction = ' BRAND MANDATE: Identify ALL prominently mentioned technology brands in this article. Each brand\'s physical icon MUST appear as a large foreground object — NEVER in the background, NEVER in the distance, NEVER described as "behind" or "beyond" anything. Every brand icon must occupy significant visual space. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = colossal Intel chip wafer on a glass pedestal. For ARM vs x86 articles: place both chips on side-by-side museum plinths facing each other as equal foreground rivals. AMD = massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon on a hilltop in the mid-foreground radiating visible signal rings. Docker = colossal whale. PostgreSQL = towering stone elephant. Redis = massive red cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/cloud computing = dramatic cumulus cloud formations rising from the ground like mountains, with server equipment integrated into them. ABSOLUTE RULE: never use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element.';
         $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
 
         try {
@@ -2257,7 +2262,7 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
                 'minimalist'            => 'minimalist design, bold shapes, clean negative space, no text',
             ];
             $style_instr_inline  = isset( $style_map_inline[ $prompt_style ] ) ? " Required visual style: {$style_map_inline[$prompt_style]}." : '';
-            $brand_instr_inline  = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = a colossal Intel chip wafer on a glass pedestal OR two oversized processor chips on museum plinths facing each other for vs/comparison articles. AMD = a massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering stone elephant statue. Redis = massive red cube monument. Kubernetes = giant ship helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/serverless = towering cumulus cloud formation with server racks emerging from it. Do NOT relegate brand elements to the background or render them subtly.';
+            $brand_instr_inline  = ' BRAND MANDATE: Identify ALL prominently mentioned technology brands in this article. Each brand\'s physical icon MUST appear as a large foreground object — NEVER in the background, NEVER in the distance, NEVER described as "behind" or "beyond" anything. Every brand icon must occupy significant visual space. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = colossal Intel chip wafer on a glass pedestal. For ARM vs x86 articles: place both chips on side-by-side museum plinths facing each other as equal foreground rivals. AMD = massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon on a hilltop in the mid-foreground radiating visible signal rings. Docker = colossal whale. PostgreSQL = towering stone elephant. Redis = massive red cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/cloud computing = dramatic cumulus cloud formations rising from the ground like mountains, with server equipment integrated into them. ABSOLUTE RULE: never use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element.';
             $no_text_instr       = $no_text ? ' CRITICAL: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles, no watermarks, no signage, no UI chrome. Pure visual imagery only.' : '';
             $system_msg = self::get_img_system_prompt();
             $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instr_inline}{$brand_instr_inline}{$no_text_instr}";
