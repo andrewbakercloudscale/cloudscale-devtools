@@ -319,8 +319,8 @@ class CSDT_Thumbnails {
 
     private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
 
-━━ NO TEXT IN IMAGES ━━
-Never quote the article title. Never list technical terms as text. Never include any words, labels, captions, or writing that would cause DALL-E to render text. DALL-E cannot produce readable text — any text instruction creates scrambled garbage that ruins the image.
+━━ TEXT IN IMAGES ━━
+DALL-E 3 CAN render short bold text (3–6 words) when described as large typographic design elements on a dark background — like a movie poster or magazine cover. Use this ONLY for dramatic articles (breakthrough, disruption, war, comparison) to add an attention-grabbing punchy headline as part of the image design. The punchy headline is NOT the article title — it is a short distilled hook (e.g. "AWS WON", "AI JUST CRACKED", "THE CLOUD WAR IS OVER"). Place text on the left or top third of the image against a strong contrasting background. For all other article types, include NO text in the image — no labels, captions, or technical terms.
 
 ━━ SAFETY RULE ━━
 Never use words like hack, hacker, exploit, breach, attack, malware, intrude, or any language implying illegal or harmful acts. Describe the defensive or structural side: a fortified vault, a reinforced door, an engineer inspecting a system.
@@ -353,33 +353,45 @@ Brand → visual form (use these exactly — they must be RECOGNISABLE, not abst
 - NVMe / SSD storage → giant NVMe M.2 sticks standing upright like monoliths
 - Cloud / cloud computing → towering cumulus cloud formations integrated with server equipment, dramatic and sculptural
 
-━━ VISUAL METAPHOR CORE PRINCIPLE ━━
-Every abstract concept must be translated into a CONCRETE PHYSICAL METAPHOR. Never describe floating data, glowing nodes, or abstract networks. Map concepts to tangible objects:
+━━ FRAME UTILISATION ━━
+Brand objects and scene elements MUST fill at least 80% of the frame. No large empty backgrounds, no excessive negative space, no vast plain floor stretching to the horizon. Objects should be ENORMOUS relative to the canvas — the viewer should feel dwarfed. Zoom in. Make everything fill the edges of the image.
+
+━━ NARRATIVE METAPHOR ━━
+Read the article\'s angle and make the image TELL THAT STORY visually. Do not just show logos side by side — show who is winning and who is struggling.
+
+Narrative → visual treatment:
+- Disruption / challenger wins → the challenger brand gleams and stands tall; the incumbent brand shows heat stress: radiating heat shimmer, cracks in the casing, steam venting, thermal throttling smoke. E.g. ARM article disrupting Intel: green Pi PCB gleams and radiates cool efficiency signals; Intel CPU lid has heat waves rising from it, edges glowing red-hot.
+- Efficiency / power saving → the efficient device surrounded by cool air currents, leaf motifs, calm energy; the power-hungry device surrounded by heat shimmer and power cables straining under load.
+- Migration / switching → the old technology crumbling, rusting, or sinking; the new technology rising cleanly from it.
+- Security / breach → a fortified vault door intact but under attack from visible cracks or dents; engineers reinforcing it.
+- Performance victory → one device on a podium with a winner\'s laurel, the other visibly smaller on a lower step.
+- Failure / outage → a suspension bridge with a broken mid-span; or a cracked server rack with sparks.
+
+━━ VISUAL METAPHOR — CONCEPT OBJECTS ━━
+Every abstract concept must translate into a CONCRETE PHYSICAL METAPHOR:
 
 - Diagnosis / inspection → a surgeon, quality inspector, or watchmaker at their workbench
-- Security / protection → a vault door, blast hatch, armoured gate, or fortified wall filling the frame
+- Security / protection → a vault door, blast hatch, armoured gate filling the frame
 - Speed / performance → a rocket engine ignition close-up or racing-car engine bay
-- Failure / outage → a suspension bridge with a broken mid-span collapsing into a stormy sea
-- Connectivity / networking → a control room operator at a console, or a dense fibre-optic cable cross-section
-- Comparison / vs → two champion artefacts on side-by-side pedestals in a grand hall with a judge figure
-- Data / storage → a vast underground archive vault, stone pillars, lone archivist dwarfed below
-- AI / machine learning → a crystalline neural lattice filling a vast cavern, figures dwarfed beneath it
-- Search / discovery → a lone explorer with a torch examining an illuminated map spread across a cathedral floor
-- Process / workflow → a factory floor with items moving along a conveyor belt, inspector watching
+- Connectivity / networking → a control room operator at a console, or fibre-optic cable cross-section
+- Data / storage → a vast underground archive vault, lone archivist dwarfed below
+- AI / machine learning → a crystalline neural lattice filling a vast cavern
+- Search / discovery → a lone explorer with a torch examining an illuminated map on a cathedral floor
+- Process / workflow → a factory floor with items on a conveyor belt, inspector watching
 - Recovery / backup → a fireproof vault door in a storm, or a lifeboat launching from a ship
-- Cloud / serverless → a grand craftsman\'s workshop with glowing tool-racks and worktops
 
 ━━ STYLE SELECTION ━━
-Pick the single best-fit style for the article:
-- Script / tool / code → cinematic editorial or isometric 3D illustration
-- Process / architecture → isometric 3D illustration or cinematic editorial
-- Opinion / leadership / culture → cinematic editorial or flat vector illustration
-- Hardware / physical device / chip → dramatic macro photography — fill the frame with the device
-- Security / reliability → vault door or armoured gate filling the frame — never a generic server room
-- Performance / comparison → macro close-up of two competing devices on a workbench, or a racing engine bay
-- Tutorial / step-by-step → flat vector illustration or isometric 3D illustration
+Default to CINEMATIC PHOTOREALISM — dramatic lighting, macro detail, ultra-sharp. Only use illustration styles when the article is a tutorial or process guide.
 
-NEVER pick: technical diagram, infographic, schematic, blueprint, or any style that implies labels or text.
+- Breakthrough / disruption / war / AI → CINEMATIC POSTER: dark dramatic background, bold punchy headline text (3–5 words), brands as foreground icons
+- Hardware / chip / physical device → dramatic MACRO PHOTOGRAPHY filling the frame: the actual device in a cinematic workshop or lab, dramatic spot lighting overhead, supporting props (tools, cables, the product\'s fruit/mascot)
+- Tutorial / migration / step-by-step → cinematic photorealistic WORKBENCH scene: the devices being migrated laid out on a wooden workbench under a workshop lamp, hands or tools mid-action, photorealistic detail
+- Security / reliability → cinematic VAULT DOOR or armoured gate filling the frame
+- Comparison / vs → MACRO PHOTOGRAPHY of two physical rivals side-by-side on a workbench or pedestal, narrative heat/condition showing who is winning
+- Architecture / system design → isometric 3D illustration only if no better physical metaphor exists
+- Opinion / culture → cinematic editorial photography
+
+NEVER pick: technical diagram, infographic, schematic, blueprint.
 
 ━━ COLOUR RULE ━━
 Only name colours when they are essential for brand recognition (e.g. "orange Cloudflare shield", "blue Docker whale", "red raspberry fruit", "green Raspberry Pi PCB"). Do NOT name colours for any non-brand scene elements, backgrounds, lighting, or atmosphere — leave those to DALL-E. Never describe the whole scene as one dominant colour.
@@ -391,11 +403,11 @@ Only name colours when they are essential for brand recognition (e.g. "orange Cl
 3. (Optional) Atmosphere, lighting, or composition detail.
 
 GOOD examples:
-"Isometric 3D illustration. A giant green Raspberry Pi PCB stands like a monument on the left, and a giant silver Intel CPU lid stands on the right, both in a grand exhibition hall facing each other as rivals. An enormous orange Cloudflare shield radiates signal rings between them."
-"Cinematic editorial. A colossal blue Docker whale surges forward with stacked shipping containers on its back, filling the frame. Dramatic ocean spray, ultra-sharp detail on the containers."
-"Isometric 3D illustration. A giant blue PostgreSQL elephant head occupies the foreground, trunk raised, presiding over a vast underground data vault. A lone technician at the central console far below."
-"Cinematic editorial. A giant orange curved smile-arrow arch spans the scene like a gateway (the AWS logo form). Engineers walk through it into a craftsman\'s workshop filled with glowing tools."
-"Flat vector illustration. A giant photorealistic red raspberry fruit (the Raspberry Pi logo, scaled to building size) stands on a plinth. Tiny engineers inspect it from below. Clean geometric composition."
+"Cinematic poster. Dark cracked stone background fills the right two-thirds. Bold all-caps white text \'OPEN SOURCE EARTHQUAKE\' on the left, below it in red \'DEEPSEEK V4\'. Glowing red lava seams run through the cracking rock. Frame-filling, dramatic."
+"Cinematic poster. Aerial battlefield at dusk: an enormous circular AWS fortress with the orange \'aws\' smile-arrow logo dominates the centre, orange energy lines radiating outward. Azure logo billboard crumbling on the left, Google Cloud sign smoking on the right. Bold white text \'THE CLOUD WAR IS OVER\' across the top, \'AWS WON\' in orange below."
+"Cinematic macro photography. A Raspberry Pi 5 green PCB lies open on a wooden workbench under a dramatic overhead workshop lamp. A red NVMe M.2 drive hovers above it mid-swap, glowing. Real raspberries (the fruit) scattered at the edges. Tools, cables, photorealistic detail."
+"Cinematic macro photography. A green Raspberry Pi PCB gleams under a spotlight, the green board clean and cool, next to a silver Intel CPU lid — its edges glowing red-hot with heat shimmer rising from the surface. NVMe drive standing upright between them."
+"Cinematic editorial. A colossal blue Docker whale surges forward, stacked shipping containers on its back, crashing through the frame. Dramatic ocean spray, ultra-sharp detail."
 
 BAD examples — produce identical images, are too abstract, or cause safety rejections:
 "A futuristic city of glowing data-centre towers stretches to the horizon. (BANNED — generic backlit city skyline)"
@@ -411,7 +423,9 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
             || strpos( $saved, 'Linux / server diagnostics → surgeon' ) !== false
             || strpos( $saved, 'Identify the single most prominent technology brand' ) !== false
             || strpos( $saved, 'polished stone monolith on a plinth' ) !== false
-            || ( strpos( $saved, 'BRAND ICONS' ) !== false && strpos( $saved, 'ACTUAL RECOGNISABLE VISUAL FORM' ) === false ) ) {
+            || strpos( $saved, 'DALL-E cannot produce readable text' ) !== false
+            || ( strpos( $saved, 'BRAND ICONS' ) !== false && strpos( $saved, 'ACTUAL RECOGNISABLE VISUAL FORM' ) === false )
+            || ( strpos( $saved, 'STYLE SELECTION' ) !== false && strpos( $saved, 'CINEMATIC POSTER' ) === false ) ) {
             $saved = self::DEFAULT_IMG_SYSTEM_PROMPT;
             update_option( 'csdt_devtools_img_system_prompt', $saved, false );
         }
@@ -578,13 +592,13 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
                     <span class="cs-sec-label"><?php esc_html_e( 'Image style:', 'cloudscale-devtools' ); ?></span>
                     <div class="cs-sec-control">
                         <select id="cs-ai-img-style" class="cs-sec-select">
-                            <option value="auto" <?php selected( $saved_style, 'auto' ); ?>><?php esc_html_e( 'Auto (system prompt decides)', 'cloudscale-devtools' ); ?></option>
-                            <option value="technical_infographic" <?php selected( $saved_style, 'technical_infographic' ); ?>><?php esc_html_e( 'Technical infographic', 'cloudscale-devtools' ); ?></option>
-                            <option value="photorealistic" <?php selected( $saved_style, 'photorealistic' ); ?>><?php esc_html_e( 'Photorealistic', 'cloudscale-devtools' ); ?></option>
-                            <option value="editorial" <?php selected( $saved_style, 'editorial' ); ?>><?php esc_html_e( 'Editorial photography', 'cloudscale-devtools' ); ?></option>
-                            <option value="isometric" <?php selected( $saved_style, 'isometric' ); ?>><?php esc_html_e( 'Isometric 3D illustration', 'cloudscale-devtools' ); ?></option>
-                            <option value="cartoon" <?php selected( $saved_style, 'cartoon' ); ?>><?php esc_html_e( 'Cartoon / illustration', 'cloudscale-devtools' ); ?></option>
-                            <option value="flat_vector" <?php selected( $saved_style, 'flat_vector' ); ?>><?php esc_html_e( 'Flat vector illustration', 'cloudscale-devtools' ); ?></option>
+                            <option value="auto" <?php selected( $saved_style, 'auto' ); ?>><?php esc_html_e( 'Auto (AI picks best style)', 'cloudscale-devtools' ); ?></option>
+                            <option value="cinematic_poster" <?php selected( $saved_style, 'cinematic_poster' ); ?>><?php esc_html_e( '🎬 Cinematic Poster (bold text in image)', 'cloudscale-devtools' ); ?></option>
+                            <option value="photorealistic" <?php selected( $saved_style, 'photorealistic' ); ?>><?php esc_html_e( 'Cinematic Photorealistic', 'cloudscale-devtools' ); ?></option>
+                            <option value="editorial" <?php selected( $saved_style, 'editorial' ); ?>><?php esc_html_e( 'Editorial Photography', 'cloudscale-devtools' ); ?></option>
+                            <option value="technical_infographic" <?php selected( $saved_style, 'technical_infographic' ); ?>><?php esc_html_e( 'Technical Infographic', 'cloudscale-devtools' ); ?></option>
+                            <option value="isometric" <?php selected( $saved_style, 'isometric' ); ?>><?php esc_html_e( 'Isometric 3D', 'cloudscale-devtools' ); ?></option>
+                            <option value="cartoon" <?php selected( $saved_style, 'cartoon' ); ?>><?php esc_html_e( 'Cartoon / Illustration', 'cloudscale-devtools' ); ?></option>
                             <option value="minimalist" <?php selected( $saved_style, 'minimalist' ); ?>><?php esc_html_e( 'Minimalist', 'cloudscale-devtools' ); ?></option>
                         </select>
                         <span class="cs-hint"><?php esc_html_e( 'Override the visual style. "Auto" defers to your system prompt instructions below.', 'cloudscale-devtools' ); ?></span>
@@ -2157,13 +2171,14 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
         $context_str = implode( "\n\n", $context_parts );
 
         $style_map = [
-            'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes, no text or labels anywhere',
-            'photorealistic'        => 'cinematic photorealistic photography',
+            'cinematic_poster'      => 'cinematic photorealistic poster with bold punchy headline text (3-5 words, all-caps) as a large typographic design element on a dark background — movie poster / magazine cover layout',
+            'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes',
+            'photorealistic'        => 'cinematic photorealistic photography, dramatic lighting, macro detail',
             'editorial'             => 'professional editorial photography',
-            'isometric'             => 'clean isometric 3D illustration, flat vector art style',
+            'isometric'             => 'clean isometric 3D illustration',
             'cartoon'               => 'bold cartoon illustration',
-            'flat_vector'           => 'flat vector illustration, bold shapes, clean lines, modern graphic design',
-            'minimalist'            => 'minimalist design, bold shapes, clean negative space, no text',
+            'flat_vector'           => 'flat vector illustration, bold shapes, clean lines',
+            'minimalist'            => 'minimalist design, bold shapes, clean negative space',
         ];
 
         // Styles that make sense as blog headers — used when auto-varying on Regenerate.
@@ -2257,13 +2272,14 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
             $context_str = implode( "\n\n", $context_parts );
 
             $style_map_inline = [
-                'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes, no text or labels anywhere',
-                'photorealistic'        => 'cinematic photorealistic photography',
+                'cinematic_poster'      => 'cinematic photorealistic poster with bold punchy headline text (3-5 words, all-caps) as a large typographic design element on a dark background — movie poster / magazine cover layout',
+                'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes',
+                'photorealistic'        => 'cinematic photorealistic photography, dramatic lighting, macro detail',
                 'editorial'             => 'professional editorial photography',
-                'isometric'             => 'clean isometric 3D illustration, flat vector art style',
+                'isometric'             => 'clean isometric 3D illustration',
                 'cartoon'               => 'bold cartoon illustration',
-                'flat_vector'           => 'flat vector illustration, bold shapes, clean lines, modern graphic design',
-                'minimalist'            => 'minimalist design, bold shapes, clean negative space, no text',
+                'flat_vector'           => 'flat vector illustration, bold shapes, clean lines',
+                'minimalist'            => 'minimalist design, bold shapes, clean negative space',
             ];
             $style_instr_inline  = isset( $style_map_inline[ $prompt_style ] ) ? " Required visual style: {$style_map_inline[$prompt_style]}." : '';
             $brand_instr_inline  = ' BRAND MANDATE: Identify ALL prominently mentioned technology brands in this article. Each brand\'s physical icon MUST appear as a large foreground object — NEVER in the background, NEVER in the distance, NEVER described as "behind" or "beyond" anything. Every brand icon must occupy significant visual space. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = colossal Intel chip wafer on a glass pedestal. For ARM vs x86 articles: place both chips on side-by-side museum plinths facing each other as equal foreground rivals. AMD = massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon on a hilltop in the mid-foreground radiating visible signal rings. Docker = colossal whale. PostgreSQL = towering stone elephant. Redis = massive red cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/cloud computing = dramatic cumulus cloud formations rising from the ground like mountains, with server equipment integrated into them. ABSOLUTE RULE: never use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element.';
@@ -2326,7 +2342,16 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
                 continue;
             }
 
-            self::overlay_title( $tmp_jpg, $title );
+            // Skip GD title overlay for cinematic poster style — text is already
+            // rendered inside the image by DALL-E as a design element.
+            $is_poster = ( $prompt_style === 'cinematic_poster' )
+                || ( stripos( $prompt, 'bold all-caps' ) !== false )
+                || ( stripos( $prompt, 'all-caps text' ) !== false )
+                || ( stripos( $prompt, 'poster layout' ) !== false )
+                || ( stripos( $prompt, 'movie poster' ) !== false );
+            if ( ! $is_poster ) {
+                self::overlay_title( $tmp_jpg, $title );
+            }
 
             $file = [
                 'name'     => $slug . '-ai-header-' . $i . '.jpg',
