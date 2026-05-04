@@ -397,6 +397,18 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
 "Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing)"
 "A shadowy hacker exploiting a vulnerable server. (safety rejection)"';
 
+    private static function get_img_system_prompt(): string {
+        $saved = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
+        // Auto-migrate: if the saved prompt is an old known version, reset to current default.
+        // Fingerprint: old prompts contained the site-specific "TOPIC → SPECIFIC SCENE GUIDE" section.
+        if ( strpos( $saved, 'TOPIC → SPECIFIC SCENE GUIDE' ) !== false
+            || strpos( $saved, 'Linux / server diagnostics → surgeon' ) !== false ) {
+            $saved = self::DEFAULT_IMG_SYSTEM_PROMPT;
+            update_option( 'csdt_devtools_img_system_prompt', $saved, false );
+        }
+        return $saved;
+    }
+
     public static function render_ai_images_panel(): void {
         $openai_key    = (string) get_option( 'csdt_devtools_openai_key', '' );
         $anthropic_key = (string) get_option( 'csdt_devtools_anthropic_key', '' );
@@ -406,7 +418,7 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
         $saved_style   = (string) get_option( 'csdt_devtools_img_style', 'auto' );
         $saved_quality = (string) get_option( 'csdt_devtools_img_quality', 'hd' );
         $saved_no_text = (bool)   get_option( 'csdt_devtools_img_no_text', false );
-        $system_prompt = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
+        $system_prompt = self::get_img_system_prompt();
         $keys_json     = wp_json_encode( [
             'openai'    => $openai_key,
             'anthropic' => $anthropic_key,
@@ -2163,8 +2175,8 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
             ? ' IMPORTANT: The user just regenerated because they did not like the previous image. You MUST choose a completely different visual metaphor: different setting, different subject, different mood. If the previous prompt used a data centre or city, use a workshop, natural landscape, or organic environment instead. If it used an isometric style, use photorealistic. Never repeat the same type of scene.'
             : '';
 
-        $system_msg   = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
-        $brand_instruction = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant processor die monolith. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering elephant statue. Redis = massive cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. Do NOT relegate brand elements to the background or render them subtly.';
+        $system_msg   = self::get_img_system_prompt();
+        $brand_instruction = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = a colossal Intel chip wafer on a glass pedestal OR two oversized processor chips on museum plinths facing each other for vs/comparison articles. AMD = a massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering stone elephant statue. Redis = massive red cube monument. Kubernetes = giant ship helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/serverless = towering cumulus cloud formation with server racks emerging from it. Do NOT relegate brand elements to the background or render them subtly.';
         $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
 
         try {
@@ -2245,9 +2257,9 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
                 'minimalist'            => 'minimalist design, bold shapes, clean negative space, no text',
             ];
             $style_instr_inline  = isset( $style_map_inline[ $prompt_style ] ) ? " Required visual style: {$style_map_inline[$prompt_style]}." : '';
-            $brand_instr_inline  = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant processor die monolith. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering elephant statue. Redis = massive cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. Do NOT relegate brand elements to the background or render them subtly.';
+            $brand_instr_inline  = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = a colossal Intel chip wafer on a glass pedestal OR two oversized processor chips on museum plinths facing each other for vs/comparison articles. AMD = a massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering stone elephant statue. Redis = massive red cube monument. Kubernetes = giant ship helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/serverless = towering cumulus cloud formation with server racks emerging from it. Do NOT relegate brand elements to the background or render them subtly.';
             $no_text_instr       = $no_text ? ' CRITICAL: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles, no watermarks, no signage, no UI chrome. Pure visual imagery only.' : '';
-            $system_msg = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
+            $system_msg = self::get_img_system_prompt();
             $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instr_inline}{$brand_instr_inline}{$no_text_instr}";
 
             try {
@@ -2530,23 +2542,31 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
                 }
             }
 
-            // Long title or imagettfbbox loop exhausted — wrap to 2 lines
+            // Long title or imagettfbbox loop exhausted — wrap to 2 lines using char count
+            // (imagettfbbox underestimates width, so we never trust it for split decisions)
             if ( $force_wrap || $font_size < $min_font ) {
-                $font_size = $min_font;
-                $words     = explode( ' ', $display );
-                $total     = count( $words );
-                for ( $split = (int) ( $total / 2 ); $split > 0; $split-- ) {
-                    $l1   = implode( ' ', array_slice( $words, 0, $split ) );
-                    $l2   = implode( ' ', array_slice( $words, $split ) );
-                    $box1 = imagettfbbox( $font_size, 0, $font, $l1 );
-                    $box2 = imagettfbbox( $font_size, 0, $font, $l2 );
-                    if ( $box1 && $box2
-                        && ( $box1[2] - $box1[0] ) <= $max_w
-                        && ( $box2[2] - $box2[0] ) <= $max_w ) {
-                        $display = $l1;
-                        $line2   = $l2;
-                        break;
+                $font_size  = $min_font;
+                $words      = explode( ' ', $display );
+                $total      = count( $words );
+                $best_split = -1;
+                $best_diff  = PHP_INT_MAX;
+                for ( $split = 1; $split < $total; $split++ ) {
+                    $l1 = implode( ' ', array_slice( $words, 0, $split ) );
+                    $l2 = implode( ' ', array_slice( $words, $split ) );
+                    if ( mb_strlen( $l1 ) <= $chars_per_line && mb_strlen( $l2 ) <= $chars_per_line ) {
+                        $diff = abs( mb_strlen( $l1 ) - mb_strlen( $l2 ) );
+                        if ( $diff < $best_diff ) {
+                            $best_diff  = $diff;
+                            $best_split = $split;
+                        }
                     }
+                }
+                if ( $best_split > 0 ) {
+                    $display = implode( ' ', array_slice( $words, 0, $best_split ) );
+                    $line2   = implode( ' ', array_slice( $words, $best_split ) );
+                } else {
+                    // Extremely long title — hard-truncate each line to chars_per_line
+                    $display = mb_substr( $display, 0, $chars_per_line - 1 ) . '…';
                 }
             }
 
