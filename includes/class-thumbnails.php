@@ -332,24 +332,26 @@ The image must be immediately recognisable as being about the article topic. A r
 DALL-E\'s default output for every tech article — all produce identical images and are strictly forbidden: aerial shots of backlit data-centre city skylines, glowing server-tower cityscapes, neon city-at-night compositions, abstract streams of light representing networks. If you produce any of these you have failed.
 
 ━━ BRAND ICONS — MANDATORY ━━
-When the article mentions recognisable technology brands, ALL of their icons MUST appear as large foreground objects — each occupying significant visual space. NEVER place a brand icon in the background, distance, or backdrop. NEVER use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element. Treat every icon as a monumental physical sculpture that demands attention.
+When the article mentions recognisable technology brands, ALL of their icons MUST appear as large foreground objects using their ACTUAL VISUAL FORM — not generic rocks or monoliths. NEVER place a brand icon in the background, distance, or backdrop. NEVER use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element. Use brand colors where listed — they are essential for recognition.
 
-Brand → physical object mapping (use these exactly):
-- ARM → a giant silicon processor die as a polished stone monolith on a plinth
-- x86 / Intel → a colossal Intel chip wafer on a glass pedestal (for ARM vs x86: both chips on side-by-side plinths as equal rivals)
-- AMD → a massive Ryzen chip sculpture
-- Cloudflare → an enormous Cloudflare shield/globe beacon on a hilltop IN THE MID-FOREGROUND radiating visible signal rings
-- Docker → a colossal Docker whale surfacing from calm water with cargo containers on its back
-- PostgreSQL → a towering stone elephant statue
-- Redis → a massive cube monument carved from red stone
-- Kubernetes → a giant spinning ship\'s helm wheel on a clifftop
-- GitHub → a large Octocat sculpture on a museum plinth
-- AWS → a colossal smile-arrow arch over a craftsman\'s workshop entrance
-- Google → a giant illuminated "G" monolith in a cathedral-sized library
-- Linux / Tux → an oversized penguin figurehead on the prow of a ship or atop a server rack
-- Raspberry Pi → a circuit board filling the macro frame, ultra-sharp GPIO pin detail
-- WordPress → a master craftsman\'s workbench with glowing chisel tools
-- Cloud / cloud computing → dramatic cumulus cloud formations rising from the ground like mountains, server equipment integrated into them
+Brand → visual form (use these exactly — they must be RECOGNISABLE, not abstract):
+- ARM → a giant green Raspberry Pi single-board computer (the iconic green PCB with GPIO pin row) scaled to monument size — this IS the most recognisable ARM device
+- x86 / Intel → a giant Intel CPU showing its silver rectangular metal lid scaled to the size of a building; for ARM vs x86 articles: show the green Pi PCB and the silver Intel CPU lid side by side as rivals
+- AMD → a giant red-boxed AMD Ryzen processor package scaled to monument size
+- Cloudflare → an enormous orange Cloudflare shield (the distinctive orange shield with a globe emblem at the centre) radiating orange signal rings — the orange colour is essential
+- Docker → a colossal blue Docker whale with colourful shipping containers stacked on its back
+- PostgreSQL → a giant blue elephant head (the PostgreSQL mascot — a blue elephant, immediately recognisable)
+- Redis → a giant red Redis cube with the Redis "die" pip pattern
+- Kubernetes → a giant ship\'s helm wheel with the Kubernetes blue-and-white colour scheme
+- GitHub → a giant black-and-white Octocat (cat body with octopus tentacles as legs) sculpture on a plinth
+- AWS → a giant orange curved smile-arrow arch (the Amazon/AWS smile logo in orange, as a physical gateway arch)
+- Azure → a giant crystalline blue gemstone "A" monument with flowing geometric wings (the Microsoft Azure logo form)
+- Google Cloud → a giant four-coloured Google "G" monument
+- Linux / Tux → a giant Tux the penguin (the Linux mascot — a cute black-and-white penguin) standing upright
+- Raspberry Pi → a giant photorealistic raspberry fruit (the actual raspberry fruit — red, round, made of drupelets) scaled to the size of a building; alternatively a giant green Pi PCB
+- WordPress → a giant blue "W" logo letter monument on a plinth
+- NVMe / SSD storage → giant NVMe M.2 sticks standing upright like monoliths
+- Cloud / cloud computing → towering cumulus cloud formations integrated with server equipment, dramatic and sculptural
 
 ━━ VISUAL METAPHOR CORE PRINCIPLE ━━
 Every abstract concept must be translated into a CONCRETE PHYSICAL METAPHOR. Never describe floating data, glowing nodes, or abstract networks. Map concepts to tangible objects:
@@ -379,8 +381,8 @@ Pick the single best-fit style for the article:
 
 NEVER pick: technical diagram, infographic, schematic, blueprint, or any style that implies labels or text.
 
-━━ COLOUR BAN ━━
-Do NOT name any colour anywhere in the prompt. Not "blue", "navy", "dark", "light", "white", "gray", "green", "warm", "cool" — nothing. Leave all colour decisions to DALL-E.
+━━ COLOUR RULE ━━
+Only name colours when they are essential for brand recognition (e.g. "orange Cloudflare shield", "blue Docker whale", "red raspberry fruit", "green Raspberry Pi PCB"). Do NOT name colours for any non-brand scene elements, backgrounds, lighting, or atmosphere — leave those to DALL-E. Never describe the whole scene as one dominant colour.
 
 ━━ OUTPUT FORMAT ━━
 2–3 sentences:
@@ -389,10 +391,11 @@ Do NOT name any colour anywhere in the prompt. Not "blue", "navy", "dark", "ligh
 3. (Optional) Atmosphere, lighting, or composition detail.
 
 GOOD examples:
-"Cinematic editorial. A lone inspector in a hard hat walks a vast factory floor examining web-page sheets rolling off a conveyor belt, with a giant illuminated G monolith glowing in the background. Epic scale, sharp foreground detail."
-"Cinematic editorial. A surgeon in a sterile theatre performs delicate work on a glowing server rack on the operating table, surrounded by monitors showing vital signs. Dramatic overhead lighting, photorealistic depth of field."
-"Isometric 3D illustration. A giant stone PostgreSQL elephant statue presides over a vast underground data vault, glowing pipelines connecting crystalline towers, a lone technician at the central console far below."
-"Cinematic editorial. A colossal ARM processor die as a polished stone monolith dominates the centre of a grand exhibition hall, two engineers in hard hats studying it from below, a Cloudflare shield/globe beacon glowing on a second plinth behind them."
+"Isometric 3D illustration. A giant green Raspberry Pi PCB stands like a monument on the left, and a giant silver Intel CPU lid stands on the right, both in a grand exhibition hall facing each other as rivals. An enormous orange Cloudflare shield radiates signal rings between them."
+"Cinematic editorial. A colossal blue Docker whale surges forward with stacked shipping containers on its back, filling the frame. Dramatic ocean spray, ultra-sharp detail on the containers."
+"Isometric 3D illustration. A giant blue PostgreSQL elephant head occupies the foreground, trunk raised, presiding over a vast underground data vault. A lone technician at the central console far below."
+"Cinematic editorial. A giant orange curved smile-arrow arch spans the scene like a gateway (the AWS logo form). Engineers walk through it into a craftsman\'s workshop filled with glowing tools."
+"Flat vector illustration. A giant photorealistic red raspberry fruit (the Raspberry Pi logo, scaled to building size) stands on a plinth. Tiny engineers inspect it from below. Clean geometric composition."
 
 BAD examples — produce identical images, are too abstract, or cause safety rejections:
 "A futuristic city of glowing data-centre towers stretches to the horizon. (BANNED — generic backlit city skyline)"
@@ -407,7 +410,8 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
         if ( strpos( $saved, 'TOPIC → SPECIFIC SCENE GUIDE' ) !== false
             || strpos( $saved, 'Linux / server diagnostics → surgeon' ) !== false
             || strpos( $saved, 'Identify the single most prominent technology brand' ) !== false
-            || ( strpos( $saved, 'BRAND ICONS' ) !== false && strpos( $saved, 'ALL of their icons' ) === false ) ) {
+            || strpos( $saved, 'polished stone monolith on a plinth' ) !== false
+            || ( strpos( $saved, 'BRAND ICONS' ) !== false && strpos( $saved, 'ACTUAL RECOGNISABLE VISUAL FORM' ) === false ) ) {
             $saved = self::DEFAULT_IMG_SYSTEM_PROMPT;
             update_option( 'csdt_devtools_img_system_prompt', $saved, false );
         }
@@ -2181,7 +2185,7 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
             : '';
 
         $system_msg   = self::get_img_system_prompt();
-        $brand_instruction = ' BRAND MANDATE: Identify ALL prominently mentioned technology brands in this article. Each brand\'s physical icon MUST appear as a large foreground object — NEVER in the background, NEVER in the distance, NEVER described as "behind" or "beyond" anything. Every brand icon must occupy significant visual space. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = colossal Intel chip wafer on a glass pedestal. For ARM vs x86 articles: place both chips on side-by-side museum plinths facing each other as equal foreground rivals. AMD = massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon on a hilltop in the mid-foreground radiating visible signal rings. Docker = colossal whale. PostgreSQL = towering stone elephant. Redis = massive red cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/cloud computing = dramatic cumulus cloud formations rising from the ground like mountains, with server equipment integrated into them. ABSOLUTE RULE: never use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element.';
+        $brand_instruction = ' BRAND MANDATE: Identify ALL prominently mentioned technology brands. Each brand icon MUST use its ACTUAL RECOGNISABLE VISUAL FORM as a large foreground object. NEVER in the background. NEVER generic rocks or monoliths. ARM = giant green Raspberry Pi PCB (the iconic green circuit board with GPIO pins) — this is the most recognisable ARM device. x86/Intel = giant silver Intel CPU showing its rectangular metal lid. For ARM vs x86: green Pi PCB and silver Intel CPU lid side-by-side as rivals. AMD = giant red AMD Ryzen processor box. Cloudflare = enormous ORANGE shield with globe emblem radiating orange signal rings — the orange colour is essential. Docker = colossal blue Docker whale with colourful shipping containers on its back. AWS = giant orange curved smile-arrow arch (the AWS smile logo in orange). Azure = giant crystalline blue "A" monument with geometric wings. GitHub = giant black-and-white Octocat (cat with octopus tentacles). PostgreSQL = giant blue elephant head. Raspberry Pi = giant photorealistic red raspberry fruit (the actual raspberry, red, made of drupelets) scaled to building size. NVMe = giant NVMe M.2 sticks standing upright. Cloud/cloud computing = towering cumulus cloud formations with server equipment integrated. Brand colours listed above are mandatory for recognition.';
         $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
 
         try {
