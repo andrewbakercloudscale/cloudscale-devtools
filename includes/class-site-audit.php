@@ -2061,9 +2061,9 @@ PROMPT;
             'post_count'          => $post_count,
             'avg_word_count'      => $avg_words,
             'no_meta_desc_count'  => count( $issues['no_meta_desc'] ),
-            'no_meta_desc_sample' => array_slice( $issues['no_meta_desc'], 0, 5 ),
+            'no_meta_desc_sample' => array_slice( $issues['no_meta_desc'], 0, 6 ),
             'no_title_tag_count'  => count( $issues['no_title_tag'] ),
-            'no_title_tag_sample' => array_slice( $issues['no_title_tag'], 0, 5 ),
+            'no_title_tag_sample' => array_slice( $issues['no_title_tag'], 0, 6 ),
             'thin_content_count'  => count( $issues['thin_content'] ),
             'thin_content_sample' => array_slice( $issues['thin_content'], 0, 10 ),
             'no_featured_img_count'  => count( $issues['no_featured_image'] ),
@@ -2164,21 +2164,21 @@ PROMPT;
         }
 
         if ( $d['no_meta_desc_count'] > 0 ) {
-            $sev     = $d['no_meta_desc_count'] > 10 ? 'high' : 'medium';
-            $samples = ! empty( $d['no_meta_desc_sample'] )
-                ? ' Examples: ' . implode( ', ', array_map(
-                    fn( $s ) => '"' . $s['title'] . '" (' . $s['url'] . ')',
-                    array_slice( $d['no_meta_desc_sample'], 0, 5 )
-                  ) ) . '.'
-                : '';
+            $sev = $d['no_meta_desc_count'] > 10 ? 'high' : 'medium';
             $findings[] = [
                 'category'   => 'SEO',
                 'severity'   => $sev,
                 'title'      => "Missing meta descriptions on {$d['no_meta_desc_count']} posts/pages",
-                'detail'     => 'Meta descriptions control how your pages appear in Google search results. Missing descriptions mean Google auto-generates them, often producing poor click-through rates.' . $samples,
+                'detail'     => 'Meta descriptions control how your pages appear in Google search results. Missing descriptions mean Google auto-generates them, often producing poor click-through rates.',
                 'fix'        => 'Use CloudScale SEO AI to auto-generate keyword-rich meta descriptions for every page in one batch operation. Focus on your highest-traffic pages first.',
                 'fix_action' => 'seo_ai_desc',
                 'affected'   => "{$d['no_meta_desc_count']} posts/pages",
+                'links'      => ! empty( $d['no_meta_desc_sample'] )
+                    ? array_map(
+                        fn( $s ) => [ 'label' => $s['title'], 'url' => $s['url'] ],
+                        array_slice( $d['no_meta_desc_sample'], 0, 6 )
+                      )
+                    : [],
                 'cta'        => [
                     'label' => '🤖 CloudScale SEO AI — Free',
                     'url'   => 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-seo-ai-help/',
@@ -2188,21 +2188,20 @@ PROMPT;
         }
 
         if ( ! empty( $d['no_title_tag_count'] ) && $d['no_title_tag_count'] > 0 ) {
-            $sev     = 'medium';
-            $samples = ! empty( $d['no_title_tag_sample'] )
-                ? ' Examples: ' . implode( ', ', array_map(
-                    fn( $s ) => '"' . $s['title'] . '" (' . $s['url'] . ')',
-                    array_slice( $d['no_title_tag_sample'], 0, 5 )
-                  ) ) . '.'
-                : '';
             $findings[] = [
                 'category'   => 'SEO',
-                'severity'   => $sev,
+                'severity'   => 'medium',
                 'title'      => "Missing SEO title tags on {$d['no_title_tag_count']} posts/pages",
-                'detail'     => 'SEO title tags are the single strongest on-page ranking signal. Without them Google writes its own titles, often truncating or mis-representing your content in search results.' . $samples,
+                'detail'     => 'SEO title tags are the single strongest on-page ranking signal. Without them Google writes its own titles, often truncating or mis-representing your content in search results.',
                 'fix'        => 'Use CloudScale SEO AI to auto-generate optimised title tags across your entire content library.',
                 'fix_action' => 'seo_ai_title',
                 'affected'   => "{$d['no_title_tag_count']} posts/pages",
+                'links'      => ! empty( $d['no_title_tag_sample'] )
+                    ? array_map(
+                        fn( $s ) => [ 'label' => $s['title'], 'url' => $s['url'] ],
+                        array_slice( $d['no_title_tag_sample'], 0, 6 )
+                      )
+                    : [],
                 'cta'        => [
                     'label' => '🤖 CloudScale SEO AI — Free',
                     'url'   => 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-seo-ai-help/',
@@ -2222,8 +2221,8 @@ PROMPT;
                 'affected' => "{$d['thin_content_count']} posts/pages",
                 'links'    => ! empty( $d['thin_content_sample'] )
                     ? array_map(
-                        fn( $s ) => [ 'url' => $s['url'], 'words' => $s['words'] ],
-                        array_slice( $d['thin_content_sample'], 0, 10 )
+                        fn( $s ) => [ 'label' => $s['title'], 'url' => $s['url'], 'words' => $s['words'] ],
+                        array_slice( $d['thin_content_sample'], 0, 6 )
                       )
                     : [],
             ];
@@ -2256,22 +2255,29 @@ PROMPT;
                 'affected' => "{$d['no_featured_img_count']} posts/pages",
                 'links'    => ! empty( $d['no_featured_img_sample'] )
                     ? array_map(
-                        fn( $s ) => [ 'url' => $s['url'] ],
-                        array_slice( $d['no_featured_img_sample'], 0, 10 )
+                        fn( $s ) => [ 'label' => $s['title'], 'url' => $s['url'] ],
+                        array_slice( $d['no_featured_img_sample'], 0, 6 )
                       )
                     : [],
             ];
         }
 
         $defimg_ack = get_option( 'csdt_defimg_no_fallback_ack', '0' ) === '1';
+        $no_img_links = ! empty( $d['no_featured_img_sample'] )
+            ? array_map(
+                fn( $s ) => [ 'label' => $s['title'], 'url' => $s['url'] ],
+                array_slice( $d['no_featured_img_sample'], 0, 6 )
+              )
+            : [];
         if ( ! empty( $d['default_image_broken'] ) ) {
             $findings[] = [
-                'category'      => 'SEO',
-                'severity'      => 'medium',
-                'title'         => 'Default featured image is broken — og:image fallback returns 404',
-                'detail'        => 'A default image is configured in Thumbnails but the file no longer exists. Posts without their own featured image will produce a broken og:image, causing no preview card on WhatsApp, LinkedIn, and Twitter.',
-                'fix'           => 'Go to Thumbnails → Default Featured Image and select a valid replacement, or click Remove to clear the broken reference if you prefer posts without a fallback image.',
-                'affected'      => 'All posts without a featured image',
+                'category' => 'SEO',
+                'severity' => 'medium',
+                'title'    => 'Default featured image is broken — og:image fallback returns 404',
+                'detail'   => 'A default image is configured in Thumbnails but the file no longer exists. Posts without their own featured image will produce a broken og:image, causing no preview card on WhatsApp, LinkedIn, and Twitter.',
+                'fix'      => 'Go to Thumbnails → Default Featured Image and select a valid replacement, or click Remove to clear the broken reference if you prefer posts without a fallback image.',
+                'affected' => 'All posts without a featured image',
+                'links'    => $no_img_links,
             ];
         } elseif ( ! empty( $d['default_image_missing'] ) && ! $defimg_ack ) {
             $findings[] = [
@@ -2281,6 +2287,7 @@ PROMPT;
                 'detail'        => 'When a post has no featured image, social platforms receive no image. A branded 1200×630 px default ensures every shared post shows a preview card. If you intentionally want no fallback, dismiss this finding.',
                 'fix'           => 'Go to Thumbnails → Default Featured Image and select a branded 1200×630 px image, or dismiss this finding if you prefer no fallback.',
                 'affected'      => 'All posts without a featured image',
+                'links'         => $no_img_links,
                 'dismiss_label' => 'No fallback intended',
                 'dismiss_id'    => 'defimg_no_fallback_ack',
             ];
@@ -2392,16 +2399,23 @@ PROMPT;
         }
 
         if ( ( $d['inactive_themes'] ?? 0 ) >= 1 ) {
-            $n    = $d['inactive_themes'];
-            $sev  = $n >= 3 ? 'medium' : 'low';
-            $names = ! empty( $d['inactive_theme_names'] ) ? ' (' . implode( ', ', $d['inactive_theme_names'] ) . ')' : '';
+            $n           = $d['inactive_themes'];
+            $sev         = $n >= 3 ? 'medium' : 'low';
+            $themes_url  = admin_url( 'themes.php' );
+            $theme_links = ! empty( $d['inactive_theme_names'] )
+                ? array_map(
+                    fn( $name ) => [ 'label' => $name, 'url' => $themes_url ],
+                    array_slice( $d['inactive_theme_names'], 0, 6 )
+                  )
+                : [];
             $findings[] = [
                 'category' => 'Security',
                 'severity' => $sev,
                 'title'    => "{$n} inactive " . ( $n === 1 ? 'theme' : 'themes' ) . ' still installed',
                 'detail'   => "Unused themes sit on disk with their full PHP code intact. An attacker who gains write access can activate an inactive theme to run arbitrary code. WordPress itself recommends keeping only themes you actually use.",
                 'fix'      => 'Go to Appearance → Themes, click each unused theme, and delete it. You only need your active theme and its parent theme (if applicable).',
-                'affected' => "{$n} inactive " . ( $n === 1 ? 'theme' : 'themes' ) . $names,
+                'affected' => "{$n} inactive " . ( $n === 1 ? 'theme' : 'themes' ),
+                'links'    => $theme_links,
             ];
         }
 
@@ -2514,8 +2528,13 @@ PROMPT;
                     'severity' => 'info',
                     'title'    => "Disk space healthy — {$d['disk_free_pct']}% free ({$d['disk_free_gb']} GB of {$d['disk_total_gb']} GB)",
                     'detail'   => 'Disk space is at a comfortable level.',
-                    'fix'      => 'No action needed. Monitor regularly.',
+                    'fix'      => 'No action needed. Run CloudScale Cleanup periodically to keep the database lean and free up space.',
                     'affected' => "Disk ({$d['disk_free_gb']} GB free)",
+                    'cta'      => [
+                        'label' => '🧹 CloudScale Cleanup — Free',
+                        'url'   => 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-database-cleanup-help/',
+                        'desc'  => 'Remove expired transients, post revisions, spam comments, and orphaned metadata in one click.',
+                    ],
                 ];
             }
         }
@@ -2542,6 +2561,11 @@ PROMPT;
         }
 
         // ── Username enumeration protection ──
+        $devtools_cta = [
+            'label' => '🔒 CloudScale Cyber DevTools — Free',
+            'url'   => 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-cyber-devtools-help/',
+            'desc'  => 'Login security, brute-force protection, CSP, security headers, and more — all in one free plugin.',
+        ];
         if ( get_option( 'csdt_devtools_enum_protect', '1' ) === '1' ) {
             $findings[] = [
                 'category' => 'Security',
@@ -2550,6 +2574,7 @@ PROMPT;
                 'detail'   => 'Login errors are genericised to "Invalid username or password." — attackers cannot distinguish a missing username from a wrong password, preventing account enumeration.',
                 'fix'      => 'No action needed.',
                 'affected' => 'Login page',
+                'cta'      => $devtools_cta,
             ];
         } else {
             $findings[] = [
@@ -2621,6 +2646,7 @@ PROMPT;
                 'detail'   => 'The login URL has been moved to a custom slug, significantly reducing automated login scan traffic.',
                 'fix'      => 'No action needed.',
                 'affected' => 'wp-login.php',
+                'cta'      => $devtools_cta,
             ];
         } else {
             $findings[] = [
@@ -2643,6 +2669,7 @@ PROMPT;
                 'detail'   => 'All administrator accounts must complete a second factor on login. This blocks account takeover even if a password is leaked.',
                 'fix'      => 'No action needed. Passkeys offer the strongest protection — consider enabling them in Security → Two-Factor settings.',
                 'affected' => 'Administrator accounts',
+                'cta'      => $devtools_cta,
             ];
         } else {
             $findings[] = [
@@ -2665,6 +2692,7 @@ PROMPT;
                 'detail'   => 'Administrator accounts have passkeys registered. Passkeys provide phishing-resistant, passwordless login using device biometrics (Face ID, Touch ID, Windows Hello) or hardware security keys.',
                 'fix'      => 'No action needed. Register additional passkeys for backup devices via Login Security → Passkeys.',
                 'affected' => 'Administrator accounts',
+                'cta'      => $devtools_cta,
             ];
         } else {
             $findings[] = [
@@ -2704,6 +2732,19 @@ PROMPT;
                 'affected' => "All {$d['post_count']} posts/pages",
             ];
         }
+
+        // Stamp DevTools CTA on every Security/info finding that doesn't already have one
+        $devtools_cta_stamp = [
+            'label' => '🔒 CloudScale Cyber DevTools — Free',
+            'url'   => 'https://andrewbaker.ninja/wordpress-plugin-help/cloudscale-cyber-devtools-help/',
+            'desc'  => 'Login security, brute-force protection, CSP, security headers, and more — all in one free plugin.',
+        ];
+        foreach ( $findings as &$f ) {
+            if ( ( $f['category'] ?? '' ) === 'Security' && ( $f['severity'] ?? '' ) === 'info' && empty( $f['cta'] ) ) {
+                $f['cta'] = $devtools_cta_stamp;
+            }
+        }
+        unset( $f );
 
         return $findings;
     }

@@ -124,8 +124,9 @@
         if (f.links && f.links.length) {
             linksHtml = '<ul style="margin:0 0 8px;padding-left:0;list-style:none;font-size:.83em;">' +
                 f.links.map(function (l) {
+                    var linkText = l.label ? escHtml(l.label) : escHtml(l.url);
                     return '<li style="margin-bottom:3px;">' +
-                        '<a href="' + escHtml(l.url) + '" target="_blank" rel="noopener" style="color:#2563eb;word-break:break-all;">' + escHtml(l.url) + '</a>' +
+                        '<a href="' + escHtml(l.url) + '" target="_blank" rel="noopener" style="color:#2563eb;">' + linkText + '</a>' +
                         (l.words ? ' <span style="color:#6b7280;">(' + l.words + ' words)</span>' : '') +
                         '</li>';
                 }).join('') + '</ul>';

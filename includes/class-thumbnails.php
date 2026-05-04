@@ -1558,6 +1558,39 @@ BAD examples — generic, unrelated to topic, or cause safety rejections:
         wp_add_inline_style( 'csdt-hero-styles', '.single .wp-post-image{width:100%;display:block;height:auto}' );
     }
 
+    // ─── Frontend admin: Generate Featured Image button ──────────────────
+
+    public static function enqueue_frontend_admin_scripts(): void {
+        if ( ! is_singular( 'post' ) || ! current_user_can( 'manage_options' ) ) { return; }
+        wp_enqueue_script(
+            'csdt-frontend-admin',
+            plugins_url( 'assets/cs-frontend-admin.js', dirname( __DIR__ ) . '/cs-code-block.php' ),
+            [],
+            CloudScale_DevTools::VERSION,
+            true
+        );
+        wp_localize_script( 'csdt-frontend-admin', 'csdtFrontAdmin', [
+            'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+            'nonce'         => wp_create_nonce( 'csdt_devtools_thumbnails' ),
+            'promptVendor'  => (string) get_option( 'csdt_devtools_prompt_vendor', 'openai' ),
+            'promptModel'   => (string) get_option( 'csdt_devtools_prompt_model', 'gpt-4o-mini' ),
+            'imgStyle'      => (string) get_option( 'csdt_devtools_img_style', 'auto' ),
+            'imgQuality'    => (string) get_option( 'csdt_devtools_img_quality', 'hd' ),
+            'imgDual'       => get_option( 'csdt_devtools_img_dual', false ) ? '1' : '0',
+        ] );
+    }
+
+    public static function inject_gen_image_button(): void {
+        if ( ! is_singular( 'post' ) || ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        $post_id = get_the_ID();
+        if ( ! $post_id ) { return; }
+        echo '<div id="csdt-gen-bar" class="csdt-gen-bar" data-post-id="' . esc_attr( (string) $post_id ) . '" style="display:none;">'
+           . '<button type="button" class="csdt-gen-img-pill">🎨 Generate Featured Image</button>'
+           . '</div>' . "\n";
+    }
+
     // ─── Private: full URL diagnostic ────────────────────────────────────
 
     /**
@@ -2331,6 +2364,40 @@ BAD examples — generic, unrelated to topic, or cause safety rejections:
         }
 
         wp_send_json_success();
+    }
+
+    // ─── Helper: extract recognisable tech brand/logo names from post text ──
+
+    private static function extract_tech_logos( string ...$texts ): string {
+        $haystack = mb_strtolower( implode( ' ', $texts ) );
+        $brands = [
+            'AWS'            => 'aws amazon',
+            'Amazon'         => 'amazon',
+            'Azure'          => 'azure microsoft',
+            'Google Cloud'   => 'google cloud gcp',
+            'Cloudflare'     => 'cloudflare',
+            'Raspberry Pi'   => 'raspberry pi raspi',
+            'ARM'            => '\barm\b',
+            'Docker'         => 'docker',
+            'Kubernetes'     => 'kubernetes k8s',
+            'Nginx'          => 'nginx',
+            'MySQL'          => 'mysql',
+            'PostgreSQL'     => 'postgresql postgres',
+            'Redis'          => 'redis',
+            'Python'         => 'python',
+            'WordPress'      => 'wordpress',
+            'GitHub'         => 'github',
+            'Linux'          => 'linux',
+            'Intel'          => 'intel',
+            'NVIDIA'         => 'nvidia',
+        ];
+        $found = [];
+        foreach ( $brands as $label => $pattern ) {
+            if ( preg_match( '/' . $pattern . '/i', $haystack ) ) {
+                $found[] = $label;
+            }
+        }
+        return implode( ', ', $found );
     }
 
     // ─── Helper: convert any image to JPEG under 400 KB ──────────────────
