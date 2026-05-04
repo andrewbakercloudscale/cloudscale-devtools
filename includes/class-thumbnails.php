@@ -2475,10 +2475,12 @@ BAD examples — generic, unrelated to topic, or cause safety rejections:
         if ( $font && function_exists( 'imagettftext' ) && function_exists( 'imagettfbbox' ) ) {
             $max_w     = $w - ( 2 * $pad );
             $font_size = (int) ( $strip_h * 0.31 );
+            $min_font  = (int) ( $strip_h * 0.22 );
             $line2     = '';
 
-            // Shrink font until single line fits
-            while ( $font_size >= 22 ) {
+            // Shrink font until single line fits, but never below the two-line size —
+            // using a smaller font on one line than on two lines gains nothing.
+            while ( $font_size >= $min_font ) {
                 $bbox = imagettfbbox( $font_size, 0, $font, $display );
                 if ( $bbox && ( $bbox[2] - $bbox[0] ) <= $max_w ) {
                     break;
@@ -2486,9 +2488,9 @@ BAD examples — generic, unrelated to topic, or cause safety rejections:
                 $font_size -= 2;
             }
 
-            // Still doesn't fit — wrap to 2 lines at a smaller size
-            if ( $font_size < 22 ) {
-                $font_size = (int) ( $strip_h * 0.22 );
+            // Still doesn't fit — wrap to 2 lines
+            if ( $font_size < $min_font ) {
+                $font_size = $min_font;
                 $words     = explode( ' ', $display );
                 $total     = count( $words );
                 for ( $split = (int) ( $total / 2 ); $split > 0; $split-- ) {
