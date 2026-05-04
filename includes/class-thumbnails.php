@@ -331,8 +331,15 @@ The image must be immediately recognisable as being about the article topic. A r
 ━━ BANNED SCENES ━━
 DALL-E\'s default output for every tech article — all produce identical images and are strictly forbidden: aerial shots of backlit data-centre city skylines, glowing server-tower cityscapes, neon city-at-night compositions, abstract streams of light representing networks. If you produce any of these you have failed.
 
-━━ BRAND ICONS — MANDATORY ━━
-When the article mentions recognisable technology brands, ALL of their icons MUST appear as large foreground objects using their ACTUAL VISUAL FORM — not generic rocks or monoliths. NEVER place a brand icon in the background, distance, or backdrop. NEVER use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element. Use brand colors where listed — they are essential for recognition.
+━━ BRAND ICONS + NARRATIVE CONDITIONS ━━
+When the article mentions recognisable technology brands, show ALL of them using their ACTUAL VISUAL FORM as large foreground objects. NEVER generic rocks or monoliths. NEVER in the background.
+
+READ THE ARTICLE FIRST. Classify each brand as CHAMPION, STRUGGLING, or NEUTRAL:
+- CHAMPION (winning, disrupting, more efficient, recommended) → gleaming, clean, cool-running, radiating cool efficiency signals, standing tall and powerful
+- STRUGGLING (being disrupted, legacy, losing market share, overheating) → glowing red-hot edges, heat shimmer rising from the surface, hairline cracks forming, smoke venting, visibly stressed
+- NEUTRAL (tool, supporting technology) → normal condition, appropriate scale
+
+Then place each brand using its recognisable visual form with the matching narrative condition applied.
 
 Brand → visual form (use these exactly — they must be RECOGNISABLE, not abstract):
 - ARM → a giant green Raspberry Pi single-board computer (the iconic green PCB with GPIO pin row) scaled to monument size — this IS the most recognisable ARM device
@@ -414,6 +421,30 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
 "Streams of light flow between towering server structures in a hazy digital city. (BANNED — abstract light-stream)"
 "Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing)"
 "A shadowy hacker exploiting a vulnerable server. (safety rejection)"';
+
+    private static function build_brand_instruction(): string {
+        return ' BRAND VISUAL FORMS — use these exact physical representations for each brand. Champions of the article gleam clean and powerful; struggling/legacy brands show heat stress (glowing red-hot edges, heat shimmer, cracking casing, smoke from vents). Apply the condition that matches the brand\'s role in this specific article.'
+            . ' ARM = giant green Raspberry Pi PCB (iconic green circuit board with GPIO pin row).'
+            . ' x86 / Intel = giant silver Intel CPU showing its rectangular metal lid.'
+            . ' AMD = giant red AMD Ryzen processor box.'
+            . ' Cloudflare = enormous orange shield with globe emblem radiating orange signal rings.'
+            . ' Docker = colossal blue Docker whale with colourful shipping containers on its back.'
+            . ' AWS = giant orange curved smile-arrow arch (the AWS smile logo in orange).'
+            . ' Azure = giant crystalline blue "A" monument with flowing geometric wings.'
+            . ' Google Cloud = giant four-coloured Google "G" monument.'
+            . ' GitHub = giant black-and-white Octocat (cat body with octopus tentacles).'
+            . ' PostgreSQL = giant blue elephant head.'
+            . ' Redis = giant red cube with pip pattern.'
+            . ' Kubernetes = giant blue-and-white ship\'s helm wheel.'
+            . ' Linux / Tux = giant Tux the penguin (black-and-white penguin standing upright).'
+            . ' Raspberry Pi = giant photorealistic red raspberry fruit (the actual raspberry fruit, red, made of drupelets).'
+            . ' WordPress = giant blue "W" letter monument.'
+            . ' NVMe / SSD = giant NVMe M.2 sticks standing upright.'
+            . ' Cloud / cloud computing = towering cumulus cloud formations with server equipment integrated.'
+            . ' DeepSeek = a giant glowing deep-sea lanternfish (the actual deep-sea creature — its bioluminescent lure pulsing).'
+            . ' OpenAI / ChatGPT = a giant brain made of crystalline lattice.'
+            . ' Every brand icon must be a large foreground object. NEVER in the background or distance.';
+    }
 
     private static function get_img_system_prompt(): string {
         $saved = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
@@ -2200,8 +2231,8 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
             : '';
 
         $system_msg   = self::get_img_system_prompt();
-        $brand_instruction = ' BRAND MANDATE: Identify ALL prominently mentioned technology brands. Each brand icon MUST use its ACTUAL RECOGNISABLE VISUAL FORM as a large foreground object. NEVER in the background. NEVER generic rocks or monoliths. ARM = giant green Raspberry Pi PCB (the iconic green circuit board with GPIO pins) — this is the most recognisable ARM device. x86/Intel = giant silver Intel CPU showing its rectangular metal lid. For ARM vs x86: green Pi PCB and silver Intel CPU lid side-by-side as rivals. AMD = giant red AMD Ryzen processor box. Cloudflare = enormous ORANGE shield with globe emblem radiating orange signal rings — the orange colour is essential. Docker = colossal blue Docker whale with colourful shipping containers on its back. AWS = giant orange curved smile-arrow arch (the AWS smile logo in orange). Azure = giant crystalline blue "A" monument with geometric wings. GitHub = giant black-and-white Octocat (cat with octopus tentacles). PostgreSQL = giant blue elephant head. Raspberry Pi = giant photorealistic red raspberry fruit (the actual raspberry, red, made of drupelets) scaled to building size. NVMe = giant NVMe M.2 sticks standing upright. Cloud/cloud computing = towering cumulus cloud formations with server equipment integrated. Brand colours listed above are mandatory for recognition.';
-        $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
+        $brand_instruction = self::build_brand_instruction();
+        $user_msg   = "{$context_str}\n\nStep 1 — Read the article and silently identify: (a) which technology brands/products are mentioned, (b) the ROLE each plays — CHAMPION (winning, more efficient, disrupting, recommended) or STRUGGLING (being disrupted, overheating, legacy, losing market share) or NEUTRAL (tool, supporting technology).\n\nStep 2 — Write the DALL-E 3 prompt using those roles. Champions must look cool, clean, powerful. Struggling brands must show heat stress: glowing red-hot edges, heat shimmer rising, cracking casing, smoke venting from vents. Do not state the roles — just apply them visually.\n\nOutput ONLY the final DALL-E 3 prompt.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
 
         try {
             switch ( $prompt_vendor ) {
@@ -2282,10 +2313,10 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
                 'minimalist'            => 'minimalist design, bold shapes, clean negative space',
             ];
             $style_instr_inline  = isset( $style_map_inline[ $prompt_style ] ) ? " Required visual style: {$style_map_inline[$prompt_style]}." : '';
-            $brand_instr_inline  = ' BRAND MANDATE: Identify ALL prominently mentioned technology brands in this article. Each brand\'s physical icon MUST appear as a large foreground object — NEVER in the background, NEVER in the distance, NEVER described as "behind" or "beyond" anything. Every brand icon must occupy significant visual space. ARM = giant silicon processor die monolith on a stone plinth. x86 / Intel = colossal Intel chip wafer on a glass pedestal. For ARM vs x86 articles: place both chips on side-by-side museum plinths facing each other as equal foreground rivals. AMD = massive Ryzen chip sculpture. Cloudflare = enormous shield/globe beacon on a hilltop in the mid-foreground radiating visible signal rings. Docker = colossal whale. PostgreSQL = towering stone elephant. Redis = massive red cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. GitHub = large Octocat sculpture. Cloud/cloud computing = dramatic cumulus cloud formations rising from the ground like mountains, with server equipment integrated into them. ABSOLUTE RULE: never use the words "background", "backdrop", "distance", "beyond", or "behind" when describing a brand element.';
+            $brand_instr_inline  = self::build_brand_instruction();
             $no_text_instr       = $no_text ? ' CRITICAL: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles, no watermarks, no signage, no UI chrome. Pure visual imagery only.' : '';
             $system_msg = self::get_img_system_prompt();
-            $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instr_inline}{$brand_instr_inline}{$no_text_instr}";
+            $user_msg   = "{$context_str}\n\nStep 1 — Read the article and silently identify: (a) which technology brands/products are mentioned, (b) the ROLE each plays — CHAMPION (winning, more efficient, disrupting, recommended) or STRUGGLING (being disrupted, overheating, legacy, losing market share) or NEUTRAL (tool, supporting technology).\n\nStep 2 — Write the DALL-E 3 prompt using those roles. Champions must look cool, clean, powerful. Struggling brands must show heat stress: glowing red-hot edges, heat shimmer rising, cracking casing, smoke venting from vents. Do not state the roles — just apply them visually.\n\nOutput ONLY the final DALL-E 3 prompt.{$style_instr_inline}{$brand_instr_inline}{$no_text_instr}";
 
             try {
                 switch ( $prompt_vendor ) {
