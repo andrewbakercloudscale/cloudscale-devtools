@@ -325,25 +325,27 @@ DALL-E SAFETY RULE: Never use words like hack, hacker, exploit, breach, attack, 
 
 RELEVANCE RULE: The image must be immediately recognisable as being about the article topic. A reader who has not read the article must be able to guess the topic from the image alone. Generic "glowing city" or "abstract digital landscape" images are forbidden — they tell the reader nothing. Ground every image in the specific tool, product, technology, or action the article describes.
 
+BANNED SCENES — DALL-E\'s default output for every tech article; all produce identical images and are strictly forbidden: aerial shots of backlit data-centre city skylines, glowing server-tower cityscapes, neon city-at-night compositions, abstract streams of light representing networks. If you produce any of these you have failed.
+
+BRAND ICONS MANDATORY: When the article mentions a recognisable technology brand, its mascot or icon MUST be the DOMINANT foreground subject — large, detailed, filling significant visual space, and immediately identifiable. Physical objects to use: ARM → a giant silicon processor die as a polished stone monolith on a plinth; Cloudflare → an enormous Cloudflare shield/globe beacon on a hilltop radiating signal rings; Docker → a colossal Docker whale surfacing from calm water; PostgreSQL → a towering stone elephant statue; Redis → a massive cube monument; Kubernetes → a giant spinning ship\'s helm wheel; GitHub → a large Octocat sculpture; AWS → a colossal smile-arrow arch. Brand elements must never be small, subtle, or background decoration.
+
 OUTPUT FORMAT — 2–3 sentences:
 1. Visual style.
-2. A concrete, specific scene that directly depicts the article topic — name the actual technology or action, not a metaphor for it.
+2. A concrete, specific scene — lead with any brand icon if present, then the surrounding environment.
 3. (Optional) Atmosphere, lighting, or composition detail.
 
 STYLE — pick what fits the article:
 - Script / tool / code → cinematic editorial or isometric 3D illustration
 - Process / architecture → isometric 3D illustration or cinematic editorial
 - Opinion / leadership / culture → cinematic editorial or flat vector illustration
-- Hardware / physical device → macro photography style
-- Security / reliability → cinematic editorial, infrastructure aesthetic
-- Performance / metrics → cinematic editorial, data-centre aesthetic
+- Hardware / physical device / chip → dramatic macro photography — fill the frame with the device
+- Security / reliability → a vault door, blast hatch, or armoured gate filling the frame — never a generic server room
+- Performance / comparison / vs → macro close-up of two competing devices side-by-side on a workbench, OR a racing-vehicle engine bay
 - Tutorial / step-by-step → flat vector illustration or isometric 3D illustration
 
 NEVER pick: technical diagram, infographic, schematic, blueprint, any style that implies labels or text.
 
 ABSOLUTE RULE — COLOUR BAN: Do NOT name any colour anywhere. Not "blue", "navy", "dark", "light", "white", "gray", "green", "warm", "cool" — nothing. Leave all colour to DALL-E.
-
-BRAND ICONS WELCOME: Reference recognisable brand mascots/icons as large foreground props — the PostgreSQL elephant statue, the AWS smile-arrow, the Docker whale, the Redis cube, the Kubernetes helm wheel, the GitHub octocat, the Google "G" monolith, the Apple logo. Use them as physical objects in the scene, not flat 2D logos.
 
 TOPIC → SPECIFIC SCENE GUIDE (always use the most specific match):
 - Linux / server diagnostics → surgeon operating on a glowing server rack on an operating table
@@ -353,24 +355,30 @@ TOPIC → SPECIFIC SCENE GUIDE (always use the most specific match):
 - Page audit / technical audit / script → a quality-control inspector on a factory floor, clipboard in hand, examining web pages rolling off a conveyor belt like printed sheets
 - AEO / AI search / answer engine → a figure standing before a vast oracle machine made of crystalline panels, presenting a question scroll
 - Security / firewall / certificates → a fortified vault door, a sealed blast door, an engineer sealing a pressure hatch
-- Network protocol / connectivity → a suspension bridge between two data-centre towers, or a control room operator monitoring signal feeds
+- Network protocol / connectivity → a control room operator at a console monitoring signal feeds, OR a close-up of dense fibre-optic cables
 - Protocol failure / outage → a suspension bridge with a broken mid-span collapsing into a stormy sea
-- Cloud / AWS / infrastructure → the AWS smile-arrow logo as a giant neon sign atop an aerial city of data-centre towers
-- Team culture / organisation → birds-eye city with connected neighbourhoods vs isolated fortress districts
-- Raspberry Pi / hardware → macro shot of a Raspberry Pi circuit board with bokeh data-centre lights
+- ARM / processor / chip / silicon / SoC → a giant ARM processor die as a polished stone monolith on a plinth in a grand exhibition hall, engineers dwarfed below examining it
+- Cloudflare / CDN / edge network / DDoS → an enormous Cloudflare shield/globe as a physical beacon on a hilltop, signal rings radiating outward, engineers in hard hats below
+- Technology comparison / vs / versus / benchmark / disruption → two champion artefacts on side-by-side pedestals — e.g. two oversized processor chips on museum plinths facing each other in a grand hall, a judge figure inspecting both
+- Cloud / AWS / serverless → a grand craftsman\'s workshop with glowing tool-racks and worktops, AWS smile-arrow arch above the entrance, engineers at benches
+- Raspberry Pi / hardware → macro shot of a Raspberry Pi circuit board filling the frame, ultra-sharp component and GPIO pin detail
 - Backup / recovery → fireproof vault door in a storm, or a lifeboat launching from a ship
-- Performance / speed → rocket engine ignition, or racing car engine bay close-up
+- Performance / speed → rocket engine ignition close-up, or racing car engine bay
 - AI / machine learning → crystalline neural lattice filling a vast cavern, figures dwarfed beneath it
 - WordPress / CMS → master craftsman\'s workshop with glowing tools on the bench
+- Team culture / organisation → birds-eye view of connected neighbourhood districts vs isolated fortress districts
 
 GOOD examples:
-"Cinematic editorial. A lone inspector in a hard hat walks a vast factory floor examining web-page sheets rolling off a conveyor belt — each sheet shows a structured web page layout — with the Google G monolith glowing in the background. Epic scale, sharp foreground."
+"Cinematic editorial. A lone inspector in a hard hat walks a vast factory floor examining web-page sheets rolling off a conveyor belt — each sheet shows a structured web page layout — with the Google G monolith glowing in the background. Epic scale, sharp foreground detail."
 "Cinematic editorial. A surgeon in a sterile theatre performs delicate work on a glowing server rack on the operating table, surrounded by monitors showing vital signs. Dramatic overhead lighting, photorealistic depth of field."
 "Isometric 3D illustration. A giant stone PostgreSQL elephant statue presides over a vast underground data vault, glowing pipelines connecting crystalline towers, a lone technician at the central console far below."
-"Dramatic macro photography. A Raspberry Pi 5 circuit board fills the frame, ultra-sharp GPIO pins, bokeh data-centre lights in the background."
+"Dramatic macro photography. A Raspberry Pi 5 circuit board fills the frame, ultra-sharp GPIO pins and component detail in the foreground."
+"Cinematic editorial. A colossal ARM processor die as a polished stone monolith dominates the centre of a grand exhibition hall, two engineers in hard hats studying it from below, a Cloudflare shield/globe beacon glowing on a second plinth behind them."
 
-BAD examples — generic, unrelated to topic, or cause safety rejections:
-"Cinematic editorial. Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing about SEO)"
+BAD examples — produce identical images across all tech articles, are too abstract, or cause safety rejections:
+"Cinematic editorial. A futuristic city of glowing data-centre towers stretches to the horizon. (BANNED — generic backlit city skyline)"
+"Cinematic editorial. Streams of light flow between towering server structures in a hazy digital city. (BANNED — abstract light-stream cityscape)"
+"Cinematic editorial. Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing)"
 "Technical illustration. \'DIAGNOSE YOUR LINUX SERVER\' — uptime, vmstat. (text = scrambled garbage)"
 "A shadowy hacker exploiting a vulnerable server. (safety rejection)"';
 
@@ -2141,7 +2149,7 @@ BAD examples — generic, unrelated to topic, or cause safety rejections:
             : '';
 
         $system_msg   = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
-        $brand_instruction = ' Scan the article for specific technology brands (e.g. PostgreSQL, MySQL, Redis, AWS, Docker, Kubernetes, Python, macOS, GitHub, Cloudflare). If any are found, make their recognisable mascot or icon a prominent visual element in the scene — e.g. the PostgreSQL elephant statue, the Docker whale, the AWS smile-arrow logo — as a large foreground prop, not as flat text.';
+        $brand_instruction = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant processor die monolith. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering elephant statue. Redis = massive cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. Do NOT relegate brand elements to the background or render them subtly.';
         $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
 
         try {
@@ -2179,12 +2187,11 @@ BAD examples — generic, unrelated to topic, or cause safety rejections:
         $post_id  = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
         $quality  = ( isset( $_POST['quality'] ) && $_POST['quality'] === 'hd' ) ? 'hd' : 'standard';
         $count    = 1;
-        $prompt   = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
-        $no_text  = isset( $_POST['no_text'] ) && '1' === $_POST['no_text'];
-
-        // Legacy fallback: if no pre-written prompt, write one inline.
-        $prompt_vendor = isset( $_POST['prompt_vendor'] ) ? sanitize_key( wp_unslash( $_POST['prompt_vendor'] ) ) : 'openai';
+        $prompt        = isset( $_POST['prompt'] )        ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+        $no_text       = isset( $_POST['no_text'] )       && '1' === $_POST['no_text'];
+        $prompt_vendor = isset( $_POST['prompt_vendor'] ) ? sanitize_key( wp_unslash( $_POST['prompt_vendor'] ) )      : 'openai';
         $prompt_model  = isset( $_POST['prompt_model'] )  ? sanitize_text_field( wp_unslash( $_POST['prompt_model'] ) ) : 'gpt-4o-mini';
+        $prompt_style  = isset( $_POST['prompt_style'] )  ? sanitize_key( wp_unslash( $_POST['prompt_style'] ) )       : 'auto';
 
         if ( ! $post_id ) {
             wp_send_json_error( [ 'message' => 'Invalid post ID.' ] );
@@ -2213,8 +2220,20 @@ BAD examples — generic, unrelated to topic, or cause safety rejections:
             $context_parts[] = "Article content:\n{$full_body}";
             $context_str = implode( "\n\n", $context_parts );
 
+            $style_map_inline = [
+                'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes, no text or labels anywhere',
+                'photorealistic'        => 'cinematic photorealistic photography',
+                'editorial'             => 'professional editorial photography',
+                'isometric'             => 'clean isometric 3D illustration, flat vector art style',
+                'cartoon'               => 'bold cartoon illustration',
+                'flat_vector'           => 'flat vector illustration, bold shapes, clean lines, modern graphic design',
+                'minimalist'            => 'minimalist design, bold shapes, clean negative space, no text',
+            ];
+            $style_instr_inline  = isset( $style_map_inline[ $prompt_style ] ) ? " Required visual style: {$style_map_inline[$prompt_style]}." : '';
+            $brand_instr_inline  = ' BRAND MANDATE: Identify the single most prominent technology brand in this article. Its mascot or icon MUST be the largest object in the image — a dominant foreground subject taking up at least 30% of the frame width. ARM = giant processor die monolith. Cloudflare = enormous shield/globe beacon. Docker = colossal whale. PostgreSQL = towering elephant statue. Redis = massive cube. Kubernetes = giant helm wheel. AWS = colossal smile-arrow arch. Do NOT relegate brand elements to the background or render them subtly.';
+            $no_text_instr       = $no_text ? ' CRITICAL: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles, no watermarks, no signage, no UI chrome. Pure visual imagery only.' : '';
             $system_msg = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
-            $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.";
+            $user_msg   = "{$context_str}\n\nWrite the DALL-E 3 prompt for this article's header image.{$style_instr_inline}{$brand_instr_inline}{$no_text_instr}";
 
             try {
                 switch ( $prompt_vendor ) {
