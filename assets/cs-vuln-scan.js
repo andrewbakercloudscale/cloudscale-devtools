@@ -167,12 +167,8 @@
                     html += '<span>' + escHtml(issue.title) + '</span>';
                     if (qf) html += '<button type="button" class="button button-small cs-audit-qf-btn" data-modal="' + escHtml(qf.modal) + '" style="font-size:11px;padding:1px 8px;height:auto;line-height:1.6">' + escHtml(qf.label) + ' \u2192</button>';
                     html += '</div>';
-                    if (issue.detail || issue.fix) {
-                        html += '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:#6366f1;font-weight:600;list-style:none;display:list-item">Details &#x25BC;</summary>';
-                        if (issue.detail) html += '<div class="cs-audit-issue-detail">' + escHtml(issue.detail) + '</div>';
-                        if (issue.fix)    html += '<div class="cs-audit-issue-fix">' + escHtml(issue.fix) + '</div>';
-                        html += '</details>';
-                    }
+                    if (issue.detail) html += '<div class="cs-audit-issue-detail">' + escHtml(issue.detail) + '</div>';
+                    if (issue.fix)    html += '<div class="cs-audit-issue-fix">' + escHtml(issue.fix) + '</div>';
                     html += '</div>';
                 });
             }
@@ -679,10 +675,51 @@
             });
         }
 
+        // ── Target URL input ──────────────────────────────────────────
+
+        var targetUrlInput = document.getElementById('cs-audit-target-url');
+        var urlStatusEl    = document.getElementById('cs-audit-url-status');
+        var homeUrl        = (cfg.homeUrl || '').replace(/\/$/, '');
+
+        function normaliseUrl(u) { return (u || '').replace(/\/$/, '').toLowerCase(); }
+
+        function isExternalUrl() {
+            if (!targetUrlInput) return false;
+            return normaliseUrl(targetUrlInput.value) !== normaliseUrl(homeUrl);
+        }
+
+        function updateUrlStatus() {
+            if (!targetUrlInput || !urlStatusEl) return;
+            var external = isExternalUrl();
+            if (external) {
+                urlStatusEl.textContent = '🌐 External site — results saved to Adhoc Cyber Audits';
+                urlStatusEl.style.color = '#2563eb';
+                if (scanBtn) { scanBtn.disabled = true; scanBtn.title = 'Internal Config Audit is only available for this site.'; }
+                if (deepBtn && cfg.hasKey) { deepBtn.disabled = false; deepBtn.title = ''; deepBtn.textContent = '🌐 Run External Audit'; }
+            } else {
+                urlStatusEl.textContent = '✔ This site';
+                urlStatusEl.style.color = '#15803d';
+                if (scanBtn && cfg.hasKey) { scanBtn.disabled = false; scanBtn.title = ''; }
+                if (deepBtn && cfg.hasKey) { deepBtn.disabled = false; deepBtn.title = ''; deepBtn.textContent = '🕵️ Run AI Deep Dive Cyber Audit'; }
+            }
+        }
+
+        if (targetUrlInput) {
+            targetUrlInput.addEventListener('input', updateUrlStatus);
+            targetUrlInput.addEventListener('change', updateUrlStatus);
+            updateUrlStatus();
+        }
+
         // ── Scan buttons ──────────────────────────────────────────────
 
         if (scanBtn) scanBtn.addEventListener('click', function () { runScan(false); });
-        if (deepBtn) deepBtn.addEventListener('click', function () { runDeepScan(false); });
+        if (deepBtn) deepBtn.addEventListener('click', function () {
+            if (isExternalUrl()) {
+                runAdhocScan(targetUrlInput ? targetUrlInput.value.trim() : '');
+            } else {
+                runDeepScan(false);
+            }
+        });
 
         // Silently pre-fill cached results on page load
         if (cfg.hasKey) {
@@ -708,10 +745,168 @@
         });
     }
 
+    // ── Adhoc scan (external URL) ────────────────────────────────────────
+
+    function runAdhocScan(targetUrl) {
+        var scanArea  = document.getElementById('cs-adhoc-scan-area');
+        var statusEl  = document.getElementById('cs-adhoc-scan-status');
+        var progressEl = document.getElementById('cs-adhoc-progress');
+        var targetLbl = document.getElementById('cs-adhoc-scan-target');
+        var deepBtn   = document.getElementById('cs-deep-scan-btn');
+
+        if (!targetUrl) { return; }
+
+        if (scanArea)  { scanArea.style.display = ''; }
+        if (targetLbl) { targetLbl.textContent = 'Scanning: ' + targetUrl; }
+        if (statusEl)  { statusEl.textContent = '⏳ Running external AI security probe…'; statusEl.className = 'cs-vuln-inline-msg'; }
+        if (deepBtn)   { deepBtn.disabled = true; }
+
+        // Scroll the Adhoc panel into view
+        var adhocPanel = document.getElementById('cs-panel-adhoc-audits');
+        if (adhocPanel) { adhocPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+        var bar = new ProgressBar(progressEl);
+        bar.tick();
+
+        post('csdt_devtools_adhoc_scan', { target_url: targetUrl })
+            .then(function (res) {
+                if (!res.success) {
+                    bar.reset();
+                    if (deepBtn) deepBtn.disabled = false;
+                    var err = res.data && res.data.message ? res.data.message : 'Failed to start scan.';
+                    if (statusEl) { statusEl.textContent = '❌ ' + err; statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-err'; }
+                    return;
+                }
+
+                var timer = setInterval(function () {
+                    bar.tick();
+                    post('csdt_devtools_scan_status', { type: 'adhoc' })
+                        .then(function (res2) {
+                            if (!res2.success) return;
+                            var d = res2.data;
+                            if (d.status === 'running') return;
+
+                            clearInterval(timer);
+                            bar.complete();
+                            if (deepBtn) deepBtn.disabled = false;
+
+                            if (d.status === 'complete' && d.data) {
+                                if (statusEl) { statusEl.textContent = '✔ Scan complete — result saved below.'; statusEl.className = 'cs-vuln-inline-msg'; }
+                                prependAdhocEntry(d.data);
+                            } else if (d.status === 'error') {
+                                bar.reset();
+                                if (statusEl) { statusEl.textContent = '❌ ' + (d.message || 'Scan failed.'); statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-err'; }
+                            }
+                        })
+                        .catch(function () {});
+                }, 3000);
+            })
+            .catch(function (e) {
+                bar.reset();
+                if (deepBtn) deepBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '❌ ' + (e.message || 'Network error.'); statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-err'; }
+            });
+    }
+
+    function prependAdhocEntry(data) {
+        var list     = document.getElementById('cs-adhoc-list');
+        var emptyEl  = document.getElementById('cs-adhoc-empty');
+        if (!list) return;
+
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        var r   = data.report || {};
+        var sc  = r.score || 0;
+        var lbl = r.score_label || '';
+        var col = sc >= 90 ? '#22c55e' : sc >= 75 ? '#4ade80' : sc >= 55 ? '#fbbf24' : sc >= 35 ? '#f97316' : '#ef4444';
+        var url = data.target_url || '';
+        var ts  = data.scanned_at ? new Date(data.scanned_at * 1000).toLocaleString() : '';
+
+        var idx = (list.querySelectorAll('.cs-adhoc-entry').length); // will be index 0 after prepend
+        var div = document.createElement('div');
+        div.className = 'cs-adhoc-entry';
+        div.setAttribute('data-adhoc-idx', '0');
+        div.style.cssText = 'background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:6px;overflow:hidden;';
+        div.innerHTML =
+            '<div class="cs-adhoc-entry-header" style="display:flex;align-items:flex-start;gap:14px;padding:10px 12px;">' +
+            '<div style="flex-shrink:0;text-align:center;min-width:48px;">' +
+            '<div style="font-size:1.4rem;font-weight:700;color:' + escHtml(col) + ';line-height:1;">' + escHtml(String(sc)) + '</div>' +
+            '<div style="font-size:10px;color:' + escHtml(col) + ';opacity:.8;">' + escHtml(lbl) + '</div>' +
+            '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">' +
+            '<a href="' + escHtml(url) + '" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:#2563eb;text-decoration:none;word-break:break-all;">' + escHtml(url) + '</a>' +
+            '<span style="font-size:11px;color:#64748b;">' + escHtml(ts) + '</span>' +
+            '<button type="button" class="cs-adhoc-delete-btn" data-idx="0" style="font-size:11px;font-weight:600;color:#ef4444;background:none;border:1px solid #fca5a5;border-radius:4px;padding:1px 8px;cursor:pointer;line-height:1.5;flex-shrink:0;">&#x2715;</button>' +
+            '</div>' +
+            '<div style="font-size:12px;color:#374151;line-height:1.5;">' + escHtml(r.summary || '') + '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="cs-adhoc-report-body" style="padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;"></div>';
+
+        // Re-index existing entries
+        list.querySelectorAll('.cs-adhoc-entry').forEach(function (el) {
+            var oldIdx = parseInt(el.getAttribute('data-adhoc-idx'), 10);
+            el.setAttribute('data-adhoc-idx', String(oldIdx + 1));
+            el.querySelectorAll('[data-idx]').forEach(function (btn) {
+                btn.setAttribute('data-idx', String(parseInt(btn.getAttribute('data-idx'), 10) + 1));
+            });
+        });
+
+        list.insertBefore(div, list.firstChild);
+
+        div._adhocData = data;
+        wireAdhocButtons();
+    }
+
+    function wireAdhocButtons() {
+        // Auto-render report body for every entry that hasn't been rendered yet
+        document.querySelectorAll('.cs-adhoc-entry').forEach(function (entry) {
+            var body = entry.querySelector('.cs-adhoc-report-body');
+            if (!body || body._rendered) return;
+            var idx  = parseInt(entry.getAttribute('data-adhoc-idx'), 10);
+            var data = entry._adhocData || (cfg.adhocHistory || [])[idx] || null;
+            if (data) { renderReport(data, body, 'deep'); body._rendered = true; }
+        });
+
+        document.querySelectorAll('.cs-adhoc-delete-btn').forEach(function (btn) {
+            btn.onclick = function () {
+                var idx     = parseInt(btn.getAttribute('data-idx'), 10);
+                var entryEl = btn.closest('.cs-adhoc-entry');
+                post('csdt_devtools_adhoc_delete', { idx: String(idx) })
+                    .then(function (res) {
+                        if (res.success && entryEl) {
+                            entryEl.remove();
+                            // Re-index remaining entries
+                            document.querySelectorAll('.cs-adhoc-entry').forEach(function (el, i) {
+                                el.setAttribute('data-adhoc-idx', String(i));
+                                el.querySelectorAll('[data-idx]').forEach(function (b) {
+                                    b.setAttribute('data-idx', String(i));
+                                });
+                            });
+                            var list = document.getElementById('cs-adhoc-list');
+                            if (list && !list.querySelector('.cs-adhoc-entry')) {
+                                var empty = document.getElementById('cs-adhoc-empty');
+                                if (empty) empty.style.display = '';
+                            }
+                        }
+                    })
+                    .catch(function () {});
+            };
+        });
+    }
+
     if ( document.readyState === 'loading' ) {
         document.addEventListener( 'DOMContentLoaded', csdtVulnInit );
     } else {
         csdtVulnInit();
+    }
+
+    // Wire up any PHP-rendered adhoc buttons on page load
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', wireAdhocButtons );
+    } else {
+        wireAdhocButtons();
     }
 
     // ── Quick Fixes ──────────────────────────────────────────────────────

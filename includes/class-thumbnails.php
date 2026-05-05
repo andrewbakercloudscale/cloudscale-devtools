@@ -317,146 +317,56 @@ class CSDT_Thumbnails {
 
     // ─── Featured Images tab ─────────────────────────────────────────────────
 
-    private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no labels, preamble, or explanation.
+    private const DEFAULT_IMG_SYSTEM_PROMPT = 'You write DALL-E 3 prompts for 1792x1024 WordPress blog post header images. Output ONLY the prompt — no preamble.
 
-━━ TEXT IN IMAGES ━━
-DALL-E 3 CAN render short bold text (3–6 words) when described as large typographic design elements on a dark background — like a movie poster or magazine cover. Use this ONLY for dramatic articles (breakthrough, disruption, war, comparison) to add an attention-grabbing punchy headline as part of the image design. The punchy headline is NOT the article title — it is a short distilled hook (e.g. "AWS WON", "AI JUST CRACKED", "THE CLOUD WAR IS OVER"). Place text on the left or top third of the image against a strong contrasting background. For all other article types, include NO text in the image — no labels, captions, or technical terms.
+━━ PROCESS ━━
+Read the article. Then write a DALL-E 3 prompt that creates a cinematic, dramatic image a reader would immediately connect to this specific article.
 
-━━ SAFETY RULE ━━
-Never use words like hack, hacker, exploit, breach, attack, malware, intrude, or any language implying illegal or harmful acts. Describe the defensive or structural side: a fortified vault, a reinforced door, an engineer inspecting a system.
+━━ BRAND ICONS ━━
+CRITICAL RULE: NEVER ask DALL-E to render a brand name as text — DALL-E mis-renders words. Describe the PHYSICAL FORM instead. A brand is recognised by its shape, colour, and form — not its name written on something.
 
-━━ RELEVANCE RULE ━━
-The image must be immediately recognisable as being about the article topic. A reader who has not read the article must be able to guess the topic from the image alone. Generic "glowing city" or "abstract digital landscape" images are forbidden — they tell the reader nothing. Ground every image in the specific tool, product, technology, or action the article describes.
+COMPANIES / PRODUCTS — use the PHYSICAL FORM, not text:
+- ARM / ARM server: a green Raspberry Pi PCB (iconic green circuit board with rows of GPIO pins) OR a bare ARM processor die (small square chip with gold contact pads). NEVER "ARM" lettering.
+- x86 / Intel server: a large silver Intel CPU lid (rectangular metal cap with subtle Intel logo embossed). NEVER a generic server tower with text.
+- Cloudflare: a large orange shield shape with a globe/grid pattern on it — the Cloudflare logo shield in solid orange.
+- AWS: the AWS orange curved smile-arrow arch (the distinctive orange arch with the arrow smile).
+- NVMe / SSD storage: slim flat black M.2 NVMe sticks standing upright — small black rectangular cards with gold edge connectors.
+- Docker: a blue Docker whale silhouette with coloured shipping containers stacked on its back.
+- GitHub: a black Octocat silhouette — cat body with octopus tentacles.
+- Raspberry Pi (brand): a green PCB board with a raspberry fruit logo. For the fruit itself: a red berry made of drupelets.
+- For all other well-known brands: use your training knowledge of their visual form.
 
-━━ BANNED SCENES ━━
-DALL-E\'s default output for every tech article — all produce identical images and are strictly forbidden: aerial shots of backlit data-centre city skylines, glowing server-tower cityscapes, neon city-at-night compositions, abstract streams of light representing networks. If you produce any of these you have failed.
+PROTOCOLS / STANDARDS / CONCEPTS (TCP, QUIC, HTTP/3, UDP, TLS, DNS, etc.): no real logo exists. Represent them with a concrete physical metaphor for what they DO — e.g. QUIC = a supersonic data packet as a glowing blue dart; TCP = a heavy gear-and-piston mechanism grinding slowly. Apply narrative conditions to these too.
 
-━━ BRAND ICONS + NARRATIVE CONDITIONS ━━
-When the article mentions recognisable technology brands, show ALL of them using their ACTUAL VISUAL FORM as large foreground objects. NEVER generic rocks or monoliths. NEVER in the background.
+━━ NARRATIVE CONDITIONS ━━
+Read the article angle CAREFULLY before assigning roles — the same technology can play different roles depending on the article\'s message:
 
-READ THE ARTICLE FIRST. Classify each brand as CHAMPION, STRUGGLING, or NEUTRAL:
-- CHAMPION (winning, disrupting, more efficient, recommended) → gleaming, clean, cool-running, radiating cool efficiency signals, standing tall and powerful
-- STRUGGLING (being disrupted, legacy, losing market share, overheating) → glowing red-hot edges, heat shimmer rising from the surface, hairline cracks forming, smoke venting, visibly stressed
-- NEUTRAL (tool, supporting technology) → normal condition, appropriate scale
+- CHAMPION / winner / rising technology → gleaming, clean, cool, powerful, radiating controlled energy
+- STRUGGLING / legacy / being-disrupted → glowing red-hot edges, heat shimmer, cracking casing, smoke from vents
+- DISRUPTOR / HIDDEN THREAT / WARNING → the subject LOOKS fast and modern but causes unexpected breakage — show it as a sleek projectile that leaves fractured connections, broken pipes, or error sparks behind it; its surface is clean but its WAKE is destructive
+- NEUTRAL / tool → normal condition
 
-Then place each brand using its recognisable visual form with the matching narrative condition applied.
+IMPORTANT: A technology can be modern AND dangerous. An article titled "X breaks your site without warning" means X is a DISRUPTOR/THREAT, not a CHAMPION — even if X is technically superior. Read the article\'s WARNING signals, not just its technical comparisons.
 
-Brand → visual form (use these exactly — they must be RECOGNISABLE, not abstract):
-- ARM → a giant green Raspberry Pi single-board computer (the iconic green PCB with GPIO pin row) scaled to monument size — this IS the most recognisable ARM device
-- x86 / Intel → a giant Intel CPU showing its silver rectangular metal lid scaled to the size of a building; for ARM vs x86 articles: show the green Pi PCB and the silver Intel CPU lid side by side as rivals
-- AMD → a giant red-boxed AMD Ryzen processor package scaled to monument size
-- Cloudflare → an enormous orange Cloudflare shield (the distinctive orange shield with a globe emblem at the centre) radiating orange signal rings — the orange colour is essential
-- Docker → a colossal blue Docker whale with colourful shipping containers stacked on its back
-- PostgreSQL → a giant blue elephant head (the PostgreSQL mascot — a blue elephant, immediately recognisable)
-- Redis → a giant red Redis cube with the Redis "die" pip pattern
-- Kubernetes → a giant ship\'s helm wheel with the Kubernetes blue-and-white colour scheme
-- GitHub → a giant black-and-white Octocat (cat body with octopus tentacles as legs) sculpture on a plinth
-- AWS → a giant orange curved smile-arrow arch (the Amazon/AWS smile logo in orange, as a physical gateway arch)
-- Azure → a giant crystalline blue gemstone "A" monument with flowing geometric wings (the Microsoft Azure logo form)
-- Google Cloud → a giant four-coloured Google "G" monument
-- Linux / Tux → a giant Tux the penguin (the Linux mascot — a cute black-and-white penguin) standing upright
-- Raspberry Pi → a giant photorealistic raspberry fruit (the actual raspberry fruit — red, round, made of drupelets) scaled to the size of a building; alternatively a giant green Pi PCB
-- WordPress → a giant blue "W" logo letter monument on a plinth
-- NVMe / SSD storage → giant NVMe M.2 sticks standing upright like monoliths
-- Cloud / cloud computing → towering cumulus cloud formations integrated with server equipment, dramatic and sculptural
+━━ COMPOSITION ━━
+- Fill 85%+ of the frame. No large empty backgrounds.
+- Cinematic photorealism by default. Macro detail. Dramatic lighting.
+- For warning / danger / unexpected-failure articles: show the moment of impact — a fast sleek element causing visible destruction: fractured cables, cracked pipes, broken connections, flying sparks.
+- For tutorials / how-tos: cinematic workshop or workbench scene, hands and tools mid-action.
+- BANNED: aerial data-centre city skylines, glowing server-tower cityscapes, abstract streams of light, generic split-screen rivalries.
+- Safety: never imply hacking, illegal acts, or breaches — describe the defensive side instead.
 
-━━ FRAME UTILISATION ━━
-Brand objects and scene elements MUST fill at least 80% of the frame. No large empty backgrounds, no excessive negative space, no vast plain floor stretching to the horizon. Objects should be ENORMOUS relative to the canvas — the viewer should feel dwarfed. Zoom in. Make everything fill the edges of the image.
+━━ TEXT RULE ━━
+The text rule is passed separately in the user message — follow it exactly.
 
-━━ NARRATIVE METAPHOR ━━
-Read the article\'s angle and make the image TELL THAT STORY visually. Do not just show logos side by side — show who is winning and who is struggling.
-
-Narrative → visual treatment:
-- Disruption / challenger wins → the challenger brand gleams and stands tall; the incumbent brand shows heat stress: radiating heat shimmer, cracks in the casing, steam venting, thermal throttling smoke. E.g. ARM article disrupting Intel: green Pi PCB gleams and radiates cool efficiency signals; Intel CPU lid has heat waves rising from it, edges glowing red-hot.
-- Efficiency / power saving → the efficient device surrounded by cool air currents, leaf motifs, calm energy; the power-hungry device surrounded by heat shimmer and power cables straining under load.
-- Migration / switching → the old technology crumbling, rusting, or sinking; the new technology rising cleanly from it.
-- Security / breach → a fortified vault door intact but under attack from visible cracks or dents; engineers reinforcing it.
-- Performance victory → one device on a podium with a winner\'s laurel, the other visibly smaller on a lower step.
-- Failure / outage → a suspension bridge with a broken mid-span; or a cracked server rack with sparks.
-
-━━ VISUAL METAPHOR — CONCEPT OBJECTS ━━
-Every abstract concept must translate into a CONCRETE PHYSICAL METAPHOR:
-
-- Diagnosis / inspection → a surgeon, quality inspector, or watchmaker at their workbench
-- Security / protection → a vault door, blast hatch, armoured gate filling the frame
-- Speed / performance → a rocket engine ignition close-up or racing-car engine bay
-- Connectivity / networking → a control room operator at a console, or fibre-optic cable cross-section
-- Data / storage → a vast underground archive vault, lone archivist dwarfed below
-- AI / machine learning → a crystalline neural lattice filling a vast cavern
-- Search / discovery → a lone explorer with a torch examining an illuminated map on a cathedral floor
-- Process / workflow → a factory floor with items on a conveyor belt, inspector watching
-- Recovery / backup → a fireproof vault door in a storm, or a lifeboat launching from a ship
-
-━━ STYLE SELECTION ━━
-Default to CINEMATIC PHOTOREALISM — dramatic lighting, macro detail, ultra-sharp. Only use illustration styles when the article is a tutorial or process guide.
-
-- Breakthrough / disruption / war / AI → CINEMATIC POSTER: dark dramatic background, bold punchy headline text (3–5 words), brands as foreground icons
-- Hardware / chip / physical device → dramatic MACRO PHOTOGRAPHY filling the frame: the actual device in a cinematic workshop or lab, dramatic spot lighting overhead, supporting props (tools, cables, the product\'s fruit/mascot)
-- Tutorial / migration / step-by-step → cinematic photorealistic WORKBENCH scene: the devices being migrated laid out on a wooden workbench under a workshop lamp, hands or tools mid-action, photorealistic detail
-- Security / reliability → cinematic VAULT DOOR or armoured gate filling the frame
-- Comparison / vs → MACRO PHOTOGRAPHY of two physical rivals side-by-side on a workbench or pedestal, narrative heat/condition showing who is winning
-- Architecture / system design → isometric 3D illustration only if no better physical metaphor exists
-- Opinion / culture → cinematic editorial photography
-
-NEVER pick: technical diagram, infographic, schematic, blueprint.
-
-━━ COLOUR RULE ━━
-Only name colours when they are essential for brand recognition (e.g. "orange Cloudflare shield", "blue Docker whale", "red raspberry fruit", "green Raspberry Pi PCB"). Do NOT name colours for any non-brand scene elements, backgrounds, lighting, or atmosphere — leave those to DALL-E. Never describe the whole scene as one dominant colour.
-
-━━ OUTPUT FORMAT ━━
-2–3 sentences:
-1. Visual style.
-2. A concrete, specific scene — lead with any brand icon if present, then the surrounding environment.
-3. (Optional) Atmosphere, lighting, or composition detail.
-
-GOOD examples:
-"Cinematic poster. Dark cracked stone background fills the right two-thirds. Bold all-caps white text \'OPEN SOURCE EARTHQUAKE\' on the left, below it in red \'DEEPSEEK V4\'. Glowing red lava seams run through the cracking rock. Frame-filling, dramatic."
-"Cinematic poster. Aerial battlefield at dusk: an enormous circular AWS fortress with the orange \'aws\' smile-arrow logo dominates the centre, orange energy lines radiating outward. Azure logo billboard crumbling on the left, Google Cloud sign smoking on the right. Bold white text \'THE CLOUD WAR IS OVER\' across the top, \'AWS WON\' in orange below."
-"Cinematic macro photography. A Raspberry Pi 5 green PCB lies open on a wooden workbench under a dramatic overhead workshop lamp. A red NVMe M.2 drive hovers above it mid-swap, glowing. Real raspberries (the fruit) scattered at the edges. Tools, cables, photorealistic detail."
-"Cinematic macro photography. A green Raspberry Pi PCB gleams under a spotlight, the green board clean and cool, next to a silver Intel CPU lid — its edges glowing red-hot with heat shimmer rising from the surface. NVMe drive standing upright between them."
-"Cinematic editorial. A colossal blue Docker whale surges forward, stacked shipping containers on its back, crashing through the frame. Dramatic ocean spray, ultra-sharp detail."
-
-BAD examples — produce identical images, are too abstract, or cause safety rejections:
-"A futuristic city of glowing data-centre towers stretches to the horizon. (BANNED — generic backlit city skyline)"
-"Streams of light flow between towering server structures in a hazy digital city. (BANNED — abstract light-stream)"
-"Towering monolithic structures representing search engines rise into a hazy sky. (too abstract — tells viewer nothing)"
-"A shadowy hacker exploiting a vulnerable server. (safety rejection)"';
-
-    private static function build_brand_instruction(): string {
-        return ' BRAND VISUAL FORMS — use these exact physical representations for each brand. Champions of the article gleam clean and powerful; struggling/legacy brands show heat stress (glowing red-hot edges, heat shimmer, cracking casing, smoke from vents). Apply the condition that matches the brand\'s role in this specific article.'
-            . ' ARM = giant green Raspberry Pi PCB (iconic green circuit board with GPIO pin row).'
-            . ' x86 / Intel = giant silver Intel CPU showing its rectangular metal lid.'
-            . ' AMD = giant red AMD Ryzen processor box.'
-            . ' Cloudflare = enormous orange shield with globe emblem radiating orange signal rings.'
-            . ' Docker = colossal blue Docker whale with colourful shipping containers on its back.'
-            . ' AWS = giant orange curved smile-arrow arch (the AWS smile logo in orange).'
-            . ' Azure = giant crystalline blue "A" monument with flowing geometric wings.'
-            . ' Google Cloud = giant four-coloured Google "G" monument.'
-            . ' GitHub = giant black-and-white Octocat (cat body with octopus tentacles).'
-            . ' PostgreSQL = giant blue elephant head.'
-            . ' Redis = giant red cube with pip pattern.'
-            . ' Kubernetes = giant blue-and-white ship\'s helm wheel.'
-            . ' Linux / Tux = giant Tux the penguin (black-and-white penguin standing upright).'
-            . ' Raspberry Pi = giant photorealistic red raspberry fruit (the actual raspberry fruit, red, made of drupelets).'
-            . ' WordPress = giant blue "W" letter monument.'
-            . ' NVMe / SSD = giant NVMe M.2 sticks standing upright.'
-            . ' Cloud / cloud computing = towering cumulus cloud formations with server equipment integrated.'
-            . ' DeepSeek = a giant glowing deep-sea lanternfish (the actual deep-sea creature — its bioluminescent lure pulsing).'
-            . ' OpenAI / ChatGPT = a giant brain made of crystalline lattice.'
-            . ' Every brand icon must be a large foreground object. NEVER in the background or distance.';
-    }
+━━ OUTPUT ━━
+2–3 sentences. Visual style first, then the specific scene.';
 
     private static function get_img_system_prompt(): string {
         $saved = (string) get_option( 'csdt_devtools_img_system_prompt', self::DEFAULT_IMG_SYSTEM_PROMPT );
         // Auto-migrate: reset saved prompt if it matches any known old version.
-        // Old v1: site-specific topic guide. Old v2: single-brand mandate without "ALL brands" rule.
-        if ( strpos( $saved, 'TOPIC → SPECIFIC SCENE GUIDE' ) !== false
-            || strpos( $saved, 'Linux / server diagnostics → surgeon' ) !== false
-            || strpos( $saved, 'Identify the single most prominent technology brand' ) !== false
-            || strpos( $saved, 'polished stone monolith on a plinth' ) !== false
-            || strpos( $saved, 'DALL-E cannot produce readable text' ) !== false
-            || ( strpos( $saved, 'BRAND ICONS' ) !== false && strpos( $saved, 'ACTUAL RECOGNISABLE VISUAL FORM' ) === false )
-            || ( strpos( $saved, 'STYLE SELECTION' ) !== false && strpos( $saved, 'CINEMATIC POSTER' ) === false ) ) {
+        // v9+ adds physical form reference for key brands; any version lacking it should be replaced.
+        if ( strpos( $saved, 'DALL-E mis-renders words' ) === false ) {
             $saved = self::DEFAULT_IMG_SYSTEM_PROMPT;
             update_option( 'csdt_devtools_img_system_prompt', $saved, false );
         }
@@ -2202,7 +2112,7 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
         $context_str = implode( "\n\n", $context_parts );
 
         $style_map = [
-            'cinematic_poster'      => 'cinematic photorealistic poster with bold punchy headline text (3-5 words, all-caps) as a large typographic design element on a dark background — movie poster / magazine cover layout',
+            'cinematic_poster'      => 'cinematic photorealistic movie-poster layout, ONE bold 2–3 word all-caps headline as the ONLY text element on a dark background — absolutely no subtitles, body copy, bullet points, captions, or any other text',
             'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes',
             'photorealistic'        => 'cinematic photorealistic photography, dramatic lighting, macro detail',
             'editorial'             => 'professional editorial photography',
@@ -2222,17 +2132,32 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
         }
 
         $style_instruction = isset( $style_map[ $style ] ) ? " Required visual style: {$style_map[$style]}." : '';
-        $no_text_suffix    = $no_text
-            ? ' CRITICAL: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles, no watermarks, no signage, no UI chrome. Pure visual imagery only. Do NOT quote the article title or any phrase inside the prompt itself.'
-            : '';
+        $is_poster = ( $style === 'cinematic_poster' );
+        $text_rule = $no_text
+            ? ' TEXT RULE: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles. Pure visual only.'
+            : ( $is_poster
+                ? ' TEXT RULE: Include ONE 2–3 word all-caps bold headline as the SOLE text element. Absolutely no subtitles, body copy, bullet points, captions, or other text.'
+                : ' TEXT RULE: Include ZERO text in the image — no headlines, titles, labels, captions, or descriptions. The article title is added separately by the publishing system.' );
 
         $vary_instruction = $force_vary
             ? ' IMPORTANT: The user just regenerated because they did not like the previous image. You MUST choose a completely different visual metaphor: different setting, different subject, different mood. If the previous prompt used a data centre or city, use a workshop, natural landscape, or organic environment instead. If it used an isometric style, use photorealistic. Never repeat the same type of scene.'
             : '';
 
+        // Pick a random compositional POV to inject into the generated prompt itself.
+        // This must be part of the GPT-4o instruction (not appended after), so it gets
+        // baked into the DALL-E prompt and survives DALL-E's internal content revision.
+        $pov_pool = [
+            'MANDATORY COMPOSITION: extreme macro close-up — fill the entire frame with surface detail, no background visible.',
+            'MANDATORY COMPOSITION: dramatic worm\'s-eye view — subjects tower above the viewer, shot from ground level looking steeply upward.',
+            'MANDATORY COMPOSITION: aerial top-down bird\'s-eye view — all subjects arranged on a flat surface, viewed from directly above.',
+            'MANDATORY COMPOSITION: first-person POV — viewer\'s hands visible in lower frame interacting with the subjects.',
+            'MANDATORY COMPOSITION: cinematic wide shot — subjects occupy left third, vast dark space on right with distant atmospheric depth.',
+            'MANDATORY COMPOSITION: over-the-shoulder mid shot — one large subject looms in the left foreground, second subject faces it from the right.',
+        ];
+        $pov_instruction = ' ' . $pov_pool[ array_rand( $pov_pool ) ];
+
         $system_msg   = self::get_img_system_prompt();
-        $brand_instruction = self::build_brand_instruction();
-        $user_msg   = "{$context_str}\n\nStep 1 — Read the article and silently identify: (a) which technology brands/products are mentioned, (b) the ROLE each plays — CHAMPION (winning, more efficient, disrupting, recommended) or STRUGGLING (being disrupted, overheating, legacy, losing market share) or NEUTRAL (tool, supporting technology).\n\nStep 2 — Write the DALL-E 3 prompt using those roles. Champions must look cool, clean, powerful. Struggling brands must show heat stress: glowing red-hot edges, heat shimmer rising, cracking casing, smoke venting from vents. Do not state the roles — just apply them visually.\n\nOutput ONLY the final DALL-E 3 prompt.{$style_instruction}{$brand_instruction}{$no_text_suffix}{$vary_instruction}";
+        $user_msg   = "{$context_str}\n\nStep 1 — Read the ENTIRE article — title, angle, and conclusion — then identify: (a) which technology brands/products/protocols are mentioned, (b) the ROLE each plays in THIS SPECIFIC ARTICLE'S NARRATIVE — CHAMPION (clearly praised, winning, recommended), STRUGGLING (clearly legacy, failing, being replaced), DISRUPTOR/THREAT (causes unexpected breakage, silent failure, hidden danger — even if technically modern), or NEUTRAL. WARNING: do not default to \"new = champion\". If the article warns that something breaks sites or causes failures, that subject is a DISRUPTOR/THREAT regardless of its technical modernity.\n\nStep 2 — Write the DALL-E 3 prompt using those roles. For companies with logos (AWS, Cloudflare, Docker, etc.) use their actual iconic visual. For protocols and concepts (TCP, QUIC, HTTP/3, etc.) use a concrete physical metaphor for what they DO. Champions gleam; struggling subjects glow red-hot; disruptors look sleek but leave fractured broken elements in their wake. Place subjects as large prominent foreground elements. Do not state the roles — just apply them visually.\n\nOutput ONLY the final DALL-E 3 prompt.{$style_instruction}{$text_rule}{$pov_instruction}{$vary_instruction}";
 
         try {
             switch ( $prompt_vendor ) {
@@ -2303,7 +2228,7 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
             $context_str = implode( "\n\n", $context_parts );
 
             $style_map_inline = [
-                'cinematic_poster'      => 'cinematic photorealistic poster with bold punchy headline text (3-5 words, all-caps) as a large typographic design element on a dark background — movie poster / magazine cover layout',
+                'cinematic_poster'      => 'cinematic photorealistic movie-poster layout, ONE bold 2–3 word all-caps headline as the ONLY text element on a dark background — absolutely no subtitles, body copy, bullet points, captions, or any other text',
                 'technical_infographic' => 'bold technical illustration with strong visual hierarchy, clean geometric shapes',
                 'photorealistic'        => 'cinematic photorealistic photography, dramatic lighting, macro detail',
                 'editorial'             => 'professional editorial photography',
@@ -2313,10 +2238,23 @@ BAD examples — produce identical images, are too abstract, or cause safety rej
                 'minimalist'            => 'minimalist design, bold shapes, clean negative space',
             ];
             $style_instr_inline  = isset( $style_map_inline[ $prompt_style ] ) ? " Required visual style: {$style_map_inline[$prompt_style]}." : '';
-            $brand_instr_inline  = self::build_brand_instruction();
-            $no_text_instr       = $no_text ? ' CRITICAL: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles, no watermarks, no signage, no UI chrome. Pure visual imagery only.' : '';
+            $is_poster_inline    = ( $prompt_style === 'cinematic_poster' );
+            $text_rule_inline    = $no_text
+                ? ' TEXT RULE: The finished image must contain ZERO text — no words, no letters, no numbers, no labels, no captions, no titles. Pure visual only.'
+                : ( $is_poster_inline
+                    ? ' TEXT RULE: Include ONE 2–3 word all-caps bold headline as the SOLE text element. Absolutely no subtitles, body copy, bullet points, captions, or other text.'
+                    : ' TEXT RULE: Include ZERO text in the image — no headlines, titles, labels, captions, or descriptions. The article title is added separately by the publishing system.' );
+            $pov_pool_inline = [
+                'MANDATORY COMPOSITION: extreme macro close-up — fill the entire frame with surface detail, no background visible.',
+                'MANDATORY COMPOSITION: dramatic worm\'s-eye view — subjects tower above the viewer, shot from ground level looking steeply upward.',
+                'MANDATORY COMPOSITION: aerial top-down bird\'s-eye view — all subjects arranged on a flat surface, viewed from directly above.',
+                'MANDATORY COMPOSITION: first-person POV — viewer\'s hands visible in lower frame interacting with the subjects.',
+                'MANDATORY COMPOSITION: cinematic wide shot — subjects occupy left third, vast dark space on right with distant atmospheric depth.',
+                'MANDATORY COMPOSITION: over-the-shoulder mid shot — one large subject looms in the left foreground, second subject faces it from the right.',
+            ];
+            $pov_inline = ' ' . $pov_pool_inline[ array_rand( $pov_pool_inline ) ];
             $system_msg = self::get_img_system_prompt();
-            $user_msg   = "{$context_str}\n\nStep 1 — Read the article and silently identify: (a) which technology brands/products are mentioned, (b) the ROLE each plays — CHAMPION (winning, more efficient, disrupting, recommended) or STRUGGLING (being disrupted, overheating, legacy, losing market share) or NEUTRAL (tool, supporting technology).\n\nStep 2 — Write the DALL-E 3 prompt using those roles. Champions must look cool, clean, powerful. Struggling brands must show heat stress: glowing red-hot edges, heat shimmer rising, cracking casing, smoke venting from vents. Do not state the roles — just apply them visually.\n\nOutput ONLY the final DALL-E 3 prompt.{$style_instr_inline}{$brand_instr_inline}{$no_text_instr}";
+            $user_msg   = "{$context_str}\n\nStep 1 — Read the ENTIRE article — title, angle, and conclusion — then identify: (a) which technology brands/products/protocols are mentioned, (b) the ROLE each plays in THIS SPECIFIC ARTICLE'S NARRATIVE — CHAMPION (clearly praised, winning, recommended), STRUGGLING (clearly legacy, failing, being replaced), DISRUPTOR/THREAT (causes unexpected breakage, silent failure, hidden danger — even if technically modern), or NEUTRAL. WARNING: do not default to \"new = champion\". If the article warns that something breaks sites or causes failures, that subject is a DISRUPTOR/THREAT regardless of its technical modernity.\n\nStep 2 — Write the DALL-E 3 prompt using those roles. For companies with logos (AWS, Cloudflare, Docker, etc.) use their actual iconic visual. For protocols and concepts (TCP, QUIC, HTTP/3, etc.) use a concrete physical metaphor for what they DO. Champions gleam; struggling subjects glow red-hot; disruptors look sleek but leave fractured broken elements in their wake. Place subjects as large prominent foreground elements. Do not state the roles — just apply them visually.\n\nOutput ONLY the final DALL-E 3 prompt.{$style_instr_inline}{$text_rule_inline}{$pov_inline}";
 
             try {
                 switch ( $prompt_vendor ) {

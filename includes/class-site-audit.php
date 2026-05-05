@@ -1685,6 +1685,8 @@ You are a penetration tester. Analyse the provided external exposure checks and 
 
 For external checks assess: HTTP security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), exposed endpoints (wp-login.php, xmlrpc.php, wp-cron.php, REST API user enumeration, author enumeration /?author=1, directory listing), SSL certificate validity and days to expiry, HTTP→HTTPS redirect enforcement, exposed sensitive files (debug.log, .env, wp-config.php.bak, .git/config, readme.html, phpinfo.php, error_log, composer.json, backup archives), database admin tools accessible (adminer, phpMyAdmin), server-status/server-info pages, and email DNS security (SPF and DMARC records present).
 
+IMPORTANT — headers_scan_blocked: If headers_scan_blocked is true (or headers_response_code >= 400), the HTTP headers request was blocked by the site's bot protection or WAF (e.g. Cloudflare returned a 403 challenge page). The challenge page's own headers do NOT represent the real site's security headers. Do NOT report any security headers (HSTS, CSP, X-Frame-Options, etc.) as missing or weak findings. Instead, include exactly one low-severity note: "Security headers unverifiable — scan blocked by bot protection (HTTP headers_response_code)." Do not penalise the score for missing headers when blocked.
+
 For plugin code scan (plugin_code_scan): list detected patterns as context only — raw static analysis that may include false positives.
 
 For code_triage: AI-verified verdicts on the static findings. Each entry has verdict (confirmed|false_positive|needs_context), severity, type, explanation, and fix. Only raise confirmed findings as real issues — do not report false_positive items as vulnerabilities. Use the severity from code_triage for confirmed items. For needs_context items, mention them at low severity. Name plugin, file, and line number in every code finding.
@@ -2963,8 +2965,8 @@ PROMPT;
         ];
     }
 
-    private static function gather_external_checks(): array {
-        $base = home_url( '/' );
+    private static function gather_external_checks( string $base_url = '' ): array {
+        $base = $base_url ? trailingslashit( $base_url ) : home_url( '/' );
         $host = (string) wp_parse_url( $base, PHP_URL_HOST );
 
         $ext = [];
@@ -3010,8 +3012,9 @@ PROMPT;
         $author_r = wp_remote_head( $base . '?author=1', [ 'timeout' => 4, 'sslverify' => false, 'redirection' => 0 ] );
         $ext['author_enum'] = [ 'exposed' => false ];
         if ( ! is_wp_error( $author_r ) ) {
-            $code = wp_remote_retrieve_response_code( $author_r );
-            $loc  = wp_remote_retrieve_header( $author_r, 'location' );
+            $code    = wp_remote_retrieve_response_code( $author_r );
+            $loc_raw = wp_remote_retrieve_header( $author_r, 'location' );
+            $loc     = is_array( $loc_raw ) ? ( reset( $loc_raw ) ?: '' ) : (string) ( $loc_raw ?? '' );
             if ( $code >= 300 && $code < 400 && $loc && strpos( $loc, '/author/' ) !== false ) {
                 $ext['author_enum'] = [ 'exposed' => true, 'redirects_to' => $loc ];
             }
@@ -3099,7 +3102,8 @@ PROMPT;
         $http_base    = preg_replace( '/^https:/i', 'http:', $base );
         $http_r       = wp_remote_head( $http_base, [ 'timeout' => 5, 'sslverify' => false, 'redirection' => 0 ] );
         $http_code    = is_wp_error( $http_r ) ? null : wp_remote_retrieve_response_code( $http_r );
-        $http_loc     = is_wp_error( $http_r ) ? null : wp_remote_retrieve_header( $http_r, 'location' );
+        $http_loc_raw = is_wp_error( $http_r ) ? null : wp_remote_retrieve_header( $http_r, 'location' );
+        $http_loc     = is_array( $http_loc_raw ) ? ( reset( $http_loc_raw ) ?: '' ) : (string) ( $http_loc_raw ?? '' );
         $ext['http_to_https'] = [
             'redirects'   => $http_code !== null && $http_code >= 300 && $http_code < 400 && $http_loc && stripos( $http_loc, 'https://' ) === 0,
             'http_code'   => $http_code,
@@ -3205,17 +3209,26 @@ PROMPT;
             : [ 'email_configured' => false ];
 
         // Security headers (from external perspective via public URL)
-        $headers_r = wp_remote_get( $base, [ 'timeout' => 5, 'sslverify' => false ] );
+        $headers_r      = wp_remote_get( $base, [ 'timeout' => 5, 'sslverify' => false ] );
+        $headers_status = is_wp_error( $headers_r ) ? 0 : (int) wp_remote_retrieve_response_code( $headers_r );
         $ext['security_headers_external'] = [];
         $ext['csp_duplicate_count']       = 0;
+        // Track whether bot protection blocked us — a 4xx/5xx means headers are unverifiable,
+        // not necessarily absent (e.g. Cloudflare challenge pages omit HSTS/CSP for their own page).
+        $ext['headers_response_code']  = $headers_status;
+        $ext['headers_scan_blocked']   = $headers_status >= 400;
         if ( ! is_wp_error( $headers_r ) ) {
             $h = wp_remote_retrieve_headers( $headers_r );
-            // Build raw multi-value map to reliably detect duplicate headers.
+            // Build raw multi-value map to detect duplicate headers.
+            // getAll() returns ['header-name' => value] where value may be an array
+            // for sites that send the same header more than once.
             $raw_multi_ext = [];
-            foreach ( $h->getAll() as $raw_line ) {
-                if ( strpos( $raw_line, ':' ) !== false ) {
-                    [ $rk, $rv ] = explode( ':', $raw_line, 2 );
-                    $raw_multi_ext[ strtolower( trim( $rk ) ) ][] = trim( $rv );
+            foreach ( (array) $h->getAll() as $hk => $hv ) {
+                $key = strtolower( trim( (string) $hk ) );
+                if ( is_array( $hv ) ) {
+                    $raw_multi_ext[ $key ] = array_map( 'strval', $hv );
+                } else {
+                    $raw_multi_ext[ $key ][] = (string) $hv;
                 }
             }
             foreach ( [ 'x-frame-options', 'x-content-type-options', 'strict-transport-security',
@@ -3225,7 +3238,8 @@ PROMPT;
                 if ( 'content-security-policy' === $hname && ! empty( $all_vals ) ) {
                     $ext['csp_duplicate_count'] = count( $all_vals );
                 }
-                $val = $h[ $hname ] ?? null;
+                // Use raw_multi_ext (built from getAll()) for reliable multi-value header access.
+                $val = $raw_multi_ext[ $hname ] ?? null;
                 $ext['security_headers_external'][ $hname ] = is_array( $val ) ? implode( ' | ', $val ) : $val;
             }
         }
@@ -3239,7 +3253,9 @@ PROMPT;
         $csp_nonces_on    = get_option( 'csdt_csp_nonces_enabled', '0' ) === '1';
         $csp_plugin_owned = get_option( 'csdt_devtools_csp_enabled', '0' ) === '1';
         $csp_quality      = [ 'present' => (bool) $csp_val, 'issues' => [], 'acknowledged' => [] ];
-        if ( $csp_val ) {
+        if ( $ext['headers_scan_blocked'] ) {
+            $csp_quality['grade'] = 'unverifiable';
+        } elseif ( $csp_val ) {
             if ( stripos( $csp_val, "'unsafe-inline'" ) !== false ) {
                 // Only flag unsafe-inline if nonce mode is off AND we're not managing it ourselves
                 if ( $csp_nonces_on ) {
@@ -3269,7 +3285,9 @@ PROMPT;
         // HSTS quality — max-age must be ≥1 year to be effective
         $hsts_val    = $ext['security_headers_external']['strict-transport-security'] ?? null;
         $hsts_quality = [ 'present' => (bool) $hsts_val, 'issues' => [] ];
-        if ( $hsts_val ) {
+        if ( $ext['headers_scan_blocked'] ) {
+            $hsts_quality['grade'] = 'unverifiable';
+        } elseif ( $hsts_val ) {
             $max_age = 0;
             if ( preg_match( '/max-age=(\d+)/i', $hsts_val, $m ) ) { $max_age = (int) $m[1]; }
             $hsts_quality['max_age']             = $max_age;
@@ -4017,6 +4035,8 @@ Cross-correlate ALL categories for compound risks:
 - ssh_port_open=true + fail2ban_running=true = good finding: SSH brute-force protection active via fail2ban
 - ssh_port_open=true + password_auth=no = good finding: SSH key-only authentication enforced, password attacks impossible
 - ssh_port_open=false = container/managed environment; omit all SSH findings entirely
+- headers_scan_blocked=true = the headers check was blocked by bot protection (WAF/CDN, e.g. Cloudflare returned a 403 challenge page). The challenge page's own headers do NOT represent the real site. Do NOT report any security headers (HSTS, CSP, X-Frame-Options, etc.) as missing or weak — they cannot be verified. Add exactly one low finding: "Security headers unverifiable — scan blocked by bot protection (HTTP <headers_response_code>)."
+- csp_quality.grade=unverifiable or hsts_quality.grade=unverifiable = same as headers_scan_blocked — do not report missing headers
 - csp_quality.grade=missing or weak + any XSS code finding = actively exploitable XSS without browser-side mitigation
 - csp_quality.acknowledged contains 'unsafe-inline-wordpress-compat' or 'unsafe-eval-wordpress-compat' = these are deliberate WordPress compatibility requirements (plugins/themes require inline scripts; underscore.js templates require eval). Do NOT report these as findings or weaknesses — they are known trade-offs. Only flag unsafe-inline/eval if they appear in csp_quality.issues (i.e. the CSP is externally managed and these are uncontrolled)
 - csp_quality.acknowledged contains 'unsafe-inline-removed-by-nonces' = nonce-based CSP is active, unsafe-inline is a no-op — report as a good finding
@@ -4186,6 +4206,32 @@ PROMPT;
 
         $type = isset( $_POST['type'] ) ? sanitize_key( $_POST['type'] ) : 'standard';
 
+        if ( $type === 'adhoc' ) {
+            $status = get_transient( 'csdt_adhoc_scan_status' );
+            if ( ! $status ) {
+                wp_send_json_success( [ 'status' => 'idle' ] );
+                return;
+            }
+            if ( $status['status'] === 'running' ) {
+                wp_send_json_success( [ 'status' => 'running' ] );
+                return;
+            }
+            if ( $status['status'] === 'complete' ) {
+                $history = get_option( 'csdt_adhoc_scans', [] );
+                $latest  = is_array( $history ) && ! empty( $history ) ? $history[0] : null;
+                if ( $latest ) {
+                    wp_send_json_success( [ 'status' => 'complete', 'data' => $latest ] );
+                    return;
+                }
+            }
+            if ( $status['status'] === 'error' ) {
+                wp_send_json_success( [ 'status' => 'error', 'message' => $status['message'] ?? 'Scan failed.' ] );
+                return;
+            }
+            wp_send_json_success( [ 'status' => 'idle' ] );
+            return;
+        }
+
         if ( $type === 'deep' ) {
             $status_key = 'csdt_deep_scan_status';
             $result_key = 'csdt_deep_scan_v1';
@@ -4224,5 +4270,83 @@ PROMPT;
         wp_send_json_success( [ 'status' => 'idle' ] );
     }
 
+    // ── Adhoc scan — external URL deep probe ──────────────────────────────
+
+    public static function ajax_adhoc_scan(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+            return;
+        }
+
+        $target_url = isset( $_POST['target_url'] ) ? esc_url_raw( wp_unslash( $_POST['target_url'] ) ) : '';
+        if ( ! $target_url || ! filter_var( $target_url, FILTER_VALIDATE_URL ) ) {
+            wp_send_json_error( [ 'message' => 'Invalid target URL.' ] );
+            return;
+        }
+
+        if ( ! CSDT_AI_Dispatcher::has_key() ) {
+            wp_send_json_error( [ 'message' => 'No API key configured.', 'need_key' => true ] );
+            return;
+        }
+
+        delete_transient( 'csdt_adhoc_scan_cancelled' );
+        set_transient( 'csdt_adhoc_scan_status', [ 'status' => 'running', 'started_at' => time(), 'target_url' => $target_url ], 900 );
+
+        CSDT_AI_Dispatcher::send_and_continue( [ 'queued' => true ] );
+        self::run_adhoc_scan( $target_url );
+        exit;
+    }
+
+    private static function run_adhoc_scan( string $target_url ): void {
+        if ( function_exists( 'set_time_limit' ) ) { set_time_limit( 0 ); } // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- background scan must not time out.
+
+        try {
+            if ( get_transient( 'csdt_adhoc_scan_cancelled' ) ) {
+                delete_transient( 'csdt_adhoc_scan_cancelled' );
+                return;
+            }
+
+            $external = self::gather_external_checks( $target_url );
+            $model    = get_option( 'csdt_devtools_deep_scan_model', '_auto_deep' );
+            $msg      = 'External WordPress site security probe for ' . $target_url . ". Data (JSON):\n\n"
+                      . wp_json_encode( [ 'target_url' => $target_url, 'external_checks' => $external ], JSON_PRETTY_PRINT );
+
+            $text   = CSDT_AI_Dispatcher::call( self::default_external_scan_prompt(), $msg, $model, 4096 );
+            $report = CSDT_AI_Dispatcher::parse_json_report( $text );
+        } catch ( \Throwable $e ) {
+            set_transient( 'csdt_adhoc_scan_status', [ 'status' => 'error', 'message' => $e->getMessage() ], 300 );
+            return;
+        }
+
+        $output = [
+            'target_url'  => $target_url,
+            'report'      => $report,
+            'model_used'  => get_option( 'csdt_devtools_ai_provider', 'anthropic' ) . '/' . $model,
+            'scanned_at'  => time(),
+        ];
+
+        $history = get_option( 'csdt_adhoc_scans', [] );
+        if ( ! is_array( $history ) ) { $history = []; }
+        array_unshift( $history, $output );
+        update_option( 'csdt_adhoc_scans', array_slice( $history, 0, 20 ), false );
+
+        set_transient( 'csdt_adhoc_scan_status', [ 'status' => 'complete', 'completed_at' => time() ], 900 );
+    }
+
+    public static function ajax_adhoc_delete(): void {
+        check_ajax_referer( CloudScale_DevTools::SECURITY_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+            return;
+        }
+        $idx     = isset( $_POST['idx'] ) ? (int) sanitize_key( $_POST['idx'] ) : -1;
+        $history = get_option( 'csdt_adhoc_scans', [] );
+        if ( is_array( $history ) && $idx >= 0 && isset( $history[ $idx ] ) ) {
+            array_splice( $history, $idx, 1 );
+            update_option( 'csdt_adhoc_scans', $history, false );
+        }
+        wp_send_json_success( [ 'deleted' => true ] );
+    }
 
 }

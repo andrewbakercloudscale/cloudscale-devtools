@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.685
+ * Version: 1.9.704
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.685';
+    const VERSION      = '1.9.704';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -397,6 +397,8 @@ class CloudScale_DevTools {
 
         add_action( 'wp_ajax_csdt_devtools_vuln_scan',          [ 'CSDT_Vuln_Scan', 'ajax_vuln_scan' ] );
         add_action( 'wp_ajax_csdt_devtools_deep_scan',          [ 'CSDT_Site_Audit', 'ajax_deep_scan' ] );
+        add_action( 'wp_ajax_csdt_devtools_adhoc_scan',         [ 'CSDT_Site_Audit', 'ajax_adhoc_scan' ] );
+        add_action( 'wp_ajax_csdt_devtools_adhoc_delete',       [ 'CSDT_Site_Audit', 'ajax_adhoc_delete' ] );
         add_action( 'wp_ajax_csdt_devtools_scan_status',        [ 'CSDT_Site_Audit', 'ajax_scan_status' ] );
         add_action( 'wp_ajax_csdt_devtools_cancel_scan',        [ 'CSDT_Site_Audit', 'ajax_cancel_scan' ] );
         add_action( 'wp_ajax_csdt_devtools_vuln_save_key',      [ 'CSDT_Vuln_Scan', 'ajax_vuln_save_key' ] );
@@ -1432,6 +1434,8 @@ class CloudScale_DevTools {
                 'savedPrompt'    => $saved_prompt,
                 'defaultPrompt'  => CSDT_Site_Audit::default_security_prompt(),
                 'scanHistory'    => get_option( 'csdt_scan_history', [] ),
+                'homeUrl'        => home_url( '/' ),
+                'adhocHistory'   => get_option( 'csdt_adhoc_scans', [] ),
             ] );
             wp_enqueue_script(
                 'csdt-sec-headers',
@@ -5147,6 +5151,16 @@ class CloudScale_DevTools {
                     <span class="cs-header-hint"><?php esc_html_e( 'AI-powered WordPress security scanning — standard or deep dive', 'cloudscale-devtools' ); ?></span>
                 </div>
                 <div class="cs-panel-body">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+                    <label for="cs-audit-target-url" style="font-size:12px;font-weight:600;color:#14532d;white-space:nowrap;">
+                        🎯 <?php esc_html_e( 'Target site:', 'cloudscale-devtools' ); ?>
+                    </label>
+                    <input type="url" id="cs-audit-target-url"
+                           value="<?php echo esc_attr( home_url( '/' ) ); ?>"
+                           placeholder="https://example.com/"
+                           style="flex:1;min-width:200px;max-width:420px;font-size:13px;padding:5px 10px;border:1px solid #86efac;border-radius:6px;color:#0f172a;background:#fff;" />
+                    <span id="cs-audit-url-status" style="font-size:12px;font-weight:600;color:#15803d;">&#x2714; <?php esc_html_e( 'This site', 'cloudscale-devtools' ); ?></span>
+                </div>
                 <div class="cs-scan-row">
                     <div class="cs-scan-col">
                         <div class="cs-scan-col-header">
@@ -5287,6 +5301,63 @@ class CloudScale_DevTools {
                 <?php endif; ?>
                 </div><!-- /cs-panel-body scan-history -->
                 </div><!-- /cs-panel-scan-history -->
+
+                <?php $adhoc_history = get_option( 'csdt_adhoc_scans', [] ); ?>
+                <div class="cs-panel" id="cs-panel-adhoc-audits">
+                <div class="cs-section-header" style="background:linear-gradient(90deg,#0c1a2e 0%,#1e3a5f 100%);border-left:3px solid #60a5fa;">
+                    <span>🌐 <?php esc_html_e( 'Adhoc Cyber Audits', 'cloudscale-devtools' ); ?></span>
+                    <span class="cs-header-hint"><?php esc_html_e( 'External site scans — results saved here', 'cloudscale-devtools' ); ?></span>
+                </div>
+                <div class="cs-panel-body">
+                    <div id="cs-adhoc-scan-area" style="display:none;margin-bottom:16px;">
+                        <span id="cs-adhoc-scan-target" style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px;"></span>
+                        <span id="cs-adhoc-scan-status" class="cs-vuln-inline-msg"></span>
+                        <div id="cs-adhoc-progress" class="cs-scan-progress" style="margin-top:6px;">
+                            <div class="cs-scan-progress-fill"></div>
+                        </div>
+                    </div>
+                    <div id="cs-adhoc-list">
+                    <?php if ( empty( $adhoc_history ) ) : ?>
+                        <div id="cs-adhoc-empty" style="text-align:center;padding:28px 20px;background:#f8fafc;border:2px dashed #e2e8f0;border-radius:8px;">
+                            <div style="font-size:2rem;margin-bottom:8px;">🌐</div>
+                            <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:5px;"><?php esc_html_e( 'No adhoc scans yet', 'cloudscale-devtools' ); ?></div>
+                            <div style="font-size:13px;color:#6b7280;max-width:380px;margin:0 auto;"><?php esc_html_e( 'Enter a different site URL above, then run an AI Deep Dive Cyber Audit.', 'cloudscale-devtools' ); ?></div>
+                        </div>
+                    <?php else : ?>
+                        <?php foreach ( $adhoc_history as $aidx => $ae ) :
+                            $as = (int) ( $ae['report']['score'] ?? 0 );
+                            $al = esc_html( $ae['report']['score_label'] ?? '' );
+                            $ad = $ae['scanned_at'] ? wp_date( 'D j M Y, g:ia', $ae['scanned_at'] ) : '';
+                            $ac = $as >= 90 ? '#22c55e' : ( $as >= 75 ? '#4ade80' : ( $as >= 55 ? '#fbbf24' : ( $as >= 35 ? '#f97316' : '#ef4444' ) ) );
+                        ?>
+                        <div data-adhoc-idx="<?php echo esc_attr( $aidx ); ?>" class="cs-adhoc-entry" style="background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:6px;overflow:hidden;">
+                            <div class="cs-adhoc-entry-header" style="display:flex;align-items:flex-start;gap:14px;padding:10px 12px;">
+                                <div style="flex-shrink:0;text-align:center;min-width:48px;">
+                                    <div style="font-size:1.4rem;font-weight:700;color:<?php echo esc_attr( $ac ); ?>;line-height:1;"><?php echo esc_html( $as ); ?></div>
+                                    <div style="font-size:10px;color:<?php echo esc_attr( $ac ); ?>;opacity:.8;"><?php echo esc_html( $al ); ?></div>
+                                </div>
+                                <div style="flex:1;min-width:0;">
+                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">
+                                        <a href="<?php echo esc_url( $ae['target_url'] ?? '' ); ?>" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:#2563eb;text-decoration:none;word-break:break-all;"><?php echo esc_html( $ae['target_url'] ?? '' ); ?></a>
+                                        <span style="font-size:11px;color:#64748b;"><?php echo esc_html( $ad ); ?></span>
+                                        <button type="button" class="cs-adhoc-delete-btn"
+                                                data-idx="<?php echo esc_attr( $aidx ); ?>"
+                                                style="font-size:11px;font-weight:600;color:#ef4444;background:none;border:1px solid #fca5a5;border-radius:4px;padding:1px 8px;cursor:pointer;line-height:1.5;flex-shrink:0;">
+                                            &#x2715;
+                                        </button>
+                                    </div>
+                                    <div style="font-size:12px;color:#374151;line-height:1.5;">
+                                        <?php echo esc_html( $ae['report']['summary'] ?? '' ); ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cs-adhoc-report-body" style="padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;"></div>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    </div>
+                </div>
+                </div><!-- /cs-panel-adhoc-audits -->
         <?php
     }
 

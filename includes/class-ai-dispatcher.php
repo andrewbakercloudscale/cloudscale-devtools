@@ -283,6 +283,7 @@ class CSDT_AI_Dispatcher {
         $key = get_option( 'csdt_devtools_openai_key', '' );
         if ( ! $key ) { throw new \RuntimeException( 'No OpenAI API key configured.' ); }
 
+
         $resp = wp_remote_post( 'https://api.openai.com/v1/images/generations', [
             'timeout' => 90,
             'headers' => [
